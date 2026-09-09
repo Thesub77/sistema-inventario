@@ -1,11 +1,11 @@
 {{-- 
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Formulario Modal de Categoría
+    DOCUMENTACIÓN DE VISTA: Formulario Modal de Categoría (Vista )
     Archivo: resources/views/categorias/form.blade.php
     Propósito: Permite la creación y edición de categorías de productos de forma modular.
     Controlador asociado: App\Http\Controllers\CategoriaController
     Modelo: App\Models\Categoria
-    Integración: Incluido en welcome.blade.php mediante @include('categorias.form')
+    Integración: Incluido en welcome.blade.php mediante @include('categorias.form') 
     =============================================================================
 --}}
 

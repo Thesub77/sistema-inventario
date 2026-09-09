@@ -1438,7 +1438,7 @@
                 },
 
                 // =========================================================================
-                // FUNCIÓN: refreshAll()
+                // FUNCIÓN: refreshAll() [ACTUALIZADO]
                 // [CAMBIO]: Se implementó la utilidad safeFetch() con cabecera Accept: application/json.
                 // Evita que un error 404/500 en una tabla secundaria rompa la carga de los demás módulos.
                 // =========================================================================
