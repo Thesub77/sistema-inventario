@@ -1448,7 +1448,7 @@
                     }
                 },
 
-                // --- POS Cart Operations ---
+                // --- POS Cart Operations -------
                 addToCart(product) {
                     if (product.existencia_bodega <= 0) {
                         Swal.fire({
