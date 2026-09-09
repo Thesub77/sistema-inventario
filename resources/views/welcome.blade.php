@@ -626,6 +626,14 @@
 
                 <!-- 5. TAB: CATEGORÍAS -->
                 <div x-show="currentTab === 'categorias'" x-cloak class="space-y-5">
+                    {{-- 
+                        [CAMBIO ARQUITECTURA MVC]: 
+                        El formulario modal fue extraído a 'resources/views/categorias/form.blade.php'.
+                        Se incluye aquí para mantener la modularidad sin romper la reactividad de Alpine.js.
+                    --}}
+                    @include('categorias.form')
+
+                    {{-- Barra superior: Título y botón para abrir el modal de creación --}}
                     <div class="flex items-center justify-between glass-panel p-4 rounded-2xl">
                         <h3 class="text-sm font-semibold text-slate-300">Gestión de Categorías de Productos</h3>
                         <button @click="openCategoryModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all">
@@ -634,7 +642,8 @@
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {{-- [CAMBIO]: Grid que itera y muestra las tarjetas solo cuando existen categorías registradas --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" x-show="categorias.length > 0">
                         <template x-for="cat in categorias" :key="cat.categoria_id">
                             <div class="glass-panel p-5 rounded-2xl flex flex-col justify-between hover:border-brand-500/40 transition-all">
                                 <div>
@@ -652,16 +661,31 @@
                                     <span class="text-xs text-slate-400 font-medium" 
                                           x-text="(productos.filter(p => p.id_categoria == cat.categoria_id).length) + ' productos'"></span>
                                     <div class="flex items-center gap-1">
-                                        <button @click="openCategoryModal(cat)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg">
+                                        {{-- Botón para editar: pasa el objeto categoría a openCategoryModal --}}
+                                        <button @click="openCategoryModal(cat)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors">
                                             <i data-lucide="edit-3" class="w-4 h-4"></i>
                                         </button>
-                                        <button @click="deleteCategory(cat)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg">
+                                        {{-- Botón para eliminar: llama a deleteCategory con confirmación SweetAlert --}}
+                                        <button @click="deleteCategory(cat)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </template>
+                    </div>
+
+                    {{-- [CAMBIO]: Estado vacío amigable cuando la base de datos no tiene categorías registradas --}}
+                    <div x-show="categorias.length === 0" x-cloak class="glass-panel p-10 text-center rounded-2xl border border-slate-800">
+                        <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-400 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="tags" class="w-6 h-6"></i>
+                        </div>
+                        <h4 class="text-white font-bold text-base">No hay categorías registradas</h4>
+                        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Comienza agregando tu primera categoría para organizar los productos.</p>
+                        <button @click="openCategoryModal()" class="mt-4 inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Crear Primera Categoría</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1051,7 +1075,9 @@
         </div>
     </div>
 
-    <!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
+    <!-- MODAL: CATEGORÍA (CREAR / EDITAR) - MOVIDO DENTRO DE TAB: CATEGORÍAS -->
+
+    <!--
     <div x-show="showCategoryModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
         <div @click.away="showCategoryModal = false" class="bg-dark-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1085,6 +1111,7 @@
             </form>
         </div>
     </div>
+    -->
 
     <!-- MODAL: CLIENTE (CREAR / EDITAR) -->
     <div x-show="showCustomerModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -1410,38 +1437,54 @@
                     });
                 },
 
+                // =========================================================================
+                // FUNCIÓN: refreshAll()
+                // [CAMBIO]: Se implementó la utilidad safeFetch() con cabecera Accept: application/json.
+                // Evita que un error 404/500 en una tabla secundaria rompa la carga de los demás módulos.
+                // =========================================================================
                 async refreshAll() {
                     this.loading = true;
                     try {
+                        const safeFetch = async (url) => {
+                            try {
+                                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                                if (!res.ok) return [];
+                                return await res.json();
+                            } catch (e) {
+                                console.warn(`Error cargando ${url}:`, e);
+                                return [];
+                            }
+                        };
+
                         const [prodRes, catRes, cliRes, usrRes, rolRes, venRes, cajRes, movCajRes, movInvRes, bitRes] = await Promise.all([
-                            fetch('/api/productos').then(r => r.json()),
-                            fetch('/api/categorias').then(r => r.json()),
-                            fetch('/api/clientes').then(r => r.json()),
-                            fetch('/api/usuarios').then(r => r.json()),
-                            fetch('/api/roles').then(r => r.json()),
-                            fetch('/api/ventas').then(r => r.json()),
-                            fetch('/api/cajas').then(r => r.json()),
-                            fetch('/api/caja-movimientos-venta').then(r => r.json()),
-                            fetch('/api/movimientos-inventario').then(r => r.json()),
-                            fetch('/api/bitacoras').then(r => r.json())
+                            safeFetch('/api/productos'),
+                            safeFetch('/api/categorias'),
+                            safeFetch('/api/clientes'),
+                            safeFetch('/api/usuarios'),
+                            safeFetch('/api/roles'),
+                            safeFetch('/api/ventas'),
+                            safeFetch('/api/cajas'),
+                            safeFetch('/api/caja-movimientos-venta'),
+                            safeFetch('/api/movimientos-inventario'),
+                            safeFetch('/api/bitacoras')
                         ]);
 
-                        this.productos = prodRes;
-                        this.categorias = catRes;
-                        this.clientes = cliRes;
-                        this.usuarios = usrRes;
-                        this.roles = rolRes;
-                        this.ventas = venRes;
-                        this.cajas = cajRes;
-                        this.cajaMovimientos = movCajRes;
-                        this.movimientosInventario = movInvRes;
-                        this.bitacoras = bitRes;
+                        this.productos = Array.isArray(prodRes) ? prodRes : [];
+                        this.categorias = Array.isArray(catRes) ? catRes : [];
+                        this.clientes = Array.isArray(cliRes) ? cliRes : [];
+                        this.usuarios = Array.isArray(usrRes) ? usrRes : [];
+                        this.roles = Array.isArray(rolRes) ? rolRes : [];
+                        this.ventas = Array.isArray(venRes) ? venRes : [];
+                        this.cajas = Array.isArray(cajRes) ? cajRes : [];
+                        this.cajaMovimientos = Array.isArray(movCajRes) ? movCajRes : [];
+                        this.movimientosInventario = Array.isArray(movInvRes) ? movInvRes : [];
+                        this.bitacoras = Array.isArray(bitRes) ? bitRes : [];
 
                         if (this.clientes.length > 0 && !this.posSale.id_cliente) {
                             this.posSale.id_cliente = this.clientes[0].cliente_id;
                         }
                     } catch (error) {
-                        console.error('Error cargando datos:', error);
+                        console.error('Error general cargando datos:', error);
                     } finally {
                         this.loading = false;
                         this.$nextTick(() => lucide.createIcons());
@@ -1728,7 +1771,14 @@
                     }
                 },
 
-                // --- Category CRUD ---
+                // =========================================================================
+                // OPERACIONES CRUD: CATEGORÍAS
+                // =========================================================================
+
+                /**
+                 * Abre el modal de Categoría inicializando los datos.
+                 * @param {Object|null} cat - Si se pasa un objeto, se entra en modo edición; de lo contrario, se inicializa para creación.
+                 */
                 openCategoryModal(cat = null) {
                     if (cat) {
                         this.isEditingCategory = true;
@@ -1746,23 +1796,57 @@
                     this.showCategoryModal = true;
                 },
 
+                /**
+                 * Envía la petición POST (crear) o PUT (actualizar) hacia el endpoint /api/categorias.
+                 * [CAMBIO]: Incluye cabecera 'Accept': 'application/json' y captura detallada de errores
+                 * de validación devueltos por el backend (Laravel / PostgreSQL).
+                 */
                 async saveCategory() {
                     const url = this.isEditingCategory 
                         ? `/api/categorias/${this.categoryForm.categoria_id}` 
                         : '/api/categorias';
                     const method = this.isEditingCategory ? 'PUT' : 'POST';
 
-                    await fetch(url, {
-                        method,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.categoryForm)
-                    });
+                    try {
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify(this.categoryForm)
+                        });
 
-                    this.showCategoryModal = false;
-                    this.refreshAll();
-                    Swal.fire({ icon: 'success', title: 'Categoría guardada', background: '#1e293b', color: '#fff' });
+                        // Validación de respuesta HTTP
+                        if (!res.ok) {
+                            const errData = await res.json().catch(() => ({}));
+                            let errorMsg = errData.message || 'Error al procesar la categoría';
+                            if (errData.errors) {
+                                errorMsg = Object.values(errData.errors).flat().join('<br>');
+                            }
+                            throw new Error(errorMsg);
+                        }
+
+                        // Cierre de modal y actualización del listado
+                        this.showCategoryModal = false;
+                        await this.refreshAll();
+                        Swal.fire({ icon: 'success', title: '¡Categoría guardada con éxito!', background: '#1e293b', color: '#fff' });
+                    } catch (error) {
+                        // Muestra alerta con el error exacto (ej. driver faltante, validación, etc.)
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Error al guardar', 
+                            html: error.message, 
+                            background: '#1e293b', 
+                            color: '#fff' 
+                        });
+                    }
                 },
 
+                /**
+                 * Elimina una categoría mediante DELETE /api/categorias/{id}.
+                 * [CAMBIO]: Solicita confirmación previa y captura posibles errores de integridad referencial.
+                 */
                 async deleteCategory(cat) {
                     const result = await Swal.fire({
                         title: '¿Eliminar categoría?',
@@ -1770,13 +1854,24 @@
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#e11d48',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonText: 'Sí, eliminar',
                         background: '#1e293b',
                         color: '#fff'
                     });
 
                     if (result.isConfirmed) {
-                        await fetch(`/api/categorias/${cat.categoria_id}`, { method: 'DELETE' });
-                        this.refreshAll();
+                        try {
+                            const res = await fetch(`/api/categorias/${cat.categoria_id}`, { 
+                                method: 'DELETE',
+                                headers: { 'Accept': 'application/json' }
+                            });
+                            if (!res.ok) throw new Error('No se pudo eliminar la categoría');
+                            await this.refreshAll();
+                            Swal.fire({ icon: 'success', title: 'Eliminado', background: '#1e293b', color: '#fff' });
+                        } catch (error) {
+                            Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#1e293b', color: '#fff' });
+                        }
                     }
                 },
 
