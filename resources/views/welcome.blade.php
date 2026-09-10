@@ -480,7 +480,7 @@
                             <!-- Customer Selector -->
                             <div>
                                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Cliente</label>
-                                <select x-model="posSale.id_cliente" class="w-full bg-dark-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                                <select x-model.number="posSale.id_cliente" class="w-full bg-dark-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
                                     <template x-for="c in clientes" :key="c.cliente_id">
                                         <option :value="c.cliente_id" x-text="c.nombre_apellido_cliente + ' (' + (c.codigo_cliente || 'Sin código') + ')'"></option>
                                     </template>
@@ -626,6 +626,9 @@
 
                 <!-- 5. TAB: CATEGORÍAS -->
                 <div x-show="currentTab === 'categorias'" x-cloak class="space-y-5">
+                    {{-- Formulario modal modularizado de categorías --}}
+                    @include('categorias.form')
+
                     <div class="flex items-center justify-between glass-panel p-4 rounded-2xl">
                         <h3 class="text-sm font-semibold text-slate-300">Gestión de Categorías de Productos</h3>
                         <button @click="openCategoryModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all">
@@ -1051,7 +1054,8 @@
         </div>
     </div>
 
-    <!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
+    {{-- MODAL: CATEGORÍA (CREAR / EDITAR) - MOVIDO A resources/views/categorias/form.blade.php --}}
+    {{--
     <div x-show="showCategoryModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
         <div @click.away="showCategoryModal = false" class="bg-dark-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1085,6 +1089,7 @@
             </form>
         </div>
     </div>
+    --}}
 
     <!-- MODAL: CLIENTE (CREAR / EDITAR) -->
     <div x-show="showCustomerModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -1251,7 +1256,7 @@
                 // POS State
                 cart: [],
                 posSale: {
-                    id_cliente: 1,
+                    id_cliente: null,
                     metodo_pago: 'Efectivo',
                     descuento_venta: 0,
                 },
@@ -1283,6 +1288,7 @@
 
                 showCategoryModal: false,
                 isEditingCategory: false,
+                isSavingCategory: false,
                 categoryForm: {
                     categoria_id: null,
                     codigo_categoria: '',
@@ -1437,8 +1443,10 @@
                         this.movimientosInventario = movInvRes;
                         this.bitacoras = bitRes;
 
-                        if (this.clientes.length > 0 && !this.posSale.id_cliente) {
-                            this.posSale.id_cliente = this.clientes[0].cliente_id;
+                        if (this.clientes.length > 0) {
+                            if (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente)) {
+                                this.posSale.id_cliente = this.clientes[0].cliente_id;
+                            }
                         }
                     } catch (error) {
                         console.error('Error cargando datos:', error);
@@ -1528,7 +1536,7 @@
                     const codeNum = String(this.ventas.length + 1).padStart(4, '0');
                     const salePayload = {
                         id_usuario: this.usuarios[0] ? this.usuarios[0].usuario_id : 1,
-                        id_cliente: this.posSale.id_cliente,
+                        id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
                         codigo_venta: `FAC-2026-${codeNum}`,
                         metodo_pago: this.posSale.metodo_pago,
                         fecha_hora_venta: new Date().toISOString().slice(0, 19).replace('T', ' '),
@@ -1747,20 +1755,48 @@
                 },
 
                 async saveCategory() {
+                    // Evita envíos duplicados si ya hay una petición en curso (doble clic o red lenta)
+                    if (this.isSavingCategory) return;
+                    this.isSavingCategory = true;
+
                     const url = this.isEditingCategory 
                         ? `/api/categorias/${this.categoryForm.categoria_id}` 
                         : '/api/categorias';
                     const method = this.isEditingCategory ? 'PUT' : 'POST';
 
-                    await fetch(url, {
-                        method,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.categoryForm)
-                    });
+                    try {
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify(this.categoryForm)
+                        });
 
-                    this.showCategoryModal = false;
-                    this.refreshAll();
-                    Swal.fire({ icon: 'success', title: 'Categoría guardada', background: '#1e293b', color: '#fff' });
+                        if (!res.ok) {
+                            const errData = await res.json().catch(() => ({}));
+                            let errorMsg = errData.message || 'Error al procesar la categoría';
+                            if (errData.errors) {
+                                errorMsg = Object.values(errData.errors).flat().join('<br>');
+                            }
+                            throw new Error(errorMsg);
+                        }
+
+                        this.showCategoryModal = false;
+                        await this.refreshAll();
+                        Swal.fire({ icon: 'success', title: '¡Categoría guardada!', background: '#1e293b', color: '#fff' });
+                    } catch (error) {
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Error al guardar', 
+                            html: error.message, 
+                            background: '#1e293b', 
+                            color: '#fff' 
+                        });
+                    } finally {
+                        this.isSavingCategory = false;
+                    }
                 },
 
                 async deleteCategory(cat) {
