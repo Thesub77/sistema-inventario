@@ -154,52 +154,66 @@ export function app() {
             return Math.max(0, total);
         },
 
-        // App Initialization & Data Fetching
-        initApp() {
-            this.refreshAll();
-            this.$watch('currentTab', () => {
-                this.$nextTick(() => {
-                    if (window.lucide) {
-                        window.lucide.createIcons();
-                    }
-                });
-            });
-        },
+        // --- Lazy Loading de Pestañas ---
+        loadedTabs: [],
 
-        async refreshAll() {
+        async loadTab(tab, force = false) {
+            if (!force && this.loadedTabs.includes(tab)) {
+                return;
+            }
+
             this.loading = true;
             try {
-                const [prodRes, catRes, cliRes, usrRes, rolRes, venRes, cajRes, movCajRes, movInvRes, bitRes] = await Promise.all([
-                    fetch('/api/productos').then(r => r.json()),
-                    fetch('/api/categorias').then(r => r.json()),
-                    fetch('/api/clientes').then(r => r.json()),
-                    fetch('/api/usuarios').then(r => r.json()),
-                    fetch('/api/roles').then(r => r.json()),
-                    fetch('/api/ventas').then(r => r.json()),
-                    fetch('/api/cajas').then(r => r.json()),
-                    fetch('/api/caja-movimientos-venta').then(r => r.json()),
-                    fetch('/api/movimientos-inventario').then(r => r.json()),
-                    fetch('/api/bitacoras').then(r => r.json())
-                ]);
+                switch (tab) {
+                    case 'dashboard':
+                        await Promise.all([
+                            this.fetchProductos(),
+                            this.fetchVentas(),
+                            this.fetchBitacoras()
+                        ]);
+                        break;
+                    case 'pos':
+                        await Promise.all([
+                            this.fetchProductos(),
+                            this.fetchCategorias(),
+                            this.fetchClientes()
+                        ]);
+                        break;
+                    case 'productos':
+                        await Promise.all([
+                            this.fetchProductos(),
+                            this.fetchCategorias()
+                        ]);
+                        break;
+                    case 'categorias':
+                        await this.fetchCategorias();
+                        break;
+                    case 'ventas':
+                    case 'caja':
+                        await this.fetchVentas();
+                        break;
+                    case 'clientes':
+                        await this.fetchClientes();
+                        break;
+                    case 'inventario':
+                        await Promise.all([
+                            this.fetchInventario(),
+                            this.fetchProductos()
+                        ]);
+                        break;
+                    case 'usuarios':
+                        await this.fetchUsuarios();
+                        break;
+                    case 'bitacora':
+                        await this.fetchBitacoras();
+                        break;
+                }
 
-                this.productos = prodRes;
-                this.categorias = catRes;
-                this.clientes = cliRes;
-                this.usuarios = usrRes;
-                this.roles = rolRes;
-                this.ventas = venRes;
-                this.cajas = cajRes;
-                this.cajaMovimientos = movCajRes;
-                this.movimientosInventario = movInvRes;
-                this.bitacoras = bitRes;
-
-                if (this.clientes.length > 0) {
-                    if (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente)) {
-                        this.posSale.id_cliente = this.clientes[0].cliente_id;
-                    }
+                if (!this.loadedTabs.includes(tab)) {
+                    this.loadedTabs.push(tab);
                 }
             } catch (error) {
-                console.error('Error cargando datos:', error);
+                console.error(`Error cargando la pestaña ${tab}:`, error);
             } finally {
                 this.loading = false;
                 this.$nextTick(() => {
@@ -208,6 +222,104 @@ export function app() {
                     }
                 });
             }
+        },
+
+        refreshCurrentTab() {
+            return this.loadTab(this.currentTab, true);
+        },
+
+        // App Initialization
+        initApp() {
+            // Cargar únicamente la pestaña activa inicial (Dashboard)
+            this.loadTab(this.currentTab);
+
+            // Observar cambios de pestaña para cargar datos bajo demanda
+            this.$watch('currentTab', (newTab) => {
+                this.loadTab(newTab);
+                this.$nextTick(() => {
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                });
+            });
+        },
+
+        // --- Data Fetching Específico y Optimizado ---
+        async fetchProductos() {
+            try {
+                this.productos = await fetch('/api/productos').then(r => r.json());
+            } catch (e) {
+                console.error('Error cargando productos:', e);
+            }
+        },
+
+        async fetchCategorias() {
+            try {
+                this.categorias = await fetch('/api/categorias').then(r => r.json());
+            } catch (e) {
+                console.error('Error cargando categorías:', e);
+            }
+        },
+
+        async fetchClientes() {
+            try {
+                this.clientes = await fetch('/api/clientes').then(r => r.json());
+                if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
+                    this.posSale.id_cliente = this.clientes[0].cliente_id;
+                }
+            } catch (e) {
+                console.error('Error cargando clientes:', e);
+            }
+        },
+
+        async fetchUsuarios() {
+            try {
+                const [usrRes, rolRes] = await Promise.all([
+                    fetch('/api/usuarios').then(r => r.json()),
+                    fetch('/api/roles').then(r => r.json())
+                ]);
+                this.usuarios = usrRes;
+                this.roles = rolRes;
+            } catch (e) {
+                console.error('Error cargando usuarios:', e);
+            }
+        },
+
+        async fetchVentas() {
+            try {
+                const [venRes, cajRes, movCajRes] = await Promise.all([
+                    fetch('/api/ventas').then(r => r.json()),
+                    fetch('/api/cajas').then(r => r.json()),
+                    fetch('/api/caja-movimientos-venta').then(r => r.json())
+                ]);
+                this.ventas = venRes;
+                this.cajas = cajRes;
+                this.cajaMovimientos = movCajRes;
+            } catch (e) {
+                console.error('Error cargando ventas y cajas:', e);
+            }
+        },
+
+        async fetchInventario() {
+            try {
+                this.movimientosInventario = await fetch('/api/movimientos-inventario').then(r => r.json());
+            } catch (e) {
+                console.error('Error cargando movimientos de inventario:', e);
+            }
+        },
+
+        async fetchBitacoras() {
+            try {
+                this.bitacoras = await fetch('/api/bitacoras').then(r => r.json());
+            } catch (e) {
+                console.error('Error cargando bitácora:', e);
+            }
+        },
+
+        // Recarga completa bajo demanda si el usuario la solicita
+        async refreshAll() {
+            this.loadedTabs = [];
+            await this.loadTab(this.currentTab, true);
         },
 
         // Modulos desacoplados

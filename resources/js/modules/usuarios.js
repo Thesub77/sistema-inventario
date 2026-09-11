@@ -59,15 +59,14 @@ export function usuariosModule() {
                 });
 
                 if (!res.ok) throw new Error('Error al guardar el usuario');
-
                 this.showUserModal = false;
-                this.refreshAll();
                 Swal.fire({
                     icon: 'success',
                     title: 'Usuario guardado',
                     background: '#1e293b',
                     color: '#fff'
                 });
+                await this.fetchUsuarios();
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -94,7 +93,7 @@ export function usuariosModule() {
                 await fetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'DELETE'
                 });
-                this.refreshAll();
+                await this.fetchUsuarios();
             }
         }
     };

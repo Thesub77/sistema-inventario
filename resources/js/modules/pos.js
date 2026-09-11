@@ -135,8 +135,20 @@ export function posModule() {
                     confirmButtonColor: '#4f46e5'
                 });
 
+                // Descontar existencias localmente para respuesta visual instantánea (0ms)
+                salePayload.detalles.forEach(d => {
+                    const p = this.productos.find(prod => prod.producto_id === d.id_producto);
+                    if (p) p.existencia_bodega = Math.max(0, p.existencia_bodega - d.cantidad);
+                });
+
                 this.clearCart();
-                this.refreshAll();
+
+                // Sincronizar en segundo plano solo ventas, inventario y bitácora
+                await Promise.all([
+                    this.fetchVentas(),
+                    this.fetchInventario(),
+                    this.fetchBitacoras()
+                ]);
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -173,7 +185,12 @@ export function posModule() {
                 await fetch(`/api/ventas/${sale.venta_id}`, {
                     method: 'DELETE'
                 });
-                this.refreshAll();
+                await Promise.all([
+                    this.fetchVentas(),
+                    this.fetchProductos(),
+                    this.fetchInventario(),
+                    this.fetchBitacoras()
+                ]);
                 Swal.fire({
                     title: 'Venta anulada',
                     icon: 'success',

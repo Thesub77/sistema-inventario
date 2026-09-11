@@ -61,13 +61,13 @@ export function categoriasModule() {
                 }
 
                 this.showCategoryModal = false;
-                await this.refreshAll();
                 Swal.fire({
                     icon: 'success',
                     title: '¡Categoría guardada!',
                     background: '#1e293b',
                     color: '#fff'
                 });
+                await this.fetchCategorias();
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -96,7 +96,7 @@ export function categoriasModule() {
                 await fetch(`/api/categorias/${cat.categoria_id}`, {
                     method: 'DELETE'
                 });
-                this.refreshAll();
+                await this.fetchCategorias();
             }
         }
     };

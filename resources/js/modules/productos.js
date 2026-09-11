@@ -70,15 +70,14 @@ export function productosModule() {
                 });
 
                 if (!res.ok) throw new Error('Error al guardar el producto');
-
                 this.showProductModal = false;
-                this.refreshAll();
                 Swal.fire({
                     icon: 'success',
                     title: '¡Producto Guardado!',
                     background: '#1e293b',
                     color: '#fff'
                 });
+                await this.fetchProductos();
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -107,13 +106,13 @@ export function productosModule() {
                 await fetch(`/api/productos/${product.producto_id}`, {
                     method: 'DELETE'
                 });
-                this.refreshAll();
                 Swal.fire({
                     title: 'Eliminado',
                     icon: 'success',
                     background: '#1e293b',
                     color: '#fff'
                 });
+                await this.fetchProductos();
             }
         },
 
@@ -164,8 +163,15 @@ export function productosModule() {
                     })
                 });
 
+                // Actualizar stock localmente de inmediato
+                const prod = this.productos.find(p => p.producto_id === this.stockForm.producto_id);
+                if (prod) prod.existencia_bodega = newStock;
+
                 this.showStockModal = false;
-                this.refreshAll();
+                await Promise.all([
+                    this.fetchInventario(),
+                    this.fetchBitacoras()
+                ]);
                 Swal.fire({
                     icon: 'success',
                     title: 'Inventario Actualizado',

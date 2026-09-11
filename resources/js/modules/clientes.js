@@ -49,15 +49,14 @@ export function clientesModule() {
                 });
 
                 if (!res.ok) throw new Error('Error al guardar el cliente');
-
                 this.showCustomerModal = false;
-                this.refreshAll();
                 Swal.fire({
                     icon: 'success',
                     title: 'Cliente guardado',
                     background: '#1e293b',
                     color: '#fff'
                 });
+                await this.fetchClientes();
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -84,7 +83,7 @@ export function clientesModule() {
                 await fetch(`/api/clientes/${c.cliente_id}`, {
                     method: 'DELETE'
                 });
-                this.refreshAll();
+                await this.fetchClientes();
             }
         }
     };
