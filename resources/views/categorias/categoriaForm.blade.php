@@ -1,11 +1,11 @@
 {{-- 
     =============================================================================
     DOCUMENTACIÓN DE VISTA: Formulario Modal de Categoría
-    Archivo: resources/views/categorias/form.blade.php
+    Archivo: resources/views/categorias/categoriaForm.blade.php
     Propósito: Permite la creación y edición de categorías de productos de forma modular.
     Controlador asociado: App\Http\Controllers\CategoriaController
     Modelo: App\Models\Categoria
-    Integración: Incluido en welcome.blade.php mediante @include('categorias.form') 
+    Integración: Incluido en welcome.blade.php mediante @include('categorias.categoriaForm') 
     =============================================================================
 --}}
 
@@ -66,20 +66,13 @@
                 </select>
             </div>
 
-            {{-- Botones de Acción del Formulario (con bloqueo anti-doble clic) --}}
+            {{-- Botones de Acción del Formulario --}}
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
-                <button type="button" 
-                        @click="showCategoryModal = false" 
-                        :disabled="isSavingCategory"
-                        class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors disabled:opacity-50">
+                <button type="button" @click="showCategoryModal = false" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
                     Cancelar
                 </button>
-                <button type="submit" 
-                        :disabled="isSavingCategory"
-                        :class="isSavingCategory ? 'opacity-60 cursor-not-allowed' : ''"
-                        class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl transition-all inline-flex items-center gap-2">
-                    <span x-show="isSavingCategory" class="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" x-cloak></span>
-                    <span x-text="isSavingCategory ? 'Guardando...' : 'Guardar'"></span>
+                <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl transition-all">
+                    Guardar
                 </button>
             </div>
         </form>
