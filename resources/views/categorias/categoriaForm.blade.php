@@ -10,6 +10,7 @@
 --}}
 
 <!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
+<!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
 <div x-show="showCategoryModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
     {{-- Contenedor principal del modal con cierre al hacer clic fuera --}}
     <div @click.away="showCategoryModal = false" class="bg-dark-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
@@ -66,13 +67,20 @@
                 </select>
             </div>
 
-            {{-- Botones de Acción del Formulario --}}
+            {{-- Botones de Acción del Formulario (con bloqueo anti-doble clic) --}}
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
-                <button type="button" @click="showCategoryModal = false" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
+                <button type="button" 
+                        @click="showCategoryModal = false" 
+                        :disabled="isSavingCategory"
+                        class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors disabled:opacity-50">
                     Cancelar
                 </button>
-                <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl transition-all">
-                    Guardar
+                <button type="submit" 
+                        :disabled="isSavingCategory"
+                        :class="isSavingCategory ? 'opacity-60 cursor-not-allowed' : ''"
+                        class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl transition-all inline-flex items-center gap-2">
+                    <span x-show="isSavingCategory" class="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" x-cloak></span>
+                    <span x-text="isSavingCategory ? 'Guardando...' : 'Guardar'"></span>
                 </button>
             </div>
         </form>
