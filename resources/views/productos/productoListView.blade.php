@@ -27,6 +27,13 @@
                     <option :value="cat.categoria_id" x-text="cat.nombre_categoria"></option>
                 </template>
             </select>
+
+            <!-- RF-05: Estado Filter -->
+            <select x-model="filterEstado" class="bg-dark-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+                <option value="">Todos los estados</option>
+                <option value="1">Activos</option>
+                <option value="0">Inactivos</option>
+            </select>
         </div>
 
         <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all">
@@ -53,7 +60,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                     <template x-for="p in filteredProducts" :key="p.producto_id">
-                        <tr class="hover:bg-slate-800/40 transition-colors">
+                        <tr class="hover:bg-slate-800/40 transition-colors" :class="p.estado != 1 ? 'opacity-50' : ''">
                             <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-300" x-text="p.codigo_producto"></td>
                             <td class="py-3.5 px-4">
                                 <div class="font-semibold text-slate-100" x-text="p.nombre_producto"></div>
@@ -81,6 +88,27 @@
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    <!-- RF-05: Toggle Estado Button -->
+                                    <button type="button" 
+                                        @click="toggleProductStatus(p)" 
+                                        class="p-1.5 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                                        :class="p.estado == 1 
+                                            ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10' 
+                                            : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'"
+                                        :title="p.estado == 1 ? 'Desactivar Producto' : 'Activar Producto'">
+                                        <!-- Ojo tachado (Desactivar) cuando está activo -->
+                                        <svg x-show="p.estado == 1" class="w-4 h-4 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
+                                            <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
+                                            <path d="M17.479 17.499A10.75 10.75 0 0 1 2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
+                                            <line x1="2" x2="22" y1="2" y2="22"/>
+                                        </svg>
+                                        <!-- Ojo abierto (Activar) cuando está inactivo -->
+                                        <svg x-show="p.estado != 1" class="w-4 h-4 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </button>
                                     <!-- Edit Button -->
                                     <button @click="openProductModal(p)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors" title="Editar Producto">
                                         <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -89,8 +117,8 @@
                                     <button @click="openStockModal(p)" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors" title="Ajustar Inventario">
                                         <i data-lucide="package-plus" class="w-4 h-4"></i>
                                     </button>
-                                    <!-- Delete Button -->
-                                    <button @click="deleteProduct(p)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors" title="Eliminar Producto">
+                                    <!-- Delete (Logical) Button -->
+                                    <button @click="deleteProduct(p)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors" title="Desactivar Producto">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                     </button>
                                 </div>

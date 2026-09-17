@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Producto;
+use App\Models\Bitacora;
 use Illuminate\Http\Request;
 
 class ProductoController extends Controller
@@ -10,6 +11,15 @@ class ProductoController extends Controller
     public function index()
     {
         $productos = Producto::with('categoria')->get();
+        return response()->json($productos);
+    }
+
+    /**
+     * RF-05: Retorna solo productos activos (estado = 1) para el POS.
+     */
+    public function activos()
+    {
+        $productos = Producto::with('categoria')->where('estado', 1)->get();
         return response()->json($productos);
     }
 
@@ -56,10 +66,52 @@ class ProductoController extends Controller
         return response()->json($producto);
     }
 
+    /**
+     * RF-05: Alterna el estado de un producto entre Activo (1) e Inactivo (0).
+     * Registra el cambio en bitácora para auditoría.
+     */
+    public function toggleEstado($id)
+    {
+        $producto = Producto::findOrFail($id);
+        $nuevoEstado = $producto->estado == 1 ? 0 : 1;
+        $producto->update(['estado' => $nuevoEstado]);
+
+        Bitacora::create([
+            'id_usuario' => 1,
+            'accion_bitacora' => 'CAMBIO_ESTADO_PRODUCTO',
+            'descripcion_bitacora' => "Producto \"{$producto->nombre_producto}\" " . ($nuevoEstado ? 'activado' : 'desactivado'),
+            'fecha_hora_bitacora' => now(),
+            'estado' => 1,
+        ]);
+
+        return response()->json([
+            'message' => 'Estado del producto actualizado correctamente',
+            'producto' => $producto->load('categoria'),
+        ]);
+    }
+
+    /**
+     * RF-05: Borrado lógico — desactiva el producto en vez de eliminarlo de la BD.
+     * Preserva el historial de ventas pasadas.
+     */
     public function destroy($id)
     {
         $producto = Producto::findOrFail($id);
-        $producto->delete();
-        return response()->json(['message' => 'Producto eliminado correctamente']);
+
+        if ($producto->estado == 0) {
+            return response()->json(['message' => 'El producto ya se encuentra inactivo'], 422);
+        }
+
+        $producto->update(['estado' => 0]);
+
+        Bitacora::create([
+            'id_usuario' => 1,
+            'accion_bitacora' => 'DESACTIVAR_PRODUCTO',
+            'descripcion_bitacora' => "Producto \"{$producto->nombre_producto}\" desactivado (borrado lógico)",
+            'fecha_hora_bitacora' => now(),
+            'estado' => 1,
+        ]);
+
+        return response()->json(['message' => 'Producto desactivado correctamente']);
     }
 }

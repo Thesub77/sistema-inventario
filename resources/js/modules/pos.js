@@ -15,6 +15,18 @@ export function posModule() {
 
         // POS Cart Operations
         addToCart(product) {
+            // RF-05: Verificar que el producto esté activo
+            if (product.estado != 1) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Producto Inactivo',
+                    text: 'Este producto está desactivado y no puede agregarse a la venta.',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+                return;
+            }
+
             if (product.existencia_bodega <= 0) {
                 Swal.fire({
                     icon: 'warning',

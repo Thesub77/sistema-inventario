@@ -3,6 +3,7 @@ export function productosModule() {
         // Products state & filters
         searchProduct: '',
         filterCategory: '',
+        filterEstado: '', // RF-05: Filtro por estado ('' = todos, 1 = activos, 0 = inactivos)
         showProductModal: false,
         isEditingProduct: false,
         productForm: {
@@ -91,28 +92,94 @@ export function productosModule() {
 
         async deleteProduct(product) {
             const result = await Swal.fire({
-                title: '¿Eliminar producto?',
-                text: `Se eliminará "${product.nombre_producto}" del catálogo.`,
+                title: '¿Desactivar producto?',
+                text: `El producto "${product.nombre_producto}" será desactivado del catálogo. Podrá reactivarse desde la lista de productos.`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
-                confirmButtonText: 'Sí, eliminar',
+                confirmButtonText: 'Sí, desactivar',
                 cancelButtonText: 'Cancelar',
                 background: '#1e293b',
                 color: '#fff'
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/productos/${product.producto_id}`, {
-                    method: 'DELETE'
+                await fetch(`/api/productos/${product.producto_id}/toggle-estado`, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/json' }
                 });
                 Swal.fire({
-                    title: 'Eliminado',
+                    title: 'Producto desactivado',
+                    text: 'El producto ya no será visible en el punto de venta.',
                     icon: 'success',
                     background: '#1e293b',
                     color: '#fff'
                 });
                 await this.fetchProductos();
+            }
+        },
+
+        /**
+         * RF-05: Alterna el estado de un producto entre Activo e Inactivo.
+         */
+        async toggleProductStatus(product) {
+            const isActive = product.estado == 1;
+            const action = isActive ? 'desactivar' : 'activar';
+            const result = await Swal.fire({
+                title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} producto?`,
+                html: isActive
+                    ? `<p class="text-slate-300">El producto "<strong>${product.nombre_producto}</strong>" será <strong>ocultado</strong> del punto de venta.</p>`
+                    : `<p class="text-slate-300">El producto "<strong>${product.nombre_producto}</strong>" volverá a estar <strong>disponible</strong> en ventas.</p>`,
+                icon: isActive ? 'warning' : 'question',
+                showCancelButton: true,
+                confirmButtonColor: isActive ? '#f59e0b' : '#10b981',
+                confirmButtonText: isActive ? 'Sí, desactivar' : 'Sí, activar',
+                cancelButtonText: 'Cancelar',
+                background: '#1e293b',
+                color: '#fff'
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                    const res = await fetch(`/api/productos/${product.producto_id}/toggle-estado`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        }
+                    });
+
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.message || 'Error al cambiar el estado del producto');
+                    }
+
+                    const data = await res.json();
+                    
+                    // Actualizar el estado en el array local de productos de inmediato
+                    product.estado = data.producto ? data.producto.estado : (isActive ? 0 : 1);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: product.estado == 1 ? '¡Producto Activado!' : 'Producto Desactivado',
+                        text: product.estado == 1
+                            ? 'El producto está disponible en el punto de venta.'
+                            : 'El producto ha sido ocultado del punto de venta.',
+                        background: '#1e293b',
+                        color: '#fff'
+                    });
+                    await this.fetchProductos();
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: error.message,
+                        background: '#1e293b',
+                        color: '#fff'
+                    });
+                }
             }
         },
 

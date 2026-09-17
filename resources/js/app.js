@@ -107,21 +107,23 @@ export function app() {
 
         get filteredProducts() {
             return this.productos.filter(p => {
+                const matchesEstado = this.filterEstado === '' || p.estado == this.filterEstado; // RF-05: Filtro por estado
                 const matchesSearch = !this.searchProduct ||
                     p.nombre_producto.toLowerCase().includes(this.searchProduct.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.searchProduct.toLowerCase());
                 const matchesCat = !this.filterCategory || p.id_categoria == this.filterCategory;
-                return matchesSearch && matchesCat;
+                return matchesEstado && matchesSearch && matchesCat;
             });
         },
 
         get posFilteredProducts() {
             return this.productos.filter(p => {
+                const isActive = p.estado == 1; // RF-05: Solo productos activos en POS
                 const matchesSearch = !this.posSearch ||
                     p.nombre_producto.toLowerCase().includes(this.posSearch.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.posSearch.toLowerCase());
                 const matchesCat = !this.posCategoryFilter || p.id_categoria == this.posCategoryFilter;
-                return matchesSearch && matchesCat;
+                return isActive && matchesSearch && matchesCat;
             });
         },
 

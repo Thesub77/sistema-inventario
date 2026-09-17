@@ -41,6 +41,17 @@ class VentaController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
+            // RF-05: Validar que todos los productos estén activos antes de procesar la venta
+            if (!empty($validated['detalles'])) {
+                foreach ($validated['detalles'] as $item) {
+                    $productoCheck = Producto::find($item['id_producto']);
+                    if (!$productoCheck || $productoCheck->estado != 1) {
+                        $nombreProducto = $productoCheck ? $productoCheck->nombre_producto : 'ID: ' . $item['id_producto'];
+                        abort(422, "El producto \"{$nombreProducto}\" está inactivo y no puede incluirse en una venta.");
+                    }
+                }
+            }
+
             $ventaData = [
                 'id_usuario' => $validated['id_usuario'],
                 'id_cliente' => $validated['id_cliente'],
