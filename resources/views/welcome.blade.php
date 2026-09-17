@@ -168,6 +168,9 @@
                 <!-- MODAL: DETALLE DE FACTURA / VENTA -->
                 @include('ventas.ventaForm')
 
+                <!-- PLANTILLA IMPRIMIBLE: COMPROBANTE DE VENTA (RF-21) -->
+                @include('ventas.comprobanteTicket')
+
             </main>
         </div>
     </div>

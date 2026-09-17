@@ -60,6 +60,21 @@
                 <span class="text-slate-400">Total Facturado:</span>
                 <span class="text-emerald-400 font-display text-lg" x-text="formatCurrency(selectedSale?.total_venta || 0)"></span>
             </div>
+
+            <!-- RF-21: Botón de Imprimir Comprobante -->
+            <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+                <button type="button" @click="showSaleDetailModal = false" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl transition-all">
+                    Cerrar
+                </button>
+                <button type="button" @click="printSale(selectedSale)" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg shadow-brand-600/20 flex items-center gap-1.5 transition-all">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                    <span>Imprimir Comprobante</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>

@@ -138,14 +138,6 @@ export function posModule() {
                 }
 
                 const newSale = await res.json();
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta Registrada!',
-                    text: `Factura ${newSale.codigo_venta} emitida por C$ ${newSale.total_venta}`,
-                    background: '#1e293b',
-                    color: '#fff',
-                    confirmButtonColor: '#4f46e5'
-                });
 
                 // Descontar existencias localmente para respuesta visual instantánea (0ms)
                 salePayload.detalles.forEach(d => {
@@ -161,6 +153,24 @@ export function posModule() {
                     this.fetchInventario(),
                     this.fetchBitacoras()
                 ]);
+
+                // RF-21: Mensaje de éxito con opción inmediata de imprimir comprobante
+                const result = await Swal.fire({
+                    icon: 'success',
+                    title: '¡Venta Registrada!',
+                    html: `<p class="text-slate-300">Factura <strong>${newSale.codigo_venta}</strong> emitida con éxito por <strong>${this.formatCurrency(newSale.total_venta)}</strong>.</p><p class="text-xs text-slate-400 mt-2">¿Desea generar e imprimir el comprobante de venta?</p>`,
+                    background: '#1e293b',
+                    color: '#fff',
+                    showCancelButton: true,
+                    confirmButtonColor: '#10b981',
+                    cancelButtonColor: '#475569',
+                    confirmButtonText: '🖨️ Imprimir Comprobante',
+                    cancelButtonText: 'Cerrar'
+                });
+
+                if (result.isConfirmed) {
+                    this.printSale(newSale);
+                }
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -177,6 +187,60 @@ export function posModule() {
         viewSaleDetails(sale) {
             this.selectedSale = sale;
             this.showSaleDetailModal = true;
+        },
+
+        /**
+         * RF-21: Generar e imprimir comprobante de venta (formato ticket / PDF)
+         */
+        printSale(sale) {
+            if (!sale) return;
+
+            // Rellenar cabecera e información del ticket
+            const codElem = document.getElementById('print-codigo-venta');
+            const fechaElem = document.getElementById('print-fecha-venta');
+            const clienteElem = document.getElementById('print-cliente-venta');
+            const usuarioElem = document.getElementById('print-usuario-venta');
+            const metodoElem = document.getElementById('print-metodo-pago');
+            const subtotalElem = document.getElementById('print-subtotal-venta');
+            const descElem = document.getElementById('print-descuento-venta');
+            const totalElem = document.getElementById('print-total-venta');
+            const tbodyElem = document.getElementById('print-items-tbody');
+
+            if (codElem) codElem.textContent = sale.codigo_venta || 'N/A';
+            if (fechaElem) fechaElem.textContent = this.formatDate(sale.fecha_hora_venta);
+            if (clienteElem) clienteElem.textContent = sale.cliente ? sale.cliente.nombre_apellido_cliente : 'Consumidor Final';
+            if (usuarioElem) usuarioElem.textContent = sale.usuario ? sale.usuario.nombre_apellido : 'Cajero / Vendedor';
+            if (metodoElem) metodoElem.textContent = sale.metodo_pago || 'Efectivo';
+            if (subtotalElem) subtotalElem.textContent = this.formatCurrency(sale.subtotal_venta);
+            if (descElem) descElem.textContent = this.formatCurrency(sale.descuento_venta || 0);
+            if (totalElem) totalElem.textContent = this.formatCurrency(sale.total_venta);
+
+            // Rellenar filas de productos
+            if (tbodyElem) {
+                tbodyElem.innerHTML = '';
+                const detalles = sale.venta_detalles || [];
+                detalles.forEach(item => {
+                    const row = document.createElement('tr');
+                    const nombre = item.producto ? item.producto.nombre_producto : `Producto #${item.id_producto}`;
+                    const precio = this.formatCurrency(item.precio_unitario);
+                    const subtotal = this.formatCurrency(item.subtotal_venta_detalle);
+
+                    row.innerHTML = `
+                        <td>${item.cantidad}</td>
+                        <td>
+                            <div>${nombre}</div>
+                            <div style="font-size: 9px; color: #555;">${precio} c/u</div>
+                        </td>
+                        <td style="text-align: right; font-weight: bold;">${subtotal}</td>
+                    `;
+                    tbodyElem.appendChild(row);
+                });
+            }
+
+            // Lanzar el diálogo de impresión nativo del navegador (impresora física o Guardar como PDF)
+            setTimeout(() => {
+                window.print();
+            }, 150);
         },
 
         async deleteSale(sale) {

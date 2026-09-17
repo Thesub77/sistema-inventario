@@ -53,10 +53,20 @@
                             <td class="py-3.5 px-4 text-right font-bold text-white" x-text="formatCurrency(v.total_venta)"></td>
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
-                                    <button @click="viewSaleDetails(v)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors" title="Ver Detalles de Factura">
+                                    <!-- RF-21: Ver Detalles -->
+                                    <button type="button" @click="viewSaleDetails(v)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Detalles de Factura">
                                         <i data-lucide="eye" class="w-4 h-4"></i>
                                     </button>
-                                    <button @click="deleteSale(v)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors" title="Anular / Eliminar Venta">
+                                    <!-- RF-21: Imprimir Comprobante Directo -->
+                                    <button type="button" @click="printSale(v)" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Imprimir Comprobante">
+                                        <svg class="w-4 h-4 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                            <rect x="6" y="14" width="12" height="8"></rect>
+                                        </svg>
+                                    </button>
+                                    <!-- Anular Venta -->
+                                    <button type="button" @click="deleteSale(v)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Anular / Eliminar Venta">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                     </button>
                                 </div>
