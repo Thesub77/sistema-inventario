@@ -125,7 +125,8 @@ export function posModule() {
                     throw new Error(err.message || 'Error al procesar la venta');
                 }
 
-                const newSale = await res.json();
+                const responseData = await res.json();
+                const newSale = responseData.venta;
                 Swal.fire({
                     icon: 'success',
                     title: '¡Venta Registrada!',
@@ -168,9 +169,26 @@ export function posModule() {
         },
 
         async deleteSale(sale) {
+            const usuariosActivos = (this.usuarios || []).filter(usuario => Number(usuario.estado) === 1);
+            if (usuariosActivos.length === 0) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'No se puede anular',
+                    text: 'No hay usuarios activos disponibles para registrar al responsable.'
+                });
+                return;
+            }
+
             const result = await Swal.fire({
                 title: '¿Anular venta?',
                 text: `Se anulará la factura ${sale.codigo_venta}`,
+                input: 'select',
+                inputLabel: 'Usuario responsable de la anulación',
+                inputOptions: Object.fromEntries(usuariosActivos.map(usuario => [
+                    String(usuario.usuario_id), usuario.nombre_apellido
+                ])),
+                inputPlaceholder: 'Seleccioná al responsable',
+                inputValidator: value => !value ? 'Seleccioná al usuario responsable.' : undefined,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
@@ -181,23 +199,59 @@ export function posModule() {
                 color: '#fff'
             });
 
-            if (result.isConfirmed) {
-                await fetch(`/api/ventas/${sale.venta_id}`, {
-                    method: 'DELETE'
+            if (!result.isConfirmed) return;
+
+            try {
+                const idUsuario = Number(result.value);
+                if (!usuariosActivos.some(usuario => Number(usuario.usuario_id) === idUsuario)) {
+                    throw new Error('Seleccioná un usuario activo para registrar la anulación.');
+                }
+
+                const res = await fetch(`/api/ventas/${sale.venta_id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ id_usuario: idUsuario })
                 });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.success !== true) {
+                    throw new Error(data.message || 'No se pudo anular la venta.');
+                }
+            } catch (error) {
+                await Swal.fire({
+                    title: 'No se pudo anular la venta',
+                    text: error.message,
+                    icon: 'error',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+                return;
+            }
+
+            try {
                 await Promise.all([
                     this.fetchVentas(),
                     this.fetchProductos(),
                     this.fetchInventario(),
                     this.fetchBitacoras()
                 ]);
-                Swal.fire({
+            } catch {
+                await Swal.fire({
                     title: 'Venta anulada',
-                    icon: 'success',
-                    background: '#1e293b',
-                    color: '#fff'
+                    text: 'La anulación se guardó, pero no se pudo actualizar la pantalla. Recargá la página.',
+                    icon: 'warning'
                 });
+                return;
             }
+
+            await Swal.fire({
+                title: 'Venta anulada',
+                icon: 'success',
+                background: '#1e293b',
+                color: '#fff'
+            });
         }
     };
 }

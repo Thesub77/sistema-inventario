@@ -9,51 +9,30 @@ class VentaDetalleController extends Controller
 {
     public function index()
     {
-        $detalles = Venta_detalle::with(['venta', 'producto'])->get();
-        return response()->json($detalles);
+        return response()->json(Venta_detalle::with(['venta', 'producto'])->get());
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'id_venta' => 'required|exists:venta,venta_id',
-            'id_producto' => 'required|exists:producto,producto_id',
-            'cantidad' => 'required|integer|min:1',
-            'subtotal_venta_detalle' => 'required|numeric|min:0',
-            'precio_unitario' => 'required|numeric|min:0',
-            'estado' => 'required|integer',
-        ]);
-
-        $detalle = Venta_detalle::create($validated);
-        return response()->json($detalle, 201);
+        return response()->json(['message' => 'Los detalles se registran al confirmar la venta mediante POST /api/ventas.'], 405);
     }
 
     public function show($id)
     {
-        $detalle = Venta_detalle::with(['venta', 'producto'])->findOrFail($id);
-        return response()->json($detalle);
+        return response()->json(Venta_detalle::with(['venta', 'producto'])->findOrFail($id));
     }
 
     public function update(Request $request, $id)
     {
-        $detalle = Venta_detalle::findOrFail($id);
-        $validated = $request->validate([
-            'id_venta' => 'sometimes|exists:venta,venta_id',
-            'id_producto' => 'sometimes|exists:producto,producto_id',
-            'cantidad' => 'sometimes|integer|min:1',
-            'subtotal_venta_detalle' => 'sometimes|numeric|min:0',
-            'precio_unitario' => 'sometimes|numeric|min:0',
-            'estado' => 'sometimes|integer',
-        ]);
+        Venta_detalle::findOrFail($id);
 
-        $detalle->update($validated);
-        return response()->json($detalle);
+        return response()->json(['message' => 'Una venta confirmada no se modifica. Anule la venta y registre una nueva.'], 405);
     }
 
     public function destroy($id)
     {
-        $detalle = Venta_detalle::findOrFail($id);
-        $detalle->delete();
-        return response()->json(['message' => 'Detalle de venta eliminado correctamente']);
+        Venta_detalle::findOrFail($id);
+
+        return response()->json(['message' => 'Los detalles se conservan como historial. Anule la venta completa.'], 405);
     }
 }
