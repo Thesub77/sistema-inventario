@@ -13,7 +13,12 @@ class Rol extends Model
     protected $fillable = [
         'nombre_rol',
         'descripcion_rol',
+        'permisos',
         'estado',
+    ];
+
+    protected $casts = [
+        'permisos' => 'array',
     ];
 
     public function usuarios()

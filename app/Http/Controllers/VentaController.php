@@ -10,6 +10,7 @@ use App\Models\Producto;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -71,6 +72,11 @@ class VentaController extends Controller
 
     public function store(Request $request)
     {
+        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
+        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
+            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
+        }
+
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
 
@@ -337,6 +343,11 @@ class VentaController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
+        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
+            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
+        }
+
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
         ]);
