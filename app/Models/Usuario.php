@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
-class Usuario extends Model
+class Usuario extends Authenticatable
 {
+    use HasApiTokens, Notifiable;
+
     protected $table = 'usuario';
     protected $primaryKey = 'usuario_id';
     public $timestamps = false;
@@ -22,6 +26,27 @@ class Usuario extends Model
     protected $hidden = [
         'contrasenia_usuario',
     ];
+
+    public function getAuthPassword()
+    {
+        return $this->contrasenia_usuario;
+    }
+
+    public function tienePermiso(string $permiso): bool
+    {
+        if ($this->esAdmin()) {
+            return true;
+        }
+
+        $permisos = $this->rol->permisos ?? [];
+
+        return in_array('*', $permisos, true) || in_array($permiso, $permisos, true);
+    }
+
+    public function esAdmin(): bool
+    {
+        return $this->rol && $this->rol->nombre_rol === 'Administrador';
+    }
 
     public function rol()
     {
