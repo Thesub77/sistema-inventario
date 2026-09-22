@@ -2,41 +2,30 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
-use App\Models\Rol;
-use App\Models\Categoria;
+use App\Models\Bitacora;
 use App\Models\Caja;
-use App\Models\Cliente;
-use App\Models\Usuario;
-use App\Models\Producto;
+use App\Models\Caja_movimiento_venta;
 use App\Models\Caja_operacion;
+use App\Models\Categoria;
+use App\Models\Cliente;
+use App\Models\Movimiento_inventario;
+use App\Models\Producto;
+use App\Models\Rol;
+use App\Models\Usuario;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
-use App\Models\Caja_movimiento_venta;
-use App\Models\Movimiento_inventario;
-use App\Models\Bitacora;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Roles
+        // 1. Roles (Por defecto solo el Administrador con todos los permisos)
         $rolAdmin = Rol::create([
             'nombre_rol' => 'Administrador',
-            'descripcion_rol' => 'Acceso total al sistema',
-            'estado' => 1,
-        ]);
-
-        $rolCajero = Rol::create([
-            'nombre_rol' => 'Cajero',
-            'descripcion_rol' => 'Gestión de cobros y caja',
-            'estado' => 1,
-        ]);
-
-        $rolVendedor = Rol::create([
-            'nombre_rol' => 'Vendedor',
-            'descripcion_rol' => 'Atención al cliente y ventas',
+            'descripcion_rol' => 'Acceso total y configuración del sistema',
+            'permisos' => ['*'],
             'estado' => 1,
         ]);
 
@@ -120,30 +109,12 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
-        // 5. Usuarios
+        // 5. Usuario Inicial Maestro
         $admin = Usuario::create([
             'id_rol' => $rolAdmin->rol_id,
             'nombre_apellido' => 'Diego Quiroz',
             'nombre_usuario' => 'si_dquiroz',
             'contrasenia_usuario' => Hash::make('admin123'),
-            'fecha_registro' => date('Y-m-d'),
-            'estado' => 1,
-        ]);
-
-        $cajero = Usuario::create([
-            'id_rol' => $rolCajero->rol_id,
-            'nombre_apellido' => 'Carlos Mendoza',
-            'nombre_usuario' => 'carlos_cajero',
-            'contrasenia_usuario' => Hash::make('cajero123'),
-            'fecha_registro' => date('Y-m-d'),
-            'estado' => 1,
-        ]);
-
-        $vendedor = Usuario::create([
-            'id_rol' => $rolVendedor->rol_id,
-            'nombre_apellido' => 'Ana Morales',
-            'nombre_usuario' => 'ana_ventas',
-            'contrasenia_usuario' => Hash::make('vendedor123'),
             'fecha_registro' => date('Y-m-d'),
             'estado' => 1,
         ]);
@@ -212,7 +183,7 @@ class DatabaseSeeder extends Seeder
         // 7. Apertura de Caja
         $operacionCaja = Caja_operacion::create([
             'id_caja' => $caja1->caja_id,
-            'id_usuario' => $cajero->usuario_id,
+            'id_usuario' => $admin->usuario_id,
             'fecha_hora_apertura' => now(),
             'monto_apertura' => 500.00,
             'monto_cierre' => null,
@@ -220,10 +191,9 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
-        // 8. Ventas
-        // Venta 1
+        // 8. Ventas de Demostración
         $venta1 = Venta::create([
-            'id_usuario' => $cajero->usuario_id,
+            'id_usuario' => $admin->usuario_id,
             'id_cliente' => $clienteCF->cliente_id,
             'codigo_venta' => 'FAC-2026-0001',
             'metodo_pago' => 'Efectivo',
@@ -234,7 +204,6 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
-        // Venta Detalle 1
         Venta_detalle::create([
             'id_venta' => $venta1->venta_id,
             'id_producto' => $prod1->producto_id,
@@ -244,52 +213,10 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
-        // Movimiento de Caja Venta 1
         Caja_movimiento_venta::create([
             'id_caja' => $caja1->caja_id,
             'id_venta' => $venta1->venta_id,
             'monto_movimiento' => 90.00,
-            'fecha_hora_movimiento' => now(),
-            'estado' => 1,
-        ]);
-
-        // Venta 2
-        $venta2 = Venta::create([
-            'id_usuario' => $vendedor->usuario_id,
-            'id_cliente' => $cliente1->cliente_id,
-            'codigo_venta' => 'FAC-2026-0002',
-            'metodo_pago' => 'Tarjeta',
-            'fecha_hora_venta' => now(),
-            'subtotal_venta' => 88.00,
-            'descuento_venta' => 0.00,
-            'total_venta' => 88.00,
-            'estado' => 1,
-        ]);
-
-        // Venta Detalle 2
-        Venta_detalle::create([
-            'id_venta' => $venta2->venta_id,
-            'id_producto' => $prod2->producto_id,
-            'cantidad' => 2,
-            'subtotal_venta_detalle' => 36.00,
-            'precio_unitario' => 18.00,
-            'estado' => 1,
-        ]);
-
-        Venta_detalle::create([
-            'id_venta' => $venta2->venta_id,
-            'id_producto' => $prod3->producto_id,
-            'cantidad' => 2,
-            'subtotal_venta_detalle' => 52.00,
-            'precio_unitario' => 26.00,
-            'estado' => 1,
-        ]);
-
-        // Movimiento de Caja Venta 2
-        Caja_movimiento_venta::create([
-            'id_caja' => $caja1->caja_id,
-            'id_venta' => $venta2->venta_id,
-            'monto_movimiento' => 88.00,
             'fecha_hora_movimiento' => now(),
             'estado' => 1,
         ]);
@@ -308,7 +235,7 @@ class DatabaseSeeder extends Seeder
 
         Movimiento_inventario::create([
             'id_producto' => $prod1->producto_id,
-            'id_usuario' => $cajero->usuario_id,
+            'id_usuario' => $admin->usuario_id,
             'tipo_movimiento' => 'Salida por Venta',
             'cantidad_movimimiento' => 2,
             'stock_anterior_producto' => 100,
@@ -323,22 +250,6 @@ class DatabaseSeeder extends Seeder
             'accion_bitacora' => 'INICIO_SESION',
             'descripcion_bitacora' => 'El usuario administrador inició sesión en el sistema',
             'fecha_hora_bitacora' => now()->subHours(2),
-            'estado' => 1,
-        ]);
-
-        Bitacora::create([
-            'id_usuario' => $cajero->usuario_id,
-            'accion_bitacora' => 'APERTURA_CAJA',
-            'descripcion_bitacora' => 'Apertura de Caja Principal con monto inicial de C$ 500.00',
-            'fecha_hora_bitacora' => now()->subHour(),
-            'estado' => 1,
-        ]);
-
-        Bitacora::create([
-            'id_usuario' => $cajero->usuario_id,
-            'accion_bitacora' => 'CREAR_VENTA',
-            'descripcion_bitacora' => 'Venta registrada con factura FAC-2026-0001 por C$ 90.00',
-            'fecha_hora_bitacora' => now(),
             'estado' => 1,
         ]);
     }
