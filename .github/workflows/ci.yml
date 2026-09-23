@@ -1,0 +1,69 @@
+name: CI - Pruebas Automatizadas con PostgreSQL
+
+on:
+  push:
+    branches: [ develop, Master ]
+  pull_request:
+    branches: [ develop, Master ]
+
+jobs:
+  tests:
+    name: Ejecutar Suite de Tests
+    runs-on: ubuntu-latest
+
+    # Levanta un contenedor de PostgreSQL aislado en GitHub Actions
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing_db
+          POSTGRES_USER: runner
+          POSTGRES_PASSWORD: secret_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP y extensiones
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, pdo, pdo_pgsql, pgsql, bcmath, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Instalar dependencias de Composer
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Preparar entorno de pruebas
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Ejecutar migraciones en PostgreSQL de prueba
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing_db
+          DB_USERNAME: runner
+          DB_PASSWORD: secret_password
+        run: php artisan migrate --force
+
+      - name: Ejecutar suite de pruebas de Laravel
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing_db
+          DB_USERNAME: runner
+          DB_PASSWORD: secret_password
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+        run: php artisan test
