@@ -8,10 +8,33 @@ use Illuminate\Validation\Rule;
 
 class CategoriaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $categorias = Categoria::all();
-        return response()->json($categorias);
+        $validated = $request->validate([
+            'buscar' => 'sometimes|required|string|max:64',
+            'estado' => 'sometimes|required|integer|in:0,1',
+            'por_pagina' => 'sometimes|required|integer|min:1|max:100',
+            'page' => 'sometimes|required|integer|min:1',
+        ]);
+
+        $query = Categoria::orderBy('categoria_id');
+
+        if (isset($validated['buscar'])) {
+            $query->where(function ($q) use ($validated) {
+                $q->whereLike('nombre_categoria', '%'.$validated['buscar'].'%')
+                    ->orWhereLike('codigo_categoria', '%'.$validated['buscar'].'%');
+            });
+        }
+
+        if (array_key_exists('estado', $validated)) {
+            $query->where('estado', $validated['estado']);
+        }
+
+        if (isset($validated['por_pagina'])) {
+            return response()->json($query->paginate((int) $validated['por_pagina'])->withQueryString());
+        }
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request)
