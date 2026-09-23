@@ -240,6 +240,27 @@ function utilsModule() {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        },
+
+        async apiFetch(url, options = {}) {
+            const opts = { ...options };
+            opts.headers = opts.headers || {};
+            if (!opts.headers['Accept']) {
+                opts.headers['Accept'] = 'application/json';
+            }
+            if (!opts.headers['Content-Type'] && !(opts.body instanceof FormData)) {
+                opts.headers['Content-Type'] = 'application/json';
+            }
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                opts.headers['Authorization'] = `Bearer ${token}`;
+            }
+            const res = await fetch(url, opts);
+            if (res.status === 401 && this.isAuthenticated) {
+                console.warn('Sesión expirada o no autorizada (401). Cerrando sesión...');
+                this.logout();
+            }
+            return res;
         }
     };
 }
@@ -285,12 +306,8 @@ function categoriasModule() {
             const method = this.isEditingCategory ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.categoryForm)
                 });
 
@@ -336,7 +353,7 @@ function categoriasModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/categorias/${cat.categoria_id}`, {
+                await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchCategorias();
@@ -403,12 +420,8 @@ function productosModule() {
             const method = this.isEditingProduct ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.productForm)
                 });
 
@@ -446,7 +459,7 @@ function productosModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/productos/${product.producto_id}`, {
+                await this.apiFetch(`/api/productos/${product.producto_id}`, {
                     method: 'DELETE'
                 });
                 Swal.fire({
@@ -477,15 +490,13 @@ function productosModule() {
                 Math.max(0, this.stockForm.stock_anterior - this.stockForm.cantidad);
 
             try {
-                await fetch(`/api/productos/${this.stockForm.producto_id}`, {
+                await this.apiFetch(`/api/productos/${this.stockForm.producto_id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ existencia_bodega: newStock })
                 });
 
-                await fetch('/api/movimientos-inventario', {
+                await this.apiFetch('/api/movimientos-inventario', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         id_producto: this.stockForm.producto_id,
                         id_usuario: this.usuarios[0] ? this.usuarios[0].usuario_id : 1,
@@ -563,12 +574,8 @@ function clientesModule() {
             const method = this.isEditingCustomer ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.customerForm)
                 });
 
@@ -604,7 +611,7 @@ function clientesModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/clientes/${c.cliente_id}`, {
+                await this.apiFetch(`/api/clientes/${c.cliente_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchClientes();
@@ -661,12 +668,8 @@ function usuariosModule() {
             }
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -702,7 +705,7 @@ function usuariosModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/usuarios/${u.usuario_id}`, {
+                await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchUsuarios();
@@ -823,12 +826,8 @@ function posModule() {
 
             this.loading = true;
             try {
-                const res = await fetch('/api/ventas', {
+                const res = await this.apiFetch('/api/ventas', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(salePayload)
                 });
 
@@ -919,12 +918,8 @@ function posModule() {
                     throw new Error('Seleccioná un usuario activo para registrar la anulación.');
                 }
 
-                const res = await fetch(`/api/ventas/${sale.venta_id}`, {
+                const res = await this.apiFetch(`/api/ventas/${sale.venta_id}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify({ id_usuario: idUsuario })
                 });
                 const data = await res.json().catch(() => ({}));
@@ -1172,7 +1167,11 @@ function app() {
         // Cargas de Datos Asíncronas
         async fetchProductos() {
             try {
-                this.productos = await fetch('/api/productos').then(r => r.json());
+                const res = await this.apiFetch('/api/productos');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.productos = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando productos:', e);
             }
@@ -1180,7 +1179,11 @@ function app() {
 
         async fetchCategorias() {
             try {
-                this.categorias = await fetch('/api/categorias').then(r => r.json());
+                const res = await this.apiFetch('/api/categorias');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.categorias = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando categorías:', e);
             }
@@ -1188,9 +1191,13 @@ function app() {
 
         async fetchClientes() {
             try {
-                this.clientes = await fetch('/api/clientes').then(r => r.json());
-                if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
-                    this.posSale.id_cliente = this.clientes[0].cliente_id;
+                const res = await this.apiFetch('/api/clientes');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.clientes = Array.isArray(data) ? data : [];
+                    if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
+                        this.posSale.id_cliente = this.clientes[0].cliente_id;
+                    }
                 }
             } catch (e) {
                 console.error('Error cargando clientes:', e);
@@ -1200,11 +1207,17 @@ function app() {
         async fetchUsuarios() {
             try {
                 const [usrRes, rolRes] = await Promise.all([
-                    fetch('/api/usuarios').then(r => r.json()),
-                    fetch('/api/roles').then(r => r.json())
+                    this.apiFetch('/api/usuarios'),
+                    this.apiFetch('/api/roles')
                 ]);
-                this.usuarios = usrRes;
-                this.roles = rolRes;
+                if (usrRes.ok) {
+                    const usrData = await usrRes.json();
+                    this.usuarios = Array.isArray(usrData) ? usrData : [];
+                }
+                if (rolRes.ok) {
+                    const rolData = await rolRes.json();
+                    this.roles = Array.isArray(rolData) ? rolData : [];
+                }
             } catch (e) {
                 console.error('Error cargando usuarios:', e);
             }
@@ -1213,13 +1226,22 @@ function app() {
         async fetchVentas() {
             try {
                 const [venRes, cajRes, movCajRes] = await Promise.all([
-                    fetch('/api/ventas').then(r => r.json()),
-                    fetch('/api/cajas').then(r => r.json()),
-                    fetch('/api/caja-movimientos-venta').then(r => r.json())
+                    this.apiFetch('/api/ventas'),
+                    this.apiFetch('/api/cajas'),
+                    this.apiFetch('/api/caja-movimientos-venta')
                 ]);
-                this.ventas = venRes;
-                this.cajas = cajRes;
-                this.cajaMovimientos = movCajRes;
+                if (venRes.ok) {
+                    const venData = await venRes.json();
+                    this.ventas = Array.isArray(venData) ? venData : [];
+                }
+                if (cajRes.ok) {
+                    const cajData = await cajRes.json();
+                    this.cajas = Array.isArray(cajData) ? cajData : [];
+                }
+                if (movCajRes.ok) {
+                    const movData = await movCajRes.json();
+                    this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                }
             } catch (e) {
                 console.error('Error cargando ventas y cajas:', e);
             }
@@ -1227,7 +1249,11 @@ function app() {
 
         async fetchInventario() {
             try {
-                this.movimientosInventario = await fetch('/api/movimientos-inventario').then(r => r.json());
+                const res = await this.apiFetch('/api/movimientos-inventario');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.movimientosInventario = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando movimientos de inventario:', e);
             }
@@ -1235,7 +1261,11 @@ function app() {
 
         async fetchBitacoras() {
             try {
-                this.bitacoras = await fetch('/api/bitacoras').then(r => r.json());
+                const res = await this.apiFetch('/api/bitacoras');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.bitacoras = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando bitácora:', e);
             }

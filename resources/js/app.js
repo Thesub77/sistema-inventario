@@ -257,7 +257,11 @@ export function app() {
         // --- Data Fetching Específico y Optimizado ---
         async fetchProductos() {
             try {
-                this.productos = await this.apiFetch('/api/productos').then(r => r.json());
+                const res = await this.apiFetch('/api/productos');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.productos = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando productos:', e);
             }
@@ -265,7 +269,11 @@ export function app() {
 
         async fetchCategorias() {
             try {
-                this.categorias = await this.apiFetch('/api/categorias').then(r => r.json());
+                const res = await this.apiFetch('/api/categorias');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.categorias = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando categorías:', e);
             }
@@ -273,9 +281,13 @@ export function app() {
 
         async fetchClientes() {
             try {
-                this.clientes = await this.apiFetch('/api/clientes').then(r => r.json());
-                if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
-                    this.posSale.id_cliente = this.clientes[0].cliente_id;
+                const res = await this.apiFetch('/api/clientes');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.clientes = Array.isArray(data) ? data : [];
+                    if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
+                        this.posSale.id_cliente = this.clientes[0].cliente_id;
+                    }
                 }
             } catch (e) {
                 console.error('Error cargando clientes:', e);
@@ -285,11 +297,17 @@ export function app() {
         async fetchUsuarios() {
             try {
                 const [usrRes, rolRes] = await Promise.all([
-                this.apiFetch('/api/usuarios').then(r => r.json()),
-                this.apiFetch('/api/roles').then(r => r.json())
-            ]);
-            this.usuarios = usrRes;
-            this.roles = rolRes;
+                    this.apiFetch('/api/usuarios'),
+                    this.apiFetch('/api/roles')
+                ]);
+                if (usrRes.ok) {
+                    const usrData = await usrRes.json();
+                    this.usuarios = Array.isArray(usrData) ? usrData : [];
+                }
+                if (rolRes.ok) {
+                    const rolData = await rolRes.json();
+                    this.roles = Array.isArray(rolData) ? rolData : [];
+                }
             } catch (e) {
                 console.error('Error cargando usuarios:', e);
             }
@@ -298,13 +316,22 @@ export function app() {
         async fetchVentas() {
             try {
                 const [venRes, cajRes, movCajRes] = await Promise.all([
-                this.apiFetch('/api/ventas').then(r => r.json()),
-                this.apiFetch('/api/cajas').then(r => r.json()),
-                this.apiFetch('/api/caja-movimientos-venta').then(r => r.json())
-            ]);
-            this.ventas = venRes;
-            this.cajas = cajRes;
-            this.cajaMovimientos = movCajRes;
+                    this.apiFetch('/api/ventas'),
+                    this.apiFetch('/api/cajas'),
+                    this.apiFetch('/api/caja-movimientos-venta')
+                ]);
+                if (venRes.ok) {
+                    const venData = await venRes.json();
+                    this.ventas = Array.isArray(venData) ? venData : [];
+                }
+                if (cajRes.ok) {
+                    const cajData = await cajRes.json();
+                    this.cajas = Array.isArray(cajData) ? cajData : [];
+                }
+                if (movCajRes.ok) {
+                    const movData = await movCajRes.json();
+                    this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                }
             } catch (e) {
                 console.error('Error cargando ventas y cajas:', e);
             }
@@ -312,7 +339,11 @@ export function app() {
 
         async fetchInventario() {
             try {
-                this.movimientosInventario = await this.apiFetch('/api/movimientos-inventario').then(r => r.json());
+                const res = await this.apiFetch('/api/movimientos-inventario');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.movimientosInventario = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando movimientos de inventario:', e);
             }
@@ -320,7 +351,11 @@ export function app() {
 
         async fetchBitacoras() {
             try {
-                this.bitacoras = await this.apiFetch('/api/bitacoras').then(r => r.json());
+                const res = await this.apiFetch('/api/bitacoras');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.bitacoras = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando bitácora:', e);
             }
