@@ -5,6 +5,6 @@ use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\BitacoraController;
 
 Route::apiResource('usuarios', UsuarioController::class);
-Route::apiResource('bitacoras', BitacoraController::class);
+Route::apiResource('bitacoras', BitacoraController::class)->only(['index', 'show']);
 
 ?>
