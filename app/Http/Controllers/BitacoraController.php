@@ -7,51 +7,44 @@ use Illuminate\Http\Request;
 
 class BitacoraController extends Controller
 {
-    public function index()
-    {
-        $bitacoras = Bitacora::with('usuario')->get();
-        return response()->json($bitacoras);
-    }
-
-    public function store(Request $request)
+    public function index(Request $request)
     {
         $validated = $request->validate([
-            'id_usuario' => 'required|exists:usuario,usuario_id',
-            'accion_bitacora' => 'required|string|max:24',
-            'descripcion_bitacora' => 'required|string|max:128',
-            'fecha_hora_bitacora' => 'required|date',
-            'estado' => 'required|integer',
+            'id_usuario' => 'sometimes|integer|exists:usuario,usuario_id',
+            'accion' => 'sometimes|string|max:64',
+            'fecha_desde' => 'sometimes|date',
+            'fecha_hasta' => 'sometimes|date',
+            'por_pagina' => 'sometimes|integer|min:1|max:100',
         ]);
 
-        $bitacora = Bitacora::create($validated);
-        return response()->json($bitacora, 201);
+        $query = Bitacora::with('usuario')->orderByDesc('bitacora_id');
+
+        if (!empty($validated['id_usuario'])) {
+            $query->where('id_usuario', $validated['id_usuario']);
+        }
+
+        if (!empty($validated['accion'])) {
+            $query->where('accion_bitacora', 'like', "%{$validated['accion']}%");
+        }
+
+        if (!empty($validated['fecha_desde'])) {
+            $query->whereDate('fecha_hora_bitacora', '>=', $validated['fecha_desde']);
+        }
+
+        if (!empty($validated['fecha_hasta'])) {
+            $query->whereDate('fecha_hora_bitacora', '<=', $validated['fecha_hasta']);
+        }
+
+        if ($request->has('por_pagina')) {
+            return response()->json($query->paginate((int) $validated['por_pagina']));
+        }
+
+        return response()->json($query->get());
     }
 
     public function show($id)
     {
         $bitacora = Bitacora::with('usuario')->findOrFail($id);
         return response()->json($bitacora);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $bitacora = Bitacora::findOrFail($id);
-        $validated = $request->validate([
-            'id_usuario' => 'sometimes|exists:usuario,usuario_id',
-            'accion_bitacora' => 'sometimes|string|max:24',
-            'descripcion_bitacora' => 'sometimes|string|max:128',
-            'fecha_hora_bitacora' => 'sometimes|date',
-            'estado' => 'sometimes|integer',
-        ]);
-
-        $bitacora->update($validated);
-        return response()->json($bitacora);
-    }
-
-    public function destroy($id)
-    {
-        $bitacora = Bitacora::findOrFail($id);
-        $bitacora->delete();
-        return response()->json(['message' => 'Bitácora eliminada correctamente']);
     }
 }
