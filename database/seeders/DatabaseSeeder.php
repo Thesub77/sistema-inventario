@@ -214,6 +214,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Caja_movimiento_venta::create([
+            'id_caja_operacion' => $operacionCaja->caja_operacion_id,
             'id_caja' => $caja1->caja_id,
             'id_venta' => $venta1->venta_id,
             'monto_movimiento' => 90.00,

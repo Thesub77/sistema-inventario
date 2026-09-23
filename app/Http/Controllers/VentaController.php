@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
-use App\Models\Caja;
 use App\Models\Caja_movimiento_venta;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
+use App\Services\CajaService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -72,10 +71,8 @@ class VentaController extends Controller
 
     public function store(Request $request)
     {
-        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
-        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
-            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
-        }
+        // El responsable real proviene del token, nunca del formulario.
+        $request->merge(['id_usuario' => $request->user()->usuario_id]);
 
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
@@ -99,29 +96,11 @@ class VentaController extends Controller
             'detalles.*.cantidad' => 'required|integer|min:1|max:2147483647',
         ]);
 
-        return DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated, $request) {
 
-            $idCaja = $validated['id_caja'] ?? null;
-
-            $queryCaja = Caja::where('estado_caja', 'Abierta')
-                ->where('estado', 1);
-
-            if ($idCaja) {
-                $queryCaja->where('caja_id', $idCaja);
-            }
-
-            $cajaAbierta = $queryCaja
-                ->lockForUpdate()
-                ->first();
-
-            if (! $cajaAbierta) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No se puede realizar la venta porque no hay una caja abierta.',
-                ], 409);
-            }
-
-            $idCaja = $cajaAbierta->caja_id;
+            $turno = app(CajaService::class)->paraVenta(isset($validated['id_caja']) ? (int) $validated['id_caja'] : null, $request->user());
+            $idCaja = $turno->id_caja;
+            $validated['fecha_hora_venta'] = now();
 
             $metodoPago = ucfirst(
                 strtolower(trim($validated['metodo_pago']))
@@ -279,6 +258,7 @@ class VentaController extends Controller
             }
 
             Caja_movimiento_venta::create([
+                'id_caja_operacion' => $turno->caja_operacion_id,
                 'id_caja' => $idCaja,
 
                 'id_venta' => $venta->venta_id,
@@ -343,10 +323,8 @@ class VentaController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
-        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
-            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
-        }
+        // El responsable real proviene del token, nunca del formulario.
+        $request->merge(['id_usuario' => $request->user()->usuario_id]);
 
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
@@ -354,8 +332,12 @@ class VentaController extends Controller
 
         return DB::transaction(function () use (
             $id,
-            $validated
+            $validated,
+            $request
         ) {
+
+            Venta::findOrFail($id);
+            app(CajaService::class)->paraAnular((int) $id, $request->user());
 
             $venta = Venta::with([
                 'venta_detalles',

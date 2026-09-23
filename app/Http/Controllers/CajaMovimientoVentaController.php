@@ -3,55 +3,55 @@
 namespace App\Http\Controllers;
 
 use App\Models\Caja_movimiento_venta;
+use App\Services\CajaService;
 use Illuminate\Http\Request;
 
 class CajaMovimientoVentaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $movimientos = Caja_movimiento_venta::with(['caja', 'venta'])->get();
-        return response()->json($movimientos);
+        app(CajaService::class)->autorizar($request->user());
+        $datos = $request->validate([
+            'id_caja' => 'sometimes|integer|exists:caja,caja_id',
+            'id_caja_operacion' => 'sometimes|integer|exists:caja_operacion,caja_operacion_id',
+            'estado' => 'sometimes|integer|in:0,1',
+        ]);
+        $query = Caja_movimiento_venta::with(['caja', 'venta']);
+        foreach ($datos as $campo => $valor) {
+            $query->where($campo, $valor);
+        }
+
+        return response()->json($query->orderByDesc('caja_movimiento_venta_id')->get());
+    }
+
+    public function show(Request $request, $id)
+    {
+        app(CajaService::class)->autorizar($request->user());
+
+        return response()->json(Caja_movimiento_venta::with(['caja', 'venta'])->findOrFail($id));
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'id_caja' => 'required|exists:caja,caja_id',
-            'id_venta' => 'nullable|exists:venta,venta_id',
-            'monto_movimiento' => 'required|numeric',
-            'fecha_hora_movimiento' => 'required|date',
-            'estado' => 'required|integer',
-        ]);
-
-        $movimiento = Caja_movimiento_venta::create($validated);
-        return response()->json($movimiento, 201);
-    }
-
-    public function show($id)
-    {
-        $movimiento = Caja_movimiento_venta::with(['caja', 'venta'])->findOrFail($id);
-        return response()->json($movimiento);
+        return $this->historial();
     }
 
     public function update(Request $request, $id)
     {
-        $movimiento = Caja_movimiento_venta::findOrFail($id);
-        $validated = $request->validate([
-            'id_caja' => 'sometimes|exists:caja,caja_id',
-            'id_venta' => 'nullable|exists:venta,venta_id',
-            'monto_movimiento' => 'sometimes|numeric',
-            'fecha_hora_movimiento' => 'sometimes|date',
-            'estado' => 'sometimes|integer',
-        ]);
+        Caja_movimiento_venta::findOrFail($id);
 
-        $movimiento->update($validated);
-        return response()->json($movimiento);
+        return $this->historial();
     }
 
     public function destroy($id)
     {
-        $movimiento = Caja_movimiento_venta::findOrFail($id);
-        $movimiento->delete();
-        return response()->json(['message' => 'Movimiento de caja eliminado correctamente']);
+        Caja_movimiento_venta::findOrFail($id);
+
+        return $this->historial();
+    }
+
+    private function historial()
+    {
+        return response()->json(['message' => 'Los movimientos se generan al vender o anular; no se modifican ni eliminan directamente.'], 405);
     }
 }

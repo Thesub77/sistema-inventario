@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Caja_operacion extends Model
 {
     protected $table = 'caja_operacion';
+
     protected $primaryKey = 'caja_operacion_id';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -18,6 +20,17 @@ class Caja_operacion extends Model
         'monto_cierre',
         'fecha_hora_cierre',
         'estado',
+        'monto_esperado',
+        'diferencia',
+        'observacion_cierre',
+        'id_usuario_cierre',
+    ];
+
+    protected $casts = [
+        'monto_apertura' => 'decimal:2',
+        'monto_cierre' => 'decimal:2',
+        'monto_esperado' => 'decimal:2',
+        'diferencia' => 'decimal:2',
     ];
 
     public function caja()
