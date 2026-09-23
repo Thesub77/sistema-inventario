@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Usuario;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -95,6 +96,32 @@ class UsuarioController extends Controller
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
         ]);
 
+        // Si se intenta desactivar el usuario (estado = 0)
+        if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0 && (int) $usuario->estado === 1) {
+            if (Auth::check() && (int) Auth::id() === (int) $usuario->usuario_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No puedes desactivar tu propio usuario en sesión.',
+                ], 403);
+            }
+
+            $esAdmin = $usuario->rol && $usuario->rol->nombre_rol === 'Administrador';
+            if ($esAdmin) {
+                $activeAdmins = Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'Administrador'))
+                    ->where('estado', 1)
+                    ->count();
+
+                if ($activeAdmins <= 1) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No se puede desactivar al único Administrador activo del sistema.',
+                    ], 403);
+                    }
+            }
+
+            $usuario->tokens()->delete();
+        }
+
         if (!empty($validated['contrasenia_usuario'])) {
             $validated['contrasenia_usuario'] = Hash::make($validated['contrasenia_usuario']);
         } else {
@@ -107,15 +134,36 @@ class UsuarioController extends Controller
 
     public function destroy($id)
     {
-        $usuario = Usuario::findOrFail($id);
+        $usuario = Usuario::with('rol')->findOrFail($id);
 
-        if ($usuario->ventas()->exists() || $usuario->caja_operaciones()->exists() || $usuario->bitacoras()->exists() || $usuario->movimiento_inventarios()->exists()) {
+        if (Auth::check() && (int) Auth::id() === (int) $usuario->usuario_id) {
             return response()->json([
-                'message' => 'No se puede eliminar el usuario porque tiene registros vinculados (ventas, operaciones de caja, bitácoras o inventario). Se sugiere cambiar su estado a inactivo.'
-            ], 409);
+                'success' => false,
+                'message' => 'No puedes desactivar tu propio usuario en sesión.',
+            ], 403);
         }
 
-        $usuario->delete();
-        return response()->json(['message' => 'Usuario eliminado correctamente']);
+        $esAdmin = $usuario->rol && $usuario->rol->nombre_rol === 'Administrador';
+        if ($esAdmin && (int) $usuario->estado === 1) {
+            $activeAdmins = Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'Administrador'))
+                ->where('estado', 1)
+                ->count();
+
+            if ($activeAdmins <= 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede desactivar al único Administrador activo del sistema.',
+                ], 403);
+            }
+        }
+
+        $usuario->update(['estado' => 0]);
+        $usuario->tokens()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario desactivado correctamente',
+            'usuario' => $usuario,
+        ]);
     }
 }
