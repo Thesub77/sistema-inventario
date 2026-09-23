@@ -6,14 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Caja_movimiento_venta extends Model
 {
-    //datos de la tabla caja_movimiento_venta
+    // datos de la tabla caja_movimiento_venta
     protected $table = 'caja_movimiento_venta';
+
     protected $primaryKey = 'caja_movimiento_venta_id';
+
     public $timestamps = false;
 
     protected $fillable = [
         'id_caja',
         'id_venta',
+        'id_caja_operacion',
         'monto_movimiento',
         'fecha_hora_movimiento',
         'estado',
