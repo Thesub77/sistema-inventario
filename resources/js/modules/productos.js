@@ -60,12 +60,8 @@ export function productosModule() {
             const method = this.isEditingProduct ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.productForm)
                 });
 
@@ -103,7 +99,7 @@ export function productosModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/productos/${product.producto_id}`, {
+                await this.apiFetch(`/api/productos/${product.producto_id}`, {
                     method: 'DELETE'
                 });
                 Swal.fire({
@@ -135,22 +131,16 @@ export function productosModule() {
 
             try {
                 // Actualizar stock del producto
-                await fetch(`/api/productos/${this.stockForm.producto_id}`, {
+                await this.apiFetch(`/api/productos/${this.stockForm.producto_id}`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify({
                         existencia_bodega: newStock
                     })
                 });
 
                 // Registrar movimiento de inventario en bitácora/kardex
-                await fetch('/api/movimientos-inventario', {
+                await this.apiFetch('/api/movimientos-inventario', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify({
                         id_producto: this.stockForm.producto_id,
                         id_usuario: this.usuarios[0] ? this.usuarios[0].usuario_id : 1,

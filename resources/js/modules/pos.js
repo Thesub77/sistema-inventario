@@ -111,12 +111,8 @@ export function posModule() {
 
             this.loading = true;
             try {
-                const res = await fetch('/api/ventas', {
+                const res = await this.apiFetch('/api/ventas', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(salePayload)
                 });
 
@@ -207,12 +203,8 @@ export function posModule() {
                     throw new Error('Seleccioná un usuario activo para registrar la anulación.');
                 }
 
-                const res = await fetch(`/api/ventas/${sale.venta_id}`, {
+                const res = await this.apiFetch(`/api/ventas/${sale.venta_id}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify({ id_usuario: idUsuario })
                 });
                 const data = await res.json().catch(() => ({}));
