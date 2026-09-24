@@ -1,4 +1,4 @@
-name: CI - Pruebas Automatizadas con PostgreSQL
+name: CI - Integración Continua (Backend & Frontend)
 
 on:
   push:
@@ -8,10 +8,10 @@ on:
 
 jobs:
   tests:
-    name: Ejecutar Suite de Tests
+    name: Ejecutar Suite de Tests (Backend)
     runs-on: ubuntu-latest
 
-    # Levanta un contenedor de PostgreSQL aislado en GitHub Actions
+    # Levantar un contenedor de PostgreSQL aislado en GitHub Actions
     services:
       postgres:
         image: postgres:15
@@ -67,3 +67,24 @@ jobs:
           CACHE_STORE: array
           SESSION_DRIVER: array
         run: php artisan test
+
+  # Compilacion del frontend
+  frontend:
+    name: Compilación Frontend (Vite & Tailwind)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependencias de Node
+        run: npm ci
+
+      - name: Compilar Frontend con Vite
+        run: npm run build
