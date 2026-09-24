@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\CajaException;
 use Illuminate\Database\Eloquent\Model;
 
 class Caja_operacion extends Model
@@ -32,6 +33,18 @@ class Caja_operacion extends Model
         'monto_esperado' => 'decimal:2',
         'diferencia' => 'decimal:2',
     ];
+
+    /**
+     * Trasladar un turno a otra caja invalidaría las referencias de sus movimientos.
+     * La caja se elige al abrir; los cambios posteriores solo afectan al cierre.
+     * Las actualizaciones masivas de la FK también deben evitarse.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (self $turno): void {
+            CajaException::rechazarSi($turno->isDirty('id_caja'), 409, 'La caja de un turno registrado no puede cambiarse.');
+        });
+    }
 
     public function caja()
     {
