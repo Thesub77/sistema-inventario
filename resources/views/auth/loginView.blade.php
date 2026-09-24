@@ -111,12 +111,5 @@
                 </button>
             </div>
         </form>
-
-        {{-- Credenciales de Demostración Rápidas --}}
-        <div class="pt-3 border-t border-slate-800 text-center">
-            <p class="text-[11px] text-slate-400">
-                Credenciales demo: <span class="font-mono text-brand-300 font-semibold cursor-pointer hover:underline" @click="loginForm.nombre_usuario='si_dquiroz'; loginForm.contrasenia_usuario='admin123'">si_dquiroz / admin123</span>
-            </p>
-        </div>
     </div>
 </div>

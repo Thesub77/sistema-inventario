@@ -21,6 +21,9 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+    <!-- Chart.js (Gráficos interactivos y responsivos para Dashboard) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Capa de Presentación: Estilos Personalizados del Sistema -->
     <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
 
@@ -88,7 +91,7 @@
                         </div>
                     </div>
                     <!-- Logout Button -->
-                    <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all flex-shrink-0">
+                    <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all flex-shrink-0 cursor-pointer active:scale-95">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
                     </button>
                 </div>

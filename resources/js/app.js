@@ -9,6 +9,7 @@ import { usuariosModule } from './modules/usuarios';
 import { utilsModule } from './modules/utils';
 import { themeModule } from './modules/theme';
 import { authModule } from './modules/auth';
+import { dashboardModule } from './modules/dashboard';
 
 export function app() {
     return {
@@ -173,6 +174,7 @@ export function app() {
                             this.fetchVentas(),
                             this.fetchBitacoras()
                         ]);
+                        this.initDashboardCharts();
                         break;
                     case 'pos':
                         await Promise.all([
@@ -241,11 +243,30 @@ export function app() {
             // Si está autenticado, cargar pestaña activa inicial
             if (this.isAuthenticated) {
                 this.loadTab(this.currentTab);
+                if (this.currentTab === 'dashboard') {
+                    this.initDashboardCharts();
+                }
             }
+
+            // Observar cambios de tema para redibujar gráficos
+            this.$watch('darkMode', () => {
+                if (this.currentTab === 'dashboard') {
+                    this.renderDashboardCharts();
+                }
+            });
+
+            this.$watch('dashboardVentasView', () => {
+                if (this.currentTab === 'dashboard') {
+                    this.renderDashboardCharts();
+                }
+            });
 
             // Observar cambios de pestaña para cargar datos bajo demanda
             this.$watch('currentTab', (newTab) => {
                 this.loadTab(newTab);
+                if (newTab === 'dashboard') {
+                    this.initDashboardCharts();
+                }
                 this.$nextTick(() => {
                     if (window.lucide) {
                         window.lucide.createIcons();
@@ -376,6 +397,7 @@ export function app() {
         ...utilsModule(),
         ...themeModule(),
         ...authModule(),
+        ...dashboardModule(),
     };
 }
 

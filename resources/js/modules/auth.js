@@ -97,22 +97,10 @@ export function authModule() {
             }
         },
 
-        async logout() {
-            if (this.authToken) {
-                try {
-                    await fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'Authorization': `Bearer ${this.authToken}`
-                        }
-                    });
-                } catch (e) {
-                    console.error('Error al cerrar sesión:', e);
-                }
-            }
+        logout() {
+            const token = this.authToken;
 
+            // 1. Limpieza inmediata del estado local (Respuesta instantánea a 0ms)
             this.authToken = null;
             this.currentUser = {
                 usuario_id: null,
@@ -125,19 +113,39 @@ export function authModule() {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_user');
 
-            Swal.fire({
-                icon: 'info',
-                title: 'Sesión Finalizada',
-                text: 'Has cerrado sesión con éxito.',
-                timer: 1500,
-                showConfirmButton: false,
-                background: this.darkMode ? '#1e293b' : '#ffffff',
-                color: this.darkMode ? '#fff' : '#0f172a'
-            });
-
+            // 2. Refrescar iconos en vista de login inmediatamente
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
             });
+
+            // 3. Notificación sutil no bloqueante (Toast en esquina superior)
+            if (window.Swal) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'info',
+                    title: 'Sesión Finalizada',
+                    text: 'Has salido correctamente.',
+                    timer: 2000,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            }
+
+            // 4. Invalidar token en el backend en segundo plano (sin congelar la interfaz)
+            if (token) {
+                fetch('/api/auth/logout', {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                }).catch(() => {});
+            }
         }
     };
 }
