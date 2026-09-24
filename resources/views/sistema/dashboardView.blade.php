@@ -162,7 +162,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Productos en Catálogo</p>
-                    <h3 class="text-2xl font-bold font-display text-white mt-1" x-text="productos.length"></h3>
+                    <h3 class="text-2xl font-bold font-display text-white mt-1" x-text="stats.totalProductos !== undefined ? stats.totalProductos : productos.length"></h3>
                     <p class="text-xs text-indigo-400 mt-2 flex items-center gap-1 font-medium">
                         <i data-lucide="boxes" class="w-3.5 h-3.5"></i>
                         <span x-text="stats.totalUnidades + ' unidades en almacén'"></span>
@@ -261,7 +261,7 @@
                 <div class="p-2 rounded-xl bg-dark-900/60">
                     <p class="text-[11px] text-slate-400">Promedio / Transacción</p>
                     <p class="text-sm font-bold text-emerald-400 mt-0.5"
-                        x-text="ventas.length > 0 ? formatCurrency(stats.totalVentasMonto / ventas.length) : 'C$ 0.00'"></p>
+                        x-text="(stats.totalVentasCount || ventas.length) > 0 ? formatCurrency(stats.totalVentasMonto / (stats.totalVentasCount || ventas.length)) : 'C$ 0.00'"></p>
                 </div>
                 <div class="p-2 rounded-xl bg-dark-900/60 col-span-2 sm:col-span-1">
                     <p class="text-[11px] text-slate-400">Visualización</p>
@@ -517,10 +517,10 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                    <template x-for="v in ventas.slice(0, 6)" :key="v.venta_id">
+                    <template x-for="v in ultimasVentas" :key="v.venta_id">
                         <tr class="hover:bg-slate-800/40 transition-colors">
                             <td class="py-3.5 px-4 font-semibold text-brand-300 font-mono" x-text="v.codigo_venta"></td>
-                            <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final'"></td>
+                            <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente_nombre || (v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final')"></td>
                             <td class="py-3.5 px-4">
                                 <span class="px-2.5 py-1 text-xs rounded-lg font-medium inline-flex items-center gap-1"
                                     :class="{
@@ -536,7 +536,7 @@
                             <td class="py-3.5 px-4 text-right font-bold text-white font-mono" x-text="formatCurrency(v.total_venta)"></td>
                         </tr>
                     </template>
-                    <tr x-show="ventas.length === 0">
+                    <tr x-show="ultimasVentas.length === 0">
                         <td colspan="5" class="py-8 text-center text-slate-500">
                             <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-1 text-slate-600"></i>
                             No hay ventas registradas aún. Abre el POS para registrar la primera venta.

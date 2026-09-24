@@ -100,6 +100,9 @@ export function app() {
         },
 
         get stats() {
+            if (this.dashboardData?.stats) {
+                return this.dashboardData.stats;
+            }
             const totalVentasMonto = this.ventas.reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
             const totalUnidades = this.productos.reduce((sum, p) => sum + Number(p.existencia_bodega || 0), 0);
             return {
@@ -169,11 +172,7 @@ export function app() {
             try {
                 switch (tab) {
                     case 'dashboard':
-                        await Promise.all([
-                            this.fetchProductos(),
-                            this.fetchVentas(),
-                            this.fetchBitacoras()
-                        ]);
+                        await this.fetchDashboardData();
                         this.initDashboardCharts();
                         break;
                     case 'pos':
