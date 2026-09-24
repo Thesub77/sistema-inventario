@@ -85,12 +85,29 @@ function themeModule() {
 // 3.5. Módulo de Dashboard Analítico (RF-13, RF-26, RF-30, RF-31, RF-32, RF-33)
 function dashboardModule() {
     return {
+        dashboardData: null,
         dashboardPeriodo: 'hoy',
         dashboardVentasView: 'dias',
         bajaRotacionFiltro: 'todos',
         stockAlertFiltro: 'todos',
         chartVentasInstance: null,
         chartTopInstance: null,
+
+        // Carga optimizada de métricas calculadas en el servidor (Issue #19)
+        async fetchDashboardData() {
+            try {
+                const localDate = new Date().toLocaleDateString('en-CA');
+                const res = await this.apiFetch(`/api/dashboard/resumen?fecha=${localDate}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.success) {
+                        this.dashboardData = json;
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando métricas optimizadas del Dashboard:', error);
+            }
+        },
 
         initDashboardCharts() {
             this.$nextTick(() => {
@@ -108,7 +125,7 @@ function dashboardModule() {
         },
 
         get ventasTurno() {
-            const hoy = new Date().toISOString().slice(0, 10);
+            const hoy = new Date().toLocaleDateString('en-CA');
             return (this.ventas || []).filter(v => {
                 if (!v.fecha_hora_venta) return false;
                 return v.fecha_hora_venta.startsWith(hoy);
@@ -116,6 +133,10 @@ function dashboardModule() {
         },
 
         get ventasTurnoStats() {
+            if (this.dashboardData?.ventasTurnoStats) {
+                return this.dashboardData.ventasTurnoStats;
+            }
+
             const list = this.ventasTurno;
             const total = list.reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
 
@@ -156,6 +177,10 @@ function dashboardModule() {
         },
 
         get stockAlerts() {
+            if (this.dashboardData?.stockAlerts) {
+                return this.dashboardData.stockAlerts;
+            }
+
             const criticos = [];
             const urgentes = [];
             const advertencias = [];
@@ -200,6 +225,10 @@ function dashboardModule() {
         },
 
         get topProductosVendidos() {
+            if (this.dashboardData?.topProductosVendidos) {
+                return this.dashboardData.topProductosVendidos;
+            }
+
             const productMap = {};
 
             (this.productos || []).forEach(p => {
@@ -256,6 +285,10 @@ function dashboardModule() {
         },
 
         get productosBajaRotacion() {
+            if (this.dashboardData?.productosBajaRotacion) {
+                return this.dashboardData.productosBajaRotacion;
+            }
+
             const salesCountMap = {};
 
             (this.ventas || []).forEach(v => {
@@ -309,7 +342,17 @@ function dashboardModule() {
         },
 
         get capitalInmovilizadoTotal() {
-            return this.productosBajaRotacion.reduce((sum, p) => sum + p.capitalInmovilizado, 0);
+            if (this.dashboardData?.capitalInmovilizadoTotal !== undefined) {
+                return this.dashboardData.capitalInmovilizadoTotal;
+            }
+            return this.productosBajaRotacion.reduce((sum, p) => sum + (p.capitalInmovilizado || 0), 0);
+        },
+
+        get ultimasVentas() {
+            if (this.dashboardData?.ultimasVentas) {
+                return this.dashboardData.ultimasVentas;
+            }
+            return (this.ventas || []).slice(0, 6);
         },
 
         renderDashboardCharts() {
@@ -331,12 +374,19 @@ function dashboardModule() {
                 let dataMonto = [];
                 let dataTickets = [];
 
-                if (this.dashboardVentasView === 'dias') {
+                if (this.dashboardData?.chartVentas) {
+                    const chartData = this.dashboardVentasView === 'dias'
+                        ? this.dashboardData.chartVentas.dias
+                        : this.dashboardData.chartVentas.semanas;
+                    labels = chartData.labels;
+                    dataMonto = chartData.dataMonto;
+                    dataTickets = chartData.dataTickets;
+                } else if (this.dashboardVentasView === 'dias') {
                     const diasMap = {};
                     for (let i = 6; i >= 0; i--) {
                         const d = new Date();
                         d.setDate(d.getDate() - i);
-                        const key = d.toISOString().slice(0, 10);
+                        const key = d.toLocaleDateString('en-CA');
                         const dayName = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
                         diasMap[key] = { label: dayName, monto: 0, tickets: 0 };
                     }
@@ -1433,6 +1483,9 @@ function app() {
         },
 
         get stats() {
+            if (this.dashboardData?.stats) {
+                return this.dashboardData.stats;
+            }
             const totalVentasMonto = this.ventas.reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
             const totalUnidades = this.productos.reduce((sum, p) => sum + Number(p.existencia_bodega || 0), 0);
             return { totalVentasMonto, totalUnidades };
@@ -1500,11 +1553,7 @@ function app() {
             try {
                 switch (tab) {
                     case 'dashboard':
-                        await Promise.all([
-                            this.fetchProductos(),
-                            this.fetchVentas(),
-                            this.fetchBitacoras()
-                        ]);
+                        await this.fetchDashboardData();
                         this.initDashboardCharts();
                         break;
                     case 'pos':

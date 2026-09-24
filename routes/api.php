@@ -8,6 +8,9 @@ require __DIR__ . '/api/auth_routes.php';
 // 2. Rutas protegidas bajo autenticación de Sanctum y control de roles/permisos
 Route::middleware('auth:sanctum')->group(function () {
 
+    // Panel y Métricas Analíticas del Dashboard
+    Route::get('/dashboard/resumen', [\App\Http\Controllers\DashboardController::class, 'resumen']);
+
     // Módulo de Administración y Auditoría (Solo Administrador o permiso 'usuarios.gestionar')
     Route::middleware('permission:usuarios.gestionar')->group(function () {
         require __DIR__ . '/api/usuario_route.php';
