@@ -7,6 +7,9 @@ import { categoriasModule } from './modules/categorias';
 import { clientesModule } from './modules/clientes';
 import { usuariosModule } from './modules/usuarios';
 import { utilsModule } from './modules/utils';
+import { themeModule } from './modules/theme';
+import { authModule } from './modules/auth';
+import { dashboardModule } from './modules/dashboard';
 
 export function app() {
     return {
@@ -171,6 +174,7 @@ export function app() {
                             this.fetchVentas(),
                             this.fetchBitacoras()
                         ]);
+                        this.initDashboardCharts();
                         break;
                     case 'pos':
                         await Promise.all([
@@ -230,12 +234,39 @@ export function app() {
 
         // App Initialization
         initApp() {
-            // Cargar únicamente la pestaña activa inicial (Dashboard)
-            this.loadTab(this.currentTab);
+            // Inicializar tema claro / oscuro
+            this.initTheme();
+
+            // Inicializar autenticación y verificar sesión
+            this.initAuth();
+
+            // Si está autenticado, cargar pestaña activa inicial
+            if (this.isAuthenticated) {
+                this.loadTab(this.currentTab);
+                if (this.currentTab === 'dashboard') {
+                    this.initDashboardCharts();
+                }
+            }
+
+            // Observar cambios de tema para redibujar gráficos
+            this.$watch('darkMode', () => {
+                if (this.currentTab === 'dashboard') {
+                    this.renderDashboardCharts();
+                }
+            });
+
+            this.$watch('dashboardVentasView', () => {
+                if (this.currentTab === 'dashboard') {
+                    this.renderDashboardCharts();
+                }
+            });
 
             // Observar cambios de pestaña para cargar datos bajo demanda
             this.$watch('currentTab', (newTab) => {
                 this.loadTab(newTab);
+                if (newTab === 'dashboard') {
+                    this.initDashboardCharts();
+                }
                 this.$nextTick(() => {
                     if (window.lucide) {
                         window.lucide.createIcons();
@@ -247,7 +278,11 @@ export function app() {
         // --- Data Fetching Específico y Optimizado ---
         async fetchProductos() {
             try {
-                this.productos = await fetch('/api/productos').then(r => r.json());
+                const res = await this.apiFetch('/api/productos');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.productos = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando productos:', e);
             }
@@ -255,7 +290,11 @@ export function app() {
 
         async fetchCategorias() {
             try {
-                this.categorias = await fetch('/api/categorias').then(r => r.json());
+                const res = await this.apiFetch('/api/categorias');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.categorias = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando categorías:', e);
             }
@@ -263,9 +302,13 @@ export function app() {
 
         async fetchClientes() {
             try {
-                this.clientes = await fetch('/api/clientes').then(r => r.json());
-                if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
-                    this.posSale.id_cliente = this.clientes[0].cliente_id;
+                const res = await this.apiFetch('/api/clientes');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.clientes = Array.isArray(data) ? data : [];
+                    if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
+                        this.posSale.id_cliente = this.clientes[0].cliente_id;
+                    }
                 }
             } catch (e) {
                 console.error('Error cargando clientes:', e);
@@ -275,11 +318,17 @@ export function app() {
         async fetchUsuarios() {
             try {
                 const [usrRes, rolRes] = await Promise.all([
-                    fetch('/api/usuarios').then(r => r.json()),
-                    fetch('/api/roles').then(r => r.json())
+                    this.apiFetch('/api/usuarios'),
+                    this.apiFetch('/api/roles')
                 ]);
-                this.usuarios = usrRes;
-                this.roles = rolRes;
+                if (usrRes.ok) {
+                    const usrData = await usrRes.json();
+                    this.usuarios = Array.isArray(usrData) ? usrData : [];
+                }
+                if (rolRes.ok) {
+                    const rolData = await rolRes.json();
+                    this.roles = Array.isArray(rolData) ? rolData : [];
+                }
             } catch (e) {
                 console.error('Error cargando usuarios:', e);
             }
@@ -288,13 +337,22 @@ export function app() {
         async fetchVentas() {
             try {
                 const [venRes, cajRes, movCajRes] = await Promise.all([
-                    fetch('/api/ventas').then(r => r.json()),
-                    fetch('/api/cajas').then(r => r.json()),
-                    fetch('/api/caja-movimientos-venta').then(r => r.json())
+                    this.apiFetch('/api/ventas'),
+                    this.apiFetch('/api/cajas'),
+                    this.apiFetch('/api/caja-movimientos-venta')
                 ]);
-                this.ventas = venRes;
-                this.cajas = cajRes;
-                this.cajaMovimientos = movCajRes;
+                if (venRes.ok) {
+                    const venData = await venRes.json();
+                    this.ventas = Array.isArray(venData) ? venData : [];
+                }
+                if (cajRes.ok) {
+                    const cajData = await cajRes.json();
+                    this.cajas = Array.isArray(cajData) ? cajData : [];
+                }
+                if (movCajRes.ok) {
+                    const movData = await movCajRes.json();
+                    this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                }
             } catch (e) {
                 console.error('Error cargando ventas y cajas:', e);
             }
@@ -302,7 +360,11 @@ export function app() {
 
         async fetchInventario() {
             try {
-                this.movimientosInventario = await fetch('/api/movimientos-inventario').then(r => r.json());
+                const res = await this.apiFetch('/api/movimientos-inventario');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.movimientosInventario = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando movimientos de inventario:', e);
             }
@@ -310,7 +372,11 @@ export function app() {
 
         async fetchBitacoras() {
             try {
-                this.bitacoras = await fetch('/api/bitacoras').then(r => r.json());
+                const res = await this.apiFetch('/api/bitacoras');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.bitacoras = Array.isArray(data) ? data : [];
+                }
             } catch (e) {
                 console.error('Error cargando bitácora:', e);
             }
@@ -329,6 +395,9 @@ export function app() {
         ...clientesModule(),
         ...usuariosModule(),
         ...utilsModule(),
+        ...themeModule(),
+        ...authModule(),
+        ...dashboardModule(),
     };
 }
 

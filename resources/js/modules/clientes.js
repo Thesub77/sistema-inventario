@@ -39,12 +39,8 @@ export function clientesModule() {
             const method = this.isEditingCustomer ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.customerForm)
                 });
 
@@ -80,7 +76,7 @@ export function clientesModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/clientes/${c.cliente_id}`, {
+                await this.apiFetch(`/api/clientes/${c.cliente_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchClientes();

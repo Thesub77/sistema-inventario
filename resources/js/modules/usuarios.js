@@ -49,12 +49,8 @@ export function usuariosModule() {
             }
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -90,7 +86,7 @@ export function usuariosModule() {
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/usuarios/${u.usuario_id}`, {
+                await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchUsuarios();

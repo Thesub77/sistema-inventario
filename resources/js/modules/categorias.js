@@ -42,12 +42,8 @@ export function categoriasModule() {
             const method = this.isEditingCategory ? 'PUT' : 'POST';
 
             try {
-                const res = await fetch(url, {
+                const res = await this.apiFetch(url, {
                     method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify(this.categoryForm)
                 });
 
@@ -64,8 +60,8 @@ export function categoriasModule() {
                 Swal.fire({
                     icon: 'success',
                     title: '¡Categoría guardada!',
-                    background: '#1e293b',
-                    color: '#fff'
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
                 });
                 await this.fetchCategorias();
             } catch (error) {
@@ -73,8 +69,8 @@ export function categoriasModule() {
                     icon: 'error',
                     title: 'Error al guardar',
                     html: error.message,
-                    background: '#1e293b',
-                    color: '#fff'
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
                 });
             } finally {
                 this.isSavingCategory = false;
@@ -88,12 +84,12 @@ export function categoriasModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
-                background: '#1e293b',
-                color: '#fff'
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
             });
 
             if (result.isConfirmed) {
-                await fetch(`/api/categorias/${cat.categoria_id}`, {
+                await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
                     method: 'DELETE'
                 });
                 await this.fetchCategorias();

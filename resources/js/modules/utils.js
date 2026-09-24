@@ -17,6 +17,27 @@ export function utilsModule() {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        },
+        async apiFetch(url, options = {}) {
+            const opts = { ...options };
+            opts.headers = opts.headers || {};
+            if (!opts.headers['Accept']) {
+                opts.headers['Accept'] = 'application/json';
+            }
+            if (!opts.headers['Content-Type'] && !(opts.body instanceof FormData)) {
+                opts.headers['Content-Type'] = 'application/json';
+            }
+            opts.credentials = 'include';
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                opts.headers['Authorization'] = `Bearer ${token}`;
+            }
+            const res = await fetch(url, opts);
+            if (res.status === 401 && this.isAuthenticated) {
+                console.warn('Sesión expirada o no autorizada (401). Cerrando sesión...');
+                this.logout();
+            }
+            return res;
         }
     };
 }

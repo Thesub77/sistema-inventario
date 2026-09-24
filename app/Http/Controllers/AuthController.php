@@ -84,15 +84,23 @@ class AuthController extends Controller
         $usuario = $request->user();
 
         if ($usuario) {
-            $usuario->currentAccessToken()->delete();
+            try {
+                $usuario->currentAccessToken()?->delete();
+            } catch (\Throwable $e) {
+                // Continuar aunque ya no exista el token
+            }
 
-            Bitacora::create([
-                'id_usuario' => $usuario->usuario_id,
-                'accion_bitacora' => 'LOGOUT',
-                'descripcion_bitacora' => "Cierre de sesión del usuario: {$usuario->nombre_usuario}",
-                'fecha_hora_bitacora' => now(),
-                'estado' => 1,
-            ]);
+            try {
+                Bitacora::create([
+                    'id_usuario' => $usuario->usuario_id,
+                    'accion_bitacora' => 'LOGOUT',
+                    'descripcion_bitacora' => "Cierre de sesión del usuario: {$usuario->nombre_usuario}",
+                    'fecha_hora_bitacora' => now(),
+                    'estado' => 1,
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Error registrando bitácora logout: ' . $e->getMessage());
+            }
         }
 
         return response()->json([

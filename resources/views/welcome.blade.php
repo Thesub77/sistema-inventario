@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<html lang="es" class="h-full">
 
 <head>
     <meta charset="UTF-8">
@@ -21,18 +21,27 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <!-- Vite JS -->
-    @vite(['resources/js/app.js'])
+    <!-- Chart.js (Gráficos interactivos y responsivos para Dashboard) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Alpine.js -->
+    <!-- Capa de Presentación: Estilos Personalizados del Sistema -->
+    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
+
+    <!-- Capa de Lógica Frontend: Módulos y Estado de la Aplicación -->
+    <script src="{{ asset('js/app.js') }}"></script>
+
+    <!-- Alpine.js (Motor de Reactividad) -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
 </head>
 
 <body class="h-full bg-dark-950 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="app()" x-init="initApp()">
 
-    <!-- Main Container -->
-    <div class="flex h-screen overflow-hidden">
+    <!-- 1. VISTA DE AUTENTICACIÓN / LOGIN -->
+    @include('auth.loginView')
+
+    <!-- 2. VISTA PRINCIPAL DEL SISTEMA (DASHBOARD & MÓDULOS) -->
+    <div x-show="isAuthenticated" x-cloak class="flex h-screen overflow-hidden">
 
         <!-- Sidebar -->
         <aside class="w-64 flex-shrink-0 bg-dark-900 border-r border-slate-800/80 flex flex-col justify-between transition-all duration-300 z-30">
@@ -68,17 +77,23 @@
 
             <!-- User Info / Footer -->
             <div class="p-4 border-t border-slate-800/80 bg-dark-950/40">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-brand-400 font-bold text-sm">
-                        DQ
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-brand-400 font-bold text-xs flex-shrink-0"
+                            x-text="currentUser.nombre_apellido ? currentUser.nombre_apellido.split(' ').map(n => n[0]).slice(0, 2).join('') : 'U'">
+                        </div>
+                        <div class="overflow-hidden">
+                            <p class="text-xs font-semibold text-slate-200 truncate" x-text="currentUser.nombre_apellido || 'Usuario'"></p>
+                            <p class="text-[11px] text-emerald-400 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span x-text="currentUser.rol || 'Administrador'"></span>
+                            </p>
+                        </div>
                     </div>
-                    <div class="overflow-hidden">
-                        <p class="text-xs font-semibold text-slate-200 truncate">Diego Quiroz</p>
-                        <p class="text-[11px] text-emerald-400 flex items-center gap-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            Administrador
-                        </p>
-                    </div>
+                    <!-- Logout Button -->
+                    <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all flex-shrink-0 cursor-pointer active:scale-95">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
         </aside>
@@ -106,6 +121,34 @@
                     <button @click="openProductModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-brand-600/20 transition-all">
                         <i data-lucide="plus" class="w-4 h-4"></i>
                         <span>Nuevo Producto</span>
+                    </button>
+
+                    <!-- Switch Modo Claro / Modo Oscuro -->
+                    <button type="button"
+                        @click="toggleTheme()"
+                        :title="darkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'"
+                        class="relative inline-flex h-8 w-16 items-center rounded-full p-1 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 border shadow-inner"
+                        :class="darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-750' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'"
+                        role="switch"
+                        :aria-checked="darkMode">
+                        <span class="sr-only">Cambiar tema</span>
+
+                        <!-- Background Sun & Moon Indicators -->
+                        <span class="absolute left-1.5 flex items-center justify-center text-amber-500 pointer-events-none transition-opacity duration-200"
+                            :class="!darkMode ? 'opacity-100' : 'opacity-30'">
+                            <i data-lucide="sun" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="absolute right-1.5 flex items-center justify-center text-indigo-400 pointer-events-none transition-opacity duration-200"
+                            :class="darkMode ? 'opacity-100' : 'opacity-30'">
+                            <i data-lucide="moon" class="w-3.5 h-3.5"></i>
+                        </span>
+
+                        <!-- Sliding Thumb with Current Mode Icon -->
+                        <span class="inline-flex h-6 w-6 transform items-center justify-center rounded-full shadow-md transition-transform duration-300 ease-in-out z-10"
+                            :class="darkMode ? 'translate-x-7 bg-slate-900 border border-slate-700 text-indigo-300' : 'translate-x-0 bg-white border border-amber-200 text-amber-500'">
+                            <i data-lucide="sun" x-show="!darkMode" class="w-3.5 h-3.5 text-amber-500" x-cloak></i>
+                            <i data-lucide="moon" x-show="darkMode" class="w-3.5 h-3.5 text-indigo-400" x-cloak></i>
+                        </span>
                     </button>
 
                     <!-- Refresh Data -->
