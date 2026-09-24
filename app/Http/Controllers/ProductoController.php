@@ -6,6 +6,7 @@ use App\Models\Producto;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -51,7 +52,7 @@ class ProductoController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate($this->rules());
+        $validated = $this->validateProducto($request);
 
         try {
             $producto = Producto::create($validated);
@@ -76,7 +77,7 @@ class ProductoController extends Controller
         try {
             $producto = DB::transaction(function () use ($request, $id) {
                 $producto = Producto::lockForUpdate()->findOrFail($id);
-                $validated = $request->validate($this->rules($producto));
+                $validated = $this->validateProducto($request, $producto);
                 if (array_key_exists('existencia_bodega', $validated)
                     && (int) $validated['existencia_bodega'] !== (int) $producto->existencia_bodega) {
                     throw ValidationException::withMessages([
@@ -145,4 +146,35 @@ class ProductoController extends Controller
             'estado' => [...$presencia, 'integer', 'in:0,1'],
         ];
     }
+
+    private function validateProducto(Request $request, ?Producto $producto = null): array
+    {
+        $validator = Validator::make($request->all(), $this->rules($producto), [
+            'codigo_producto.unique' => 'El código de producto ya está registrado.',
+            'id_categoria.exists' => 'La categoría seleccionada no es válida o está inactiva.',
+            'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
+        ]);
+
+        $validator->after(function ($validator) use ($request, $producto) {
+            if ($validator->errors()->has('costo_compra') || $validator->errors()->has('precio_venta')) {
+                return;
+            }
+
+            $costo = $request->input('costo_compra', $producto?->costo_compra);
+            $precio = $request->input('precio_venta', $producto?->precio_venta);
+
+            if ($costo !== null && $precio !== null && is_numeric($costo) && is_numeric($precio)) {
+                if ((float) $precio < (float) $costo) {
+                    if ($request->has('costo_compra') && ! $request->has('precio_venta')) {
+                        $validator->errors()->add('costo_compra', 'El costo de compra no puede ser mayor que el precio de venta actual.');
+                    } else {
+                        $validator->errors()->add('precio_venta', 'El precio de venta no puede ser menor que el costo de compra.');
+                    }
+                }
+            }
+        });
+
+        return $validator->validate();
+    }
 }
+
