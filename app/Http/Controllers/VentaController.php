@@ -3,20 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
-use App\Models\Caja;
 use App\Models\Caja_movimiento_venta;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
+use App\Services\CajaService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * API de ventas: consulta, confirmación, comprobante y anulación lógica.
+ *
+ * 
+ *
+ * Integración con cajas:
+ * - Vender exige un turno abierto válido con fecha y monto real de apertura.
+ * - Caja y turno del movimiento se obtienen del servicio, no del formulario.
+ * - Una devolución de otro turno genera un egreso sin cambiar el cierre anterior.
+ * - Solo el administrador puede autorizar una devolución sin turno disponible.
+ *
+ * Los errores de validación y CajaException se propagan al manejador de la API,
+ * que conserva el estado HTTP y agrega success: false y message a errores 4xx.
+ */
 class VentaController extends Controller
 {
+    /**
+     * GET /api/ventas: lista ventas, incluidas las anuladas, de más reciente a antigua.
+     * Admite fechas inclusivas, usuario y coincidencia parcial del código de venta.
+     * Devuelve un arreglo con usuario, cliente y detalles; no aplica paginación.
+     */
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -70,12 +88,18 @@ class VentaController extends Controller
         return response()->json($ventas);
     }
 
+    /**
+     * POST /api/ventas: confirma una venta y devuelve success, message y venta (201).
+     *
+     * 
+     * CajaService selecciona un turno propio único o una caja abierta única si
+     * no se indica id_caja. No crea aperturas ni presume un monto inicial cero.
+     * Cualquier excepción revierte todas las escrituras de esta confirmación.
+     */
     public function store(Request $request)
     {
-        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
-        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
-            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
-        }
+        // El responsable real proviene del token, nunca del formulario.
+        $request->merge(['id_usuario' => $request->user()->usuario_id]);
 
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
@@ -99,29 +123,13 @@ class VentaController extends Controller
             'detalles.*.cantidad' => 'required|integer|min:1|max:2147483647',
         ]);
 
-        return DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated, $request) {
 
-            $idCaja = $validated['id_caja'] ?? null;
-
-            $queryCaja = Caja::where('estado_caja', 'Abierta')
-                ->where('estado', 1);
-
-            if ($idCaja) {
-                $queryCaja->where('caja_id', $idCaja);
-            }
-
-            $cajaAbierta = $queryCaja
-                ->lockForUpdate()
-                ->first();
-
-            if (! $cajaAbierta) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No se puede realizar la venta porque no hay una caja abierta.',
-                ], 409);
-            }
-
-            $idCaja = $cajaAbierta->caja_id;
+            // El servicio bloquea primero la caja y el turno para coordinar la venta
+            // con otras ventas y con el cierre. Después se bloquean los productos.
+            $turno = app(CajaService::class)->paraVenta(isset($validated['id_caja']) ? (int) $validated['id_caja'] : null, $request->user());
+            // La fecha de entrada se valida por contrato; la fecha guardada es la del servidor.
+            $validated['fecha_hora_venta'] = now();
 
             $metodoPago = ucfirst(
                 strtolower(trim($validated['metodo_pago']))
@@ -143,6 +151,8 @@ class VentaController extends Controller
 
             $detallesProcesados = [];
 
+            // Orden estable de bloqueo para reducir interbloqueos entre transacciones.
+            // Primero se validan todas las líneas y se calculan sus importes en centavos.
             foreach (collect($validated['detalles'])->sortBy('id_producto') as $index => $item) {
 
                 $producto = Producto::where(
@@ -176,6 +186,7 @@ class VentaController extends Controller
                 $cantidad =
                     (int) $item['cantidad'];
 
+                // Comprueba la capacidad antes de multiplicar y acumular el subtotal.
                 if ($precioUnitario > intdiv(999999999999999999 - $subtotalVenta, $cantidad)) {
                     throw ValidationException::withMessages(['detalles' => 'El importe supera la capacidad de la venta.']);
                 }
@@ -228,6 +239,8 @@ class VentaController extends Controller
                 'estado' => 1,
             ]);
 
+            // Con las líneas ya validadas, guarda el precio aplicado, descuenta stock
+            // y registra las existencias anteriores y resultantes para auditoría.
             foreach ($detallesProcesados as $detalle) {
 
                 $producto =
@@ -278,8 +291,10 @@ class VentaController extends Controller
                 ]);
             }
 
+            // Ambas referencias provienen del mismo turno validado, nunca del formulario.
             Caja_movimiento_venta::create([
-                'id_caja' => $idCaja,
+                'id_caja_operacion' => $turno->caja_operacion_id,
+                'id_caja' => $turno->id_caja,
 
                 'id_venta' => $venta->venta_id,
 
@@ -316,6 +331,10 @@ class VentaController extends Controller
         });
     }
 
+    /**
+     * GET /api/ventas/{id}: devuelve la venta con detalles y movimientos de caja.
+     * Incluye ingresos y devoluciones relacionados; responde 404 si no existe.
+     */
     public function show($id)
     {
         $venta = Venta::with([
@@ -329,6 +348,10 @@ class VentaController extends Controller
         return response()->json($venta);
     }
 
+    /**
+     * PUT/PATCH /api/ventas/{id}: rechaza cambios sobre una venta existente (405).
+     * Para corregir una venta se debe anular y registrar otra; no se reescriben importes.
+     */
     public function update(Request $request, $id)
     {
         $venta = Venta::findOrFail($id);
@@ -341,21 +364,37 @@ class VentaController extends Controller
         ], 405);
     }
 
+    /**
+     * DELETE /api/ventas/{id}: anula lógicamente la venta y repone su inventario.
+     * El id_caja opcional indica dónde registrar la devolución, no la caja original.
+     * CajaService comprueba autorización y selecciona el turno de destino; si no
+     * hay uno disponible, solo un administrador puede registrar el egreso sin turno.
+     *
+     * 
+     * Los detalles y la venta pasan a estado 0. La bitácora identifica al usuario
+     * que anuló y el destino del egreso. Todo se confirma o revierte conjuntamente.
+     * Los reintentos se rechazan (409) para impedir una segunda reposición de stock.
+     */
     public function destroy(Request $request, $id)
     {
-        $usuarioAutenticadoId = $request->user()?->usuario_id ?? Auth::id();
-        if (! $request->has('id_usuario') && $usuarioAutenticadoId) {
-            $request->merge(['id_usuario' => $usuarioAutenticadoId]);
-        }
+        // El responsable real proviene del token, nunca del formulario.
+        $request->merge(['id_usuario' => $request->user()->usuario_id]);
 
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
+            'id_caja' => 'sometimes|required|integer|exists:caja,caja_id',
         ]);
 
         return DB::transaction(function () use (
             $id,
-            $validated
+            $validated,
+            $request
         ) {
+
+            Venta::findOrFail($id);
+            // Bloquea las cajas antes de la venta y los productos. El servicio también
+            // rechaza movimientos de origen ambiguos antes de modificar inventario.
+            $turnoDevolucion = app(CajaService::class)->paraAnular((int) $id, $request->user(), isset($validated['id_caja']) ? (int) $validated['id_caja'] : null);
 
             $venta = Venta::with([
                 'venta_detalles',
@@ -370,6 +409,8 @@ class VentaController extends Controller
                 ], 409);
             }
 
+            // Se restituyen las cantidades originales incluso si el producto está
+            // inactivo; se exige que exista y que la existencia no desborde su columna.
             foreach ($venta->venta_detalles->sortBy('id_producto') as $detalle) {
 
                 $producto = Producto::where(
@@ -429,24 +470,41 @@ class VentaController extends Controller
                     'estado' => 0,
                 ]);
 
-            Caja_movimiento_venta::where(
-                'id_venta',
-                $venta->venta_id
-            )
-                ->update([
-                    'estado' => 0,
-                ]);
+            $origen = Caja_movimiento_venta::with('turno')->where('id_venta', $venta->venta_id)->lockForUpdate()->firstOrFail();
+            // null representa la autorización administrativa sin turno. Una referencia
+            // distinta exige un egreso separado para no alterar el arqueo de origen.
+            $registrarEgreso = $turnoDevolucion === null || $origen->id_caja_operacion === null
+                || (int) $origen->id_caja_operacion !== (int) $turnoDevolucion->caja_operacion_id;
+            // Los cierres emitidos conservan su ingreso; el egreso pertenece al presente.
+            if ($origen->turno === null || ! $registrarEgreso) {
+                $origen->update(['estado' => 0]);
+            }
 
             $venta->update([
                 'estado' => 0,
             ]);
+
+            if ($registrarEgreso) {
+                // La salida actual no reasigna el ingreso histórico a otro turno.
+                $cajas = app(CajaService::class);
+                Caja_movimiento_venta::create([
+                    'id_caja' => $turnoDevolucion?->id_caja ?? $origen->id_caja,
+                    'id_caja_operacion' => $turnoDevolucion?->caja_operacion_id,
+                    'id_venta' => $venta->venta_id,
+                    'monto_movimiento' => $cajas->importe(-$cajas->centavos($venta->total_venta)),
+                    'fecha_hora_movimiento' => now(),
+                    'estado' => 1,
+                ]);
+            }
 
             Bitacora::create([
                 'id_usuario' => $validated['id_usuario'],
 
                 'accion_bitacora' => 'ANULAR_VENTA',
 
-                'descripcion_bitacora' => "Venta {$venta->codigo_venta} anulada.",
+                'descripcion_bitacora' => "Venta {$venta->codigo_venta} anulada.".($registrarEgreso
+                    ? ($turnoDevolucion ? " Devolucion en turno #{$turnoDevolucion->caja_operacion_id}." : " Egreso sin turno autorizado por administrador en caja #{$origen->id_caja}.")
+                    : ' Anulacion dentro del mismo turno.'),
 
                 'fecha_hora_bitacora' => now(),
 
@@ -461,6 +519,11 @@ class VentaController extends Controller
         });
     }
 
+    /**
+     * GET /api/ventas/{id}/comprobante: entrega datos JSON y la bandera anulada.
+     * Los importes proceden de la venta guardada; no se recalculan con precios actuales.
+     * 
+     */
     public function comprobante($id)
     {
         // Los importes y precios son los guardados al confirmar, no los del catálogo actual.
@@ -472,6 +535,11 @@ class VentaController extends Controller
         ]);
     }
 
+    /**
+     * Convierte importes no negativos, con hasta dos decimales, a centavos enteros.
+     * Se usa para precios y descuentos; evita operar con flotantes en los cálculos.
+     * Los egresos negativos se convierten mediante CajaService, que maneja el signo.
+     */
     private function centavos($valor): int
     {
         $partes = explode('.', (string) $valor, 2);
@@ -479,6 +547,7 @@ class VentaController extends Controller
         return ((int) $partes[0] * 100) + (int) str_pad($partes[1] ?? '', 2, '0');
     }
 
+    /** Convierte centavos no negativos a una cadena decimal con dos posiciones. */
     private function importe(int $centavos): string
     {
         return intdiv($centavos, 100).'.'.str_pad((string) ($centavos % 100), 2, '0', STR_PAD_LEFT);
