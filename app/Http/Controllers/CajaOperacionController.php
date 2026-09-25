@@ -6,6 +6,7 @@ use App\Exceptions\CajaException;
 use App\Models\Caja;
 use App\Models\Caja_operacion;
 use App\Services\CajaService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -33,8 +34,7 @@ class CajaOperacionController extends Controller
      * - Un usuario Administrador puede consultar el historial de todos los turnos.
      * - Un usuario con permiso de caja/POS solo visualiza los turnos asociados a su propio usuario.
      *
-     * @param  Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function index(Request $request)
     {
@@ -57,8 +57,7 @@ class CajaOperacionController extends Controller
      * - Se bloquea la fila de la caja (`lockForUpdate`), se crea el registro del turno,
      *   se actualiza la caja a 'Abierta' y se audita en la bitácora dentro de la misma transacción.
      *
-     * @param  Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function store(Request $request)
     {
@@ -102,9 +101,8 @@ class CajaOperacionController extends Controller
      * - Desglose de devoluciones y anulaciones por método de pago.
      * - Monto total de efectivo físico esperado en caja.
      *
-     * @param  Request  $request
      * @param  int  $id  Identificador del turno (caja_operacion_id).
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function show(Request $request, $id)
     {
@@ -132,9 +130,8 @@ class CajaOperacionController extends Controller
      * - Cambia el estado del turno a inactivo (estado = 0) y la caja a 'Cerrada'.
      * - Registra la acción en la bitácora de auditoría.
      *
-     * @param  Request  $request
      * @param  int  $id  Identificador del turno (caja_operacion_id).
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function update(Request $request, $id)
     {
@@ -184,7 +181,7 @@ class CajaOperacionController extends Controller
      * y nunca deben ser borrados de la base de datos.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse 405 Method Not Allowed
+     * @return JsonResponse 405 Method Not Allowed
      */
     public function destroy($id)
     {

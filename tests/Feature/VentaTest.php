@@ -2,12 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Bitacora;
 use App\Models\Caja;
-use App\Models\Caja_movimiento_venta;
 use App\Models\Categoria;
 use App\Models\Cliente;
-use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
@@ -22,9 +19,13 @@ class VentaTest extends TestCase
     use RefreshDatabase;
 
     protected Usuario $usuario;
+
     protected Cliente $cliente;
+
     protected Categoria $categoria;
+
     protected Producto $producto;
+
     protected Caja $cajaAbierta;
 
     protected function setUp(): void
@@ -98,8 +99,8 @@ class VentaTest extends TestCase
                 [
                     'id_producto' => $this->producto->producto_id,
                     'cantidad' => 2,
-                ]
-            ]
+                ],
+            ],
         ];
 
         $res = $this->postJson('/api/ventas', $payload);
@@ -119,8 +120,8 @@ class VentaTest extends TestCase
                 [
                     'id_producto' => $this->producto->producto_id,
                     'cantidad' => 50, // Stock es 10
-                ]
-            ]
+                ],
+            ],
         ];
 
         $res = $this->postJson('/api/ventas', $payload);
@@ -140,12 +141,12 @@ class VentaTest extends TestCase
                 [
                     'id_producto' => $this->producto->producto_id,
                     'cantidad' => 2,
-                ]
-            ]
+                ],
+            ],
         ];
 
         $res = $this->postJson('/api/ventas', $payload);
-        
+
         // Debería responder 201 Created
         $res->assertStatus(201);
 
@@ -203,8 +204,8 @@ class VentaTest extends TestCase
                 [
                     'id_producto' => $this->producto->producto_id,
                     'cantidad' => 3,
-                ]
-            ]
+                ],
+            ],
         ];
 
         $resVenta = $this->postJson('/api/ventas', $payload);
@@ -213,7 +214,7 @@ class VentaTest extends TestCase
 
         // Anular venta enviando id_usuario
         $resAnular = $this->deleteJson("/api/ventas/{$ventaId}", [
-            'id_usuario' => $this->usuario->usuario_id
+            'id_usuario' => $this->usuario->usuario_id,
         ]);
         $resAnular->assertStatus(200);
 
@@ -237,7 +238,7 @@ class VentaTest extends TestCase
 
         // Reintento de anulación debe responder 409
         $resAnularRepetido = $this->deleteJson("/api/ventas/{$ventaId}", [
-            'id_usuario' => $this->usuario->usuario_id
+            'id_usuario' => $this->usuario->usuario_id,
         ]);
         $resAnularRepetido->assertStatus(409);
     }
@@ -250,7 +251,7 @@ class VentaTest extends TestCase
             'codigo_venta' => 'FAC-005',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
-            'detalles' => []
+            'detalles' => [],
         ];
 
         $res = $this->postJson('/api/ventas', $payload);

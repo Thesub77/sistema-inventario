@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Caja extends Model
 {
-    //datos de la tabla caja
+    // datos de la tabla caja
     protected $table = 'caja';
+
     protected $primaryKey = 'caja_id';
+
     public $timestamps = false;
 
     protected $fillable = [

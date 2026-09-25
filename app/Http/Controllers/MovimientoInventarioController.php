@@ -26,10 +26,10 @@ class MovimientoInventarioController extends Controller
                 $query->where($campo, $datos[$campo]);
             }
         }
-        if (!empty($datos['fecha_desde'])) {
+        if (! empty($datos['fecha_desde'])) {
             $query->whereDate('fecha_movimiento', '>=', $datos['fecha_desde']);
         }
-        if (!empty($datos['fecha_hasta'])) {
+        if (! empty($datos['fecha_hasta'])) {
             $query->whereDate('fecha_movimiento', '<=', $datos['fecha_hasta']);
         }
 
@@ -39,7 +39,7 @@ class MovimientoInventarioController extends Controller
     public function store(Request $request)
     {
         // Ambos nombres de entrada se guardan en la columna original de la BD.
-        if ($request->has('cantidad_movimiento') && !$request->has('cantidad_movimimiento')) {
+        if ($request->has('cantidad_movimiento') && ! $request->has('cantidad_movimimiento')) {
             $request->merge(['cantidad_movimimiento' => $request->input('cantidad_movimiento')]);
         }
         $ajuste = $request->input('tipo_movimiento') === 'Ajuste Manual';
@@ -69,7 +69,7 @@ class MovimientoInventarioController extends Controller
             if (isset($datos['stock_anterior_producto']) && (int) $datos['stock_anterior_producto'] !== $anterior) {
                 throw ValidationException::withMessages(['stock_anterior_producto' => 'Las existencias cambiaron. Consulte el stock actual antes de registrar el movimiento.']);
             }
-            if (!$ajuste && isset($datos['stock_resultante_producto']) && (int) $datos['stock_resultante_producto'] !== $nuevo) {
+            if (! $ajuste && isset($datos['stock_resultante_producto']) && (int) $datos['stock_resultante_producto'] !== $nuevo) {
                 throw ValidationException::withMessages(['stock_resultante_producto' => 'El saldo enviado no coincide con el movimiento solicitado.']);
             }
 

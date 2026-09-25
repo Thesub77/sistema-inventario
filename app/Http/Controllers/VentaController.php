@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * API de ventas: consulta, confirmación, comprobante y anulación lógica.
  *
- * 
+ *
  *
  * Integración con cajas:
  * - Vender exige un turno abierto válido con fecha y monto real de apertura.
@@ -91,7 +91,7 @@ class VentaController extends Controller
     /**
      * POST /api/ventas: confirma una venta y devuelve success, message y venta (201).
      *
-     * 
+     *
      * CajaService selecciona un turno propio único o una caja abierta única si
      * no se indica id_caja. No crea aperturas ni presume un monto inicial cero.
      * Cualquier excepción revierte todas las escrituras de esta confirmación.
@@ -370,7 +370,7 @@ class VentaController extends Controller
      * CajaService comprueba autorización y selecciona el turno de destino; si no
      * hay uno disponible, solo un administrador puede registrar el egreso sin turno.
      *
-     * 
+     *
      * Los detalles y la venta pasan a estado 0. La bitácora identifica al usuario
      * que anuló y el destino del egreso. Todo se confirma o revierte conjuntamente.
      * Los reintentos se rechazan (409) para impedir una segunda reposición de stock.
@@ -522,7 +522,6 @@ class VentaController extends Controller
     /**
      * GET /api/ventas/{id}/comprobante: entrega datos JSON y la bandera anulada.
      * Los importes proceden de la venta guardada; no se recalculan con precios actuales.
-     * 
      */
     public function comprobante($id)
     {

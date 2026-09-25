@@ -8,7 +8,6 @@ use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
-use App\Models\Venta;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -18,8 +17,11 @@ class IntegridadSeguridadTest extends TestCase
     use RefreshDatabase;
 
     protected Rol $rolAdmin;
+
     protected Rol $rolCajero;
+
     protected Usuario $adminPrincipal;
+
     protected Usuario $adminSecundario;
 
     protected function setUp(): void
@@ -427,4 +429,3 @@ class IntegridadSeguridadTest extends TestCase
         $resBitPag->assertJsonStructure(['data', 'current_page', 'per_page', 'total']);
     }
 }
-

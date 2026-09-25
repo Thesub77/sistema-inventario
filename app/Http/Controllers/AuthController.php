@@ -6,6 +6,7 @@ use App\Models\Bitacora;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -99,7 +100,7 @@ class AuthController extends Controller
                     'estado' => 1,
                 ]);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Error registrando bitácora logout: ' . $e->getMessage());
+                Log::warning('Error registrando bitácora logout: '.$e->getMessage());
             }
         }
 

@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Categoria extends Model
 {
-    //datos de la tabla categoria
+    // datos de la tabla categoria
     protected $table = 'categoria';
+
     protected $primaryKey = 'categoria_id';
+
     public $timestamps = false;
 
     protected $fillable = [
