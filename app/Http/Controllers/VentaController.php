@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
 use App\Models\Caja_movimiento_venta;
+use App\Models\Empresa;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -526,10 +527,20 @@ class VentaController extends Controller
     public function comprobante($id)
     {
         // Los importes y precios son los guardados al confirmar, no los del catálogo actual.
-        $venta = Venta::with(['usuario', 'cliente', 'venta_detalles.producto'])->findOrFail($id);
+        $venta = Venta::with([
+            'usuario',
+            'cliente',
+            'venta_detalles.producto',
+            'caja_movimiento_ventas.caja.empresa',
+        ])->findOrFail($id);
+
+        $empresa = $venta->caja_movimiento_ventas->first()?->caja?->empresa
+            ?? Empresa::where('estado', 1)->first()
+            ?? Empresa::first();
 
         return response()->json([
             'comprobante' => $venta,
+            'empresa' => $empresa,
             'anulada' => (int) $venta->estado === 0,
         ]);
     }

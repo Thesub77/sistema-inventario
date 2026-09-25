@@ -14,11 +14,17 @@ class Caja extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'id_empresa',
         'descripcion_caja',
         'tipo_apertura',
         'estado_caja',
         'estado',
     ];
+
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class, 'id_empresa', 'empresa_id');
+    }
 
     public function caja_operaciones()
     {

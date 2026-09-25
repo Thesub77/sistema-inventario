@@ -8,6 +8,7 @@ use App\Models\Caja_movimiento_venta;
 use App\Models\Caja_operacion;
 use App\Models\Categoria;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Rol;
@@ -65,8 +66,11 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
+        $empresaId = Empresa::where('estado', 1)->value('empresa_id');
+
         // 3. Cajas
         $caja1 = Caja::create([
+            'id_empresa' => $empresaId,
             'descripcion_caja' => 'Caja Principal - Mostrador 1',
             'tipo_apertura' => 'Manual',
             'estado_caja' => 'Abierta',
@@ -74,6 +78,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $caja2 = Caja::create([
+            'id_empresa' => $empresaId,
             'descripcion_caja' => 'Caja Secundaria - Mostrador 2',
             'tipo_apertura' => 'Manual',
             'estado_caja' => 'Cerrada',

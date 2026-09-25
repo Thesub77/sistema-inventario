@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmpresaController;
 use Illuminate\Support\Facades\Route;
 
 // 1. Rutas de autenticación pública (login con rate limiting y endpoints de sesión)
@@ -11,6 +12,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Panel y Métricas Analíticas del Dashboard
     Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
+
+    // Identidad y Datos del Negocio (RF-21)
+    Route::get('/empresa', [EmpresaController::class, 'show']);
+    Route::match(['put', 'patch'], '/empresa', [EmpresaController::class, 'update'])
+        ->middleware('permission:usuarios.gestionar');
 
     // Módulo de Administración y Auditoría (Solo Administrador o permiso 'usuarios.gestionar')
     Route::middleware('permission:usuarios.gestionar')->group(function () {

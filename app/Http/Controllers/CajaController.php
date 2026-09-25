@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\CajaException;
 use App\Models\Caja;
 use App\Models\Caja_operacion;
+use App\Models\Empresa;
 use App\Services\CajaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
 
-        return response()->json(Caja::orderBy('caja_id', 'desc')->get());
+        return response()->json(Caja::with('empresa')->orderBy('caja_id', 'desc')->get());
     }
 
     /**
@@ -47,9 +48,15 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
         $validated = $request->validate([
+            'id_empresa' => 'sometimes|nullable|integer|exists:empresa,empresa_id',
             'descripcion_caja' => 'required|string|max:128',
             'tipo_apertura' => 'required|string|max:16',
         ]);
+
+        if (empty($validated['id_empresa'])) {
+            $validated['id_empresa'] = Empresa::where('estado', 1)->value('empresa_id')
+                ?? Empresa::value('empresa_id');
+        }
 
         // Se conservan las reglas de negocio: nueva caja activa y cerrada.
         $caja = Caja::create($validated + ['estado_caja' => 'Cerrada', 'estado' => 1]);
@@ -57,7 +64,7 @@ class CajaController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Caja registrada correctamente.',
-            'caja' => $caja,
+            'caja' => $caja->load('empresa'),
         ], 201);
     }
 
@@ -74,6 +81,7 @@ class CajaController extends Controller
         $usuario = $request->user();
 
         return response()->json(Caja::with([
+            'empresa',
             'caja_operaciones' => function ($query) use ($usuario) {
                 if (! $usuario->esAdmin()) {
                     $query->where('id_usuario', $usuario->usuario_id);
@@ -97,6 +105,7 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
         $validated = $request->validate([
+            'id_empresa' => 'sometimes|nullable|integer|exists:empresa,empresa_id',
             'descripcion_caja' => 'sometimes|required|string|max:128',
             'tipo_apertura' => 'sometimes|required|string|max:16',
             'estado' => 'sometimes|integer|in:0,1',
@@ -113,7 +122,7 @@ class CajaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Caja actualizada correctamente.',
-                'caja' => $caja,
+                'caja' => $caja->load('empresa'),
             ]);
         }, 3);
     }
