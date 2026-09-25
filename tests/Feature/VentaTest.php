@@ -257,4 +257,53 @@ class VentaTest extends TestCase
         $res = $this->postJson('/api/ventas', $payload);
         $res->assertStatus(422);
     }
+
+    public function test_rechaza_venta_por_transferencia_sin_referencia_de_transaccion(): void
+    {
+        $payload = [
+            'id_usuario' => $this->usuario->usuario_id,
+            'id_cliente' => $this->cliente->cliente_id,
+            'codigo_venta' => 'FAC-TRF-001',
+            'metodo_pago' => 'Transferencia',
+            'fecha_hora_venta' => now()->toDateTimeString(),
+            'detalles' => [
+                [
+                    'id_producto' => $this->producto->producto_id,
+                    'cantidad' => 1,
+                ],
+            ],
+        ];
+
+        $res = $this->postJson('/api/ventas', $payload);
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrors(['referencia_transferencia']);
+    }
+
+    public function test_registra_venta_por_transferencia_con_referencia_exitosamente(): void
+    {
+        $payload = [
+            'id_usuario' => $this->usuario->usuario_id,
+            'id_cliente' => $this->cliente->cliente_id,
+            'codigo_venta' => 'FAC-TRF-002',
+            'metodo_pago' => 'Transferencia',
+            'referencia_transferencia' => 'TRF-BAC-987654321',
+            'fecha_hora_venta' => now()->toDateTimeString(),
+            'detalles' => [
+                [
+                    'id_producto' => $this->producto->producto_id,
+                    'cantidad' => 1,
+                ],
+            ],
+        ];
+
+        $res = $this->postJson('/api/ventas', $payload);
+        $res->assertStatus(201);
+
+        $this->assertDatabaseHas('venta', [
+            'codigo_venta' => 'FAC-TRF-002',
+            'metodo_pago' => 'Transferencia',
+            'referencia_transferencia' => 'TRF-BAC-987654321',
+            'estado' => 1,
+        ]);
+    }
 }

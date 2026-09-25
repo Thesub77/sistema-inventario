@@ -18,6 +18,7 @@ class Venta extends Model
         'id_cliente',
         'codigo_venta',
         'metodo_pago',
+        'referencia_transferencia',
         'fecha_hora_venta',
         'subtotal_venta',
         'descuento_venta',
