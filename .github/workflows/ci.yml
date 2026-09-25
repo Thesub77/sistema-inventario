@@ -131,7 +131,7 @@ jobs:
           node-version: 20
 
       - name: Auditoría de paquetes PHP (Composer Audit)
-        run: composer audit
+        run: composer audit --locked
 
       - name: Auditoría de paquetes JS (NPM Audit)
         run: npm audit --audit-level=high
