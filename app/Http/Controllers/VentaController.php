@@ -112,7 +112,7 @@ class VentaController extends Controller
 
             'fecha_hora_venta' => 'required|date',
 
-            'descuento_venta' => 'nullable|numeric|decimal:0,2|min:0|max:999.99',
+            'descuento_venta' => 'nullable|numeric|decimal:0,2|min:0|max:99999999.99',
 
             'id_caja' => 'nullable|exists:caja,caja_id',
 
