@@ -11,6 +11,7 @@ use App\Models\Usuario;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -19,8 +20,11 @@ class DashboardTest extends TestCase
     use RefreshDatabase;
 
     protected Usuario $usuario;
+
     protected Categoria $categoria;
+
     protected Cliente $cliente;
+
     protected Caja $caja;
 
     protected function setUp(): void
@@ -136,7 +140,7 @@ class DashboardTest extends TestCase
             'fecha',
             'ventasTurnoStats' => [
                 'total', 'totalTickets', 'efectivo', 'countEfectivo', 'pctEfectivo',
-                'transferencia', 'tarjeta'
+                'transferencia', 'tarjeta',
             ],
             'stats' => ['totalVentasMonto', 'totalVentasCount', 'totalProductos', 'totalUnidades'],
             'stockAlerts' => ['criticos', 'urgentes', 'advertencias', 'totalAlertas', 'todos'],
@@ -179,7 +183,7 @@ class DashboardTest extends TestCase
 
     public function test_dashboard_requiere_autenticacion(): void
     {
-        \Illuminate\Support\Facades\Auth::forgetGuards();
+        Auth::forgetGuards();
         $this->getJson('/api/dashboard/resumen')->assertStatus(401);
     }
 }

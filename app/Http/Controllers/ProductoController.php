@@ -177,4 +177,3 @@ class ProductoController extends Controller
         return $validator->validate();
     }
 }
-

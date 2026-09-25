@@ -21,26 +21,26 @@ class BitacoraController extends Controller
 
         $query = Bitacora::with('usuario')->orderByDesc('id_bitacora');
 
-        if (!empty($validated['buscar'])) {
+        if (! empty($validated['buscar'])) {
             $query->where(function ($q) use ($validated) {
                 $q->whereLike('accion_bitacora', '%'.$validated['buscar'].'%')
                     ->orWhereLike('descripcion_bitacora', '%'.$validated['buscar'].'%');
             });
         }
 
-        if (!empty($validated['id_usuario'])) {
+        if (! empty($validated['id_usuario'])) {
             $query->where('id_usuario', $validated['id_usuario']);
         }
 
-        if (!empty($validated['accion'])) {
+        if (! empty($validated['accion'])) {
             $query->whereLike('accion_bitacora', "%{$validated['accion']}%");
         }
 
-        if (!empty($validated['fecha_desde'])) {
+        if (! empty($validated['fecha_desde'])) {
             $query->whereDate('fecha_hora_bitacora', '>=', $validated['fecha_desde']);
         }
 
-        if (!empty($validated['fecha_hasta'])) {
+        if (! empty($validated['fecha_hasta'])) {
             $query->whereDate('fecha_hora_bitacora', '<=', $validated['fecha_hasta']);
         }
 
@@ -54,6 +54,7 @@ class BitacoraController extends Controller
     public function show($id)
     {
         $bitacora = Bitacora::with('usuario')->findOrFail($id);
+
         return response()->json($bitacora);
     }
 }

@@ -88,3 +88,50 @@ jobs:
 
       - name: Compilar Frontend con Vite
         run: npm run build
+
+  # Linter y formato de código PHP
+  lint:
+    name: Verificación de Estilo (Laravel Pint)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Instalar dependencias de Composer
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Validar estilo de código con Laravel Pint
+        run: vendor/bin/pint --test
+
+  # Auditoría de seguridad de dependencias
+  security:
+    name: Auditoría de Seguridad (Dependencias)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Auditoría de paquetes PHP (Composer Audit)
+        run: composer audit
+
+      - name: Auditoría de paquetes JS (NPM Audit)
+        run: npm audit --audit-level=high

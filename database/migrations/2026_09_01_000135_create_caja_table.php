@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('descripcion_caja', 128);
             $table->string('tipo_apertura', 16);
             $table->string('estado_caja', 16);
-            $table->tinyInteger('estado'); 
+            $table->tinyInteger('estado');
         });
     }
 

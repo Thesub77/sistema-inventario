@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Bitacora;
 use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,8 +14,11 @@ class AuthAndRoleTest extends TestCase
     use RefreshDatabase;
 
     protected Rol $rolAdmin;
+
     protected Rol $rolCajero;
+
     protected Usuario $admin;
+
     protected Usuario $cajero;
 
     protected function setUp(): void

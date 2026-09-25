@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Producto extends Model
 {
-    //datos dela tabla producto
+    // datos dela tabla producto
     protected $table = 'producto';
+
     protected $primaryKey = 'producto_id';
+
     public $timestamps = false;
 
     protected $fillable = [

@@ -52,12 +52,14 @@ class CategoriaController extends Controller
         ]);
 
         $categoria = Categoria::create($validated);
+
         return response()->json($categoria, 201);
     }
 
     public function show($id)
     {
         $categoria = Categoria::with('productos')->findOrFail($id);
+
         return response()->json($categoria);
     }
 
@@ -87,6 +89,7 @@ class CategoriaController extends Controller
         ]);
 
         $categoria->update($validated);
+
         return response()->json($categoria);
     }
 

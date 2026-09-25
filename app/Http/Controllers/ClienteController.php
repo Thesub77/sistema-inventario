@@ -54,12 +54,14 @@ class ClienteController extends Controller
         ]);
 
         $cliente = Cliente::create($validated);
+
         return response()->json($cliente, 201);
     }
 
     public function show($id)
     {
         $cliente = Cliente::with('ventas')->findOrFail($id);
+
         return response()->json($cliente);
     }
 
@@ -84,6 +86,7 @@ class ClienteController extends Controller
         ]);
 
         $cliente->update($validated);
+
         return response()->json($cliente);
     }
 

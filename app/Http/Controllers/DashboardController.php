@@ -18,7 +18,7 @@ class DashboardController extends Controller
     public function resumen(Request $request): JsonResponse
     {
         $fechaHoy = $request->query('fecha', Carbon::today()->toDateString());
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHoy)) {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHoy)) {
             $fechaHoy = Carbon::today()->toDateString();
         }
 
@@ -186,7 +186,7 @@ class DashboardController extends Controller
             ->where('p.estado', 1)
             ->where(function ($query) {
                 $query->whereNull('sv.total_vendido')
-                      ->orWhere('sv.total_vendido', '<=', 2);
+                    ->orWhere('sv.total_vendido', '<=', 2);
             })
             ->select(
                 'p.producto_id',

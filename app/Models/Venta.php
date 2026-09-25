@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Venta extends Model
 {
-    //datos de la tabla venta
+    // datos de la tabla venta
     protected $table = 'venta';
+
     protected $primaryKey = 'venta_id';
+
     public $timestamps = false;
 
     protected $fillable = [

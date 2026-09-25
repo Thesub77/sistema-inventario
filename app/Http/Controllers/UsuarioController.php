@@ -13,6 +13,7 @@ class UsuarioController extends Controller
     public function index()
     {
         $usuarios = Usuario::with('rol')->get();
+
         return response()->json($usuarios);
     }
 
@@ -51,12 +52,14 @@ class UsuarioController extends Controller
         $validated['contrasenia_usuario'] = Hash::make($validated['contrasenia_usuario']);
 
         $usuario = Usuario::create($validated);
+
         return response()->json($usuario, 201);
     }
 
     public function show($id)
     {
         $usuario = Usuario::with(['rol', 'ventas', 'caja_operaciones', 'bitacoras'])->findOrFail($id);
+
         return response()->json($usuario);
     }
 
@@ -116,19 +119,20 @@ class UsuarioController extends Controller
                         'success' => false,
                         'message' => 'No se puede desactivar al único Administrador activo del sistema.',
                     ], 403);
-                    }
+                }
             }
 
             $usuario->tokens()->delete();
         }
 
-        if (!empty($validated['contrasenia_usuario'])) {
+        if (! empty($validated['contrasenia_usuario'])) {
             $validated['contrasenia_usuario'] = Hash::make($validated['contrasenia_usuario']);
         } else {
             unset($validated['contrasenia_usuario']);
         }
 
         $usuario->update($validated);
+
         return response()->json($usuario);
     }
 
