@@ -42,6 +42,7 @@ class VentaController extends Controller
             'fecha_hasta' => 'nullable|date'.($request->filled('fecha_desde') ? '|after_or_equal:fecha_desde' : ''),
             'id_usuario' => 'nullable|exists:usuario,usuario_id',
             'codigo_venta' => 'nullable|string|max:32',
+            'referencia_transferencia' => 'nullable|string|max:64',
         ]);
 
         $query = Venta::with([
@@ -81,6 +82,13 @@ class VentaController extends Controller
             );
         }
 
+        if (! empty($validated['referencia_transferencia'])) {
+            $query->where(
+                'referencia_transferencia',
+                $validated['referencia_transferencia']
+            );
+        }
+
         $ventas = $query
             ->orderBy('venta_id', 'desc')
             ->get();
@@ -110,6 +118,13 @@ class VentaController extends Controller
 
             'metodo_pago' => 'required|string|max:16',
 
+            'referencia_transferencia' => [
+                Rule::requiredIf(fn () => ucfirst(strtolower(trim($request->input('metodo_pago', '')))) === 'Transferencia'),
+                'nullable',
+                'string',
+                'max:64',
+            ],
+
             'fecha_hora_venta' => 'required|date',
 
             'descuento_venta' => 'nullable|numeric|decimal:0,2|min:0|max:99999999.99',
@@ -121,6 +136,9 @@ class VentaController extends Controller
             'detalles.*.id_producto' => 'required|exists:producto,producto_id|distinct',
 
             'detalles.*.cantidad' => 'required|integer|min:1|max:2147483647',
+        ], [
+            'referencia_transferencia.required' => 'El número de referencia o identificador de la transacción es obligatorio para pagos por transferencia.',
+            'referencia_transferencia.max' => 'El número de referencia de la transferencia no puede superar los 64 caracteres.',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
@@ -227,6 +245,10 @@ class VentaController extends Controller
                 'codigo_venta' => $validated['codigo_venta'],
 
                 'metodo_pago' => $metodoPago,
+
+                'referencia_transferencia' => $metodoPago === 'Transferencia'
+                    ? ($validated['referencia_transferencia'] ?? null)
+                    : null,
 
                 'fecha_hora_venta' => $validated['fecha_hora_venta'],
 
