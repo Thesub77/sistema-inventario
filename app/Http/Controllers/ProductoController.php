@@ -84,6 +84,11 @@ class ProductoController extends Controller
                         'existencia_bodega' => 'Registre una entrada, salida o ajuste en movimientos-inventario para cambiar las existencias.',
                     ]);
                 }
+                if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0 && (int) $producto->existencia_bodega > 0) {
+                    throw ValidationException::withMessages([
+                        'estado' => "No se puede desactivar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de desactivarlo.",
+                    ]);
+                }
                 $producto->update($validated);
 
                 return $producto;
@@ -100,9 +105,21 @@ class ProductoController extends Controller
     public function destroy($id)
     {
         $producto = Producto::findOrFail($id);
+
+        if ($producto->existencia_bodega > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "No se puede desactivar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de desactivarlo.",
+            ], 409);
+        }
+
         $producto->update(['estado' => 0]);
 
-        return response()->json(['message' => 'Producto desactivado correctamente']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Producto desactivado correctamente',
+            'producto' => $producto,
+        ]);
     }
 
     private function conEstadoStock(Producto $producto): Producto
