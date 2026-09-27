@@ -35,9 +35,19 @@
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Cantidad a Agregar / Restar</label>
+                <label class="block text-xs font-semibold text-slate-300 mb-1" x-text="stockForm.tipo_movimiento === 'Ajuste Manual' ? 'Nuevo Stock Total' : 'Cantidad a Registrar'"></label>
                 <input type="number" min="1" x-model.number="stockForm.cantidad" required
                     class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+            </div>
+
+            <!-- Campo de justificación obligatorio para salidas o ajustes manuales -->
+            <div x-show="stockForm.tipo_movimiento === 'Salida por Merma' || stockForm.tipo_movimiento === 'Ajuste Manual'">
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Motivo / Justificación *</label>
+                <input type="text" maxlength="90" x-model="stockForm.justificacion"
+                    :required="stockForm.tipo_movimiento === 'Salida por Merma' || stockForm.tipo_movimiento === 'Ajuste Manual'"
+                    placeholder="Ej. Producto dañado o diferencia en conteo físico"
+                    class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500">
+                <p class="text-[10px] text-slate-400 mt-1">Requerido para salidas y ajustes (máximo 90 caracteres).</p>
             </div>
 
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
