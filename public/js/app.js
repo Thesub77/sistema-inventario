@@ -858,6 +858,7 @@ function productosModule() {
             stock_anterior: 0,
             cantidad: 10,
             tipo_movimiento: 'Entrada por Compra',
+            justificacion: '',
         },
 
         openProductModal(product = null) {
@@ -945,57 +946,120 @@ function productosModule() {
             this.stockForm = {
                 producto_id: product.producto_id,
                 nombre_producto: product.nombre_producto,
-                stock_anterior: product.existencia_bodega,
+                stock_anterior: Number(product.existencia_bodega ?? product.stockActual ?? 0),
                 cantidad: 10,
-                tipo_movimiento: 'Entrada por Compra'
+                tipo_movimiento: 'Entrada por Compra',
+                justificacion: '',
             };
             this.showStockModal = true;
         },
 
         async saveStockAdjustment() {
-            const isAdd = this.stockForm.tipo_movimiento.includes('Entrada') || this.stockForm.tipo_movimiento.includes('Compra');
-            const newStock = isAdd ?
-                this.stockForm.stock_anterior + this.stockForm.cantidad :
-                Math.max(0, this.stockForm.stock_anterior - this.stockForm.cantidad);
+            if (!this.stockForm.producto_id || this.stockForm.cantidad <= 0) return;
+
+            const isAjuste = this.stockForm.tipo_movimiento === 'Ajuste Manual';
+            const isSalida = this.stockForm.tipo_movimiento === 'Salida por Merma' || this.stockForm.tipo_movimiento === 'Salida';
+            const isEntrada = this.stockForm.tipo_movimiento.includes('Entrada') || this.stockForm.tipo_movimiento.includes('Compra');
+
+            // Validación previa en cliente de justificación requerida para salidas y ajustes
+            if ((isAjuste || isSalida) && (!this.stockForm.justificacion || !this.stockForm.justificacion.trim())) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Justificación Requerida',
+                    text: 'Debe ingresar una justificación breve para registrar la salida o ajuste (máximo 90 caracteres).',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            // Validación previa para evitar salidas que excedan las existencias actuales
+            if (isSalida && Number(this.stockForm.cantidad) > this.stockForm.stock_anterior) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Existencia Insuficiente',
+                    text: `No se puede dar salida a ${this.stockForm.cantidad} unidades porque solo hay ${this.stockForm.stock_anterior} en bodega.`,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            // Cálculo del nuevo stock previsto
+            let newStock = this.stockForm.stock_anterior;
+            if (isAjuste) {
+                newStock = Number(this.stockForm.cantidad);
+            } else if (isEntrada) {
+                newStock = this.stockForm.stock_anterior + Number(this.stockForm.cantidad);
+            } else {
+                newStock = Math.max(0, this.stockForm.stock_anterior - Number(this.stockForm.cantidad));
+            }
+
+            // Construcción del payload para el registro transaccional en Kardex
+            const payload = {
+                id_producto: this.stockForm.producto_id,
+                id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                tipo_movimiento: this.stockForm.tipo_movimiento,
+                cantidad_movimiento: Number(this.stockForm.cantidad),
+                fecha_movimiento: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            };
+
+            // Campo obligatorio específico para el tipo de movimiento Ajuste Manual
+            if (isAjuste) {
+                payload.stock_resultante_producto = newStock;
+            }
+
+            // Asignación de la justificación si fue provista
+            if (this.stockForm.justificacion && this.stockForm.justificacion.trim()) {
+                payload.justificacion = this.stockForm.justificacion.trim().slice(0, 90);
+            }
+
+            // Cierre inmediato del modal para agilizar la interacción visual (0ms)
+            this.showStockModal = false;
+
+            // Actualización optimista del estado local en memoria
+            const prod = this.productos.find(p => p.producto_id === this.stockForm.producto_id);
+            const stockRespaldo = prod ? prod.existencia_bodega : this.stockForm.stock_anterior;
+            if (prod) prod.existencia_bodega = newStock;
 
             try {
-                await this.apiFetch(`/api/productos/${this.stockForm.producto_id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ existencia_bodega: newStock })
-                });
-
-                await this.apiFetch('/api/movimientos-inventario', {
+                // Envío directo al endpoint de movimientos de inventario que ejecuta el lockForUpdate
+                const res = await this.apiFetch('/api/movimientos-inventario', {
                     method: 'POST',
-                    body: JSON.stringify({
-                        id_producto: this.stockForm.producto_id,
-                        id_usuario: this.usuarios[0] ? this.usuarios[0].usuario_id : 1,
-                        tipo_movimiento: this.stockForm.tipo_movimiento,
-                        cantidad_movimimiento: this.stockForm.cantidad,
-                        stock_anterior_producto: this.stockForm.stock_anterior,
-                        stock_resultante_producto: newStock,
-                        fecha_movimiento: new Date().toISOString().slice(0, 19).replace('T', ' '),
-                        estado: 1
-                    })
+                    body: JSON.stringify(payload)
                 });
 
-                const prod = this.productos.find(p => p.producto_id === this.stockForm.producto_id);
-                if (prod) prod.existencia_bodega = newStock;
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    // En caso de error se revierte el stock optimista al valor original
+                    if (prod) prod.existencia_bodega = stockRespaldo;
+                    throw new Error(err.message || 'Error al procesar el ajuste de inventario.');
+                }
 
-                this.showStockModal = false;
+                // Sincronización concurrente de entidades para actualizar existencias y vistas
                 await Promise.all([
+                    this.fetchProductos(),
                     this.fetchInventario(),
                     this.fetchBitacoras()
                 ]);
+
+                // Notificación no intrusiva con temporizador automático
                 Swal.fire({
+                    toast: true,
+                    position: 'top-end',
                     icon: 'success',
-                    title: 'Inventario Actualizado',
+                    title: 'Stock Actualizado',
+                    text: `Existencias actualizadas a ${newStock} unidades.`,
+                    timer: 2500,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
+                    title: 'Error de Inventario',
                     text: error.message,
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
