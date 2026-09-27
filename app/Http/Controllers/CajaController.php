@@ -9,6 +9,7 @@ use App\Services\CajaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Controlador de Cajas Físicas / Puntos de Venta.
@@ -38,6 +39,7 @@ class CajaController extends Controller
     /**
      * Registra una nueva caja física en el sistema.
      *
+     * Valida la unicidad del nombre/descripción y restringe el tipo de apertura.
      * Toda nueva caja se inicializa en estado activa (estado = 1) y 'Cerrada',
      * lista para recibir su primera apertura formal de turno.
      *
@@ -47,8 +49,13 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
         $validated = $request->validate([
-            'descripcion_caja' => 'required|string|max:128',
-            'tipo_apertura' => 'required|string|max:16',
+            'descripcion_caja' => 'required|string|max:128|unique:caja,descripcion_caja',
+            'tipo_apertura' => ['required', 'string', 'max:16', Rule::in(['Manual', 'Automatica', 'Automática'])],
+        ], [
+            'descripcion_caja.required' => 'El nombre o descripción de la caja es obligatorio.',
+            'descripcion_caja.unique' => 'Ya existe una caja registrada con este nombre o descripción.',
+            'tipo_apertura.required' => 'El tipo de apertura es obligatorio.',
+            'tipo_apertura.in' => 'El tipo de apertura debe ser Manual o Automatica.',
         ]);
 
         // Se conservan las reglas de negocio: nueva caja activa y cerrada.
@@ -86,6 +93,7 @@ class CajaController extends Controller
     /**
      * Actualiza la información básica de una caja.
      *
+     * Valida la unicidad ignorando la caja actual y restringe el tipo de apertura.
      * El estado operativo ('estado_caja': 'Abierta'/'Cerrada') está prohibido aquí,
      * ya que solo se altera mediante aperturas y cierres en CajaOperacionController.
      * Si se solicita desactivar la caja (estado = 0), se valida que no tenga turnos abiertos.
@@ -97,10 +105,25 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
         $validated = $request->validate([
-            'descripcion_caja' => 'sometimes|required|string|max:128',
-            'tipo_apertura' => 'sometimes|required|string|max:16',
+            'descripcion_caja' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:128',
+                Rule::unique('caja', 'descripcion_caja')->ignore($id, 'caja_id'),
+            ],
+            'tipo_apertura' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:16',
+                Rule::in(['Manual', 'Automatica', 'Automática']),
+            ],
             'estado' => 'sometimes|integer|in:0,1',
             'estado_caja' => 'prohibited',
+        ], [
+            'descripcion_caja.unique' => 'Ya existe otra caja registrada con este nombre o descripción.',
+            'tipo_apertura.in' => 'El tipo de apertura debe ser Manual o Automatica.',
         ]);
 
         return DB::transaction(function () use ($validated, $id) {
