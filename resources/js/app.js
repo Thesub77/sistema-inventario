@@ -179,7 +179,8 @@ export function app() {
                         await Promise.all([
                             this.fetchProductos(),
                             this.fetchCategorias(),
-                            this.fetchClientes()
+                            this.fetchClientes(),
+                            this.fetchVentas()
                         ]);
                         break;
                     case 'productos':

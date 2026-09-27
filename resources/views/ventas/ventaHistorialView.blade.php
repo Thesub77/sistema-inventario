@@ -47,12 +47,16 @@
                                 <span class="px-2 py-0.5 text-xs rounded-md font-medium"
                                     :class="v.metodo_pago === 'Efectivo' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-brand-500/10 text-brand-400'"
                                     x-text="v.metodo_pago"></span>
+                                <span x-show="v.referencia_transferencia" class="block font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[130px]" :title="v.referencia_transferencia" x-text="v.referencia_transferencia"></span>
                             </td>
                             <td class="py-3.5 px-4 text-xs text-slate-400" x-text="formatDate(v.fecha_hora_venta)"></td>
                             <td class="py-3.5 px-4 text-right text-slate-400" x-text="formatCurrency(v.subtotal_venta)"></td>
                             <td class="py-3.5 px-4 text-right font-bold text-white" x-text="formatCurrency(v.total_venta)"></td>
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    <button @click="openReceiptModal(v.venta_id, v)" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors" title="Imprimir Comprobante">
+                                        <i data-lucide="printer" class="w-4 h-4"></i>
+                                    </button>
                                     <button @click="viewSaleDetails(v)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors" title="Ver Detalles de Factura">
                                         <i data-lucide="eye" class="w-4 h-4"></i>
                                     </button>

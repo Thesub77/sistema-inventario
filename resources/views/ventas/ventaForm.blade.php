@@ -29,7 +29,10 @@
                 </div>
                 <div>
                     <span class="text-slate-400">Método de Pago:</span>
-                    <p class="font-bold text-brand-300" x-text="selectedSale?.metodo_pago"></p>
+                    <p class="font-bold text-brand-300">
+                        <span x-text="selectedSale?.metodo_pago"></span>
+                        <span x-show="selectedSale?.referencia_transferencia" class="text-slate-400 font-mono text-[11px] block font-normal" x-text="'Ref: ' + selectedSale?.referencia_transferencia"></span>
+                    </p>
                 </div>
             </div>
 
@@ -59,6 +62,15 @@
             <div class="pt-3 border-t border-slate-800 flex justify-between items-center text-sm font-bold">
                 <span class="text-slate-400">Total Facturado:</span>
                 <span class="text-emerald-400 font-display text-lg" x-text="formatCurrency(selectedSale?.total_venta || 0)"></span>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="pt-2 flex justify-end gap-2 border-t border-slate-800/60">
+                <button type="button" @click="openReceiptModal(selectedSale?.venta_id, selectedSale)"
+                    class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>Imprimir Comprobante</span>
+                </button>
             </div>
         </div>
     </div>
