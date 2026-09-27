@@ -701,13 +701,31 @@ function utilsModule() {
 
         formatDate(dateStr) {
             if (!dateStr) return 'N/A';
-            const d = new Date(dateStr);
+            let normalized = String(dateStr).trim();
+            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                const fallback = new Date(dateStr);
+                if (isNaN(fallback.getTime())) return dateStr;
+                return fallback.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+            }
             return d.toLocaleDateString('es-ES', {
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric',
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                hour12: true
             });
         },
 
@@ -1257,10 +1275,17 @@ function posModule() {
         posSale: {
             id_cliente: null,
             metodo_pago: 'Efectivo',
+            referencia_transferencia: '',
             descuento_venta: 0,
         },
         showSaleDetailModal: false,
         selectedSale: null,
+
+        // Estado y control del comprobante de venta imprimible
+        showReceiptModal: false,
+        receiptData: null,
+        receiptAnulada: false,
+        loadingReceipt: false,
 
         addToCart(product) {
             if (product.existencia_bodega <= 0) {
@@ -1333,17 +1358,49 @@ function posModule() {
         clearCart() {
             this.cart = [];
             this.posSale.descuento_venta = 0;
+            this.posSale.referencia_transferencia = '';
         },
 
         async processSale() {
             if (this.cart.length === 0) return;
 
-            const codeNum = String(this.ventas.length + 1).padStart(4, '0');
+            // Validación de identificador / referencia en transferencias
+            if (this.posSale.metodo_pago === 'Transferencia' && (!this.posSale.referencia_transferencia || !this.posSale.referencia_transferencia.trim())) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Referencia Requerida',
+                    text: 'Debes ingresar el número de referencia o voucher para pagos por transferencia.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            // Generar código de factura de inmediato en 0ms sin bloquear con peticiones de red
+            let candidateCode = '';
+            if (this.ventas && this.ventas.length > 0) {
+                const nums = this.ventas.map(v => {
+                    const match = (v.codigo_venta || '').match(/(\d+)$/);
+                    return match ? parseInt(match[1], 10) : 0;
+                });
+                let nextNum = Math.max(0, ...nums) + 1;
+                candidateCode = `FAC-2026-${String(nextNum).padStart(4, '0')}`;
+                while (this.ventas.some(v => v.codigo_venta === candidateCode)) {
+                    nextNum++;
+                    candidateCode = `FAC-2026-${String(nextNum).padStart(4, '0')}`;
+                }
+            } else {
+                candidateCode = `FAC-2026-${Date.now().toString().slice(-6)}`;
+            }
+
             const salePayload = {
-                id_usuario: this.currentUser.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
                 id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
-                codigo_venta: `FAC-2026-${codeNum}`,
+                codigo_venta: candidateCode,
                 metodo_pago: this.posSale.metodo_pago,
+                referencia_transferencia: (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta')
+                    ? (this.posSale.referencia_transferencia ? this.posSale.referencia_transferencia.trim() : null)
+                    : null,
                 fecha_hora_venta: new Date().toISOString().slice(0, 19).replace('T', ' '),
                 subtotal_venta: this.cartSubtotal,
                 descuento_venta: this.posSale.descuento_venta || 0,
@@ -1359,10 +1416,25 @@ function posModule() {
 
             this.loading = true;
             try {
-                const res = await this.apiFetch('/api/ventas', {
+                let res = await this.apiFetch('/api/ventas', {
                     method: 'POST',
                     body: JSON.stringify(salePayload)
                 });
+
+                // Si ocurriese una colisión inesperada de código por concurrencia, reintentar con sufijo único
+                if (!res.ok) {
+                    const clonedRes = res.clone();
+                    const errData = await clonedRes.json().catch(() => ({}));
+                    const codeCollision = (errData.errors && errData.errors.codigo_venta) ||
+                                          (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
+                    if (codeCollision) {
+                        salePayload.codigo_venta = `FAC-2026-${Date.now().toString().slice(-6)}`;
+                        res = await this.apiFetch('/api/ventas', {
+                            method: 'POST',
+                            body: JSON.stringify(salePayload)
+                        });
+                    }
+                }
 
                 if (!res.ok) {
                     const err = await res.json();
@@ -1371,15 +1443,8 @@ function posModule() {
 
                 const responseData = await res.json();
                 const newSale = responseData.venta;
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta Registrada!',
-                    text: `Factura ${newSale.codigo_venta} emitida por C$ ${newSale.total_venta}`,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a',
-                    confirmButtonColor: '#4f46e5'
-                });
 
+                // Descontar existencias y limpiar carrito de forma reactiva instantánea
                 salePayload.detalles.forEach(d => {
                     const p = this.productos.find(prod => prod.producto_id === d.id_producto);
                     if (p) p.existencia_bodega = Math.max(0, p.existencia_bodega - d.cantidad);
@@ -1387,11 +1452,38 @@ function posModule() {
 
                 this.clearCart();
 
-                await Promise.all([
-                    this.fetchVentas(),
-                    this.fetchInventario(),
-                    this.fetchBitacoras()
-                ]);
+                // Actualizar historial en memoria de inmediato (0ms)
+                if (Array.isArray(this.ventas)) {
+                    this.ventas.unshift(newSale);
+                }
+
+                // Precargar datos del comprobante para apertura inmediata (0ms sin esperas de red)
+                this.receiptData = newSale;
+                this.receiptAnulada = Boolean(newSale.estado === 0);
+
+                // Sincronizaciones secundarias en background sin bloquear la interfaz
+                setTimeout(() => {
+                    this.fetchInventario();
+                    this.fetchBitacoras();
+                }, 100);
+
+                // Notificación con opción inmediata de imprimir el comprobante oficial
+                const alertResult = await Swal.fire({
+                    icon: 'success',
+                    title: '¡Venta Registrada!',
+                    text: `Factura ${newSale.codigo_venta} emitida por C$ ${newSale.total_venta}`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Imprimir Comprobante',
+                    cancelButtonText: 'Continuar Vendiendo',
+                    confirmButtonColor: '#10b981',
+                    cancelButtonColor: '#4f46e5',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+
+                if (alertResult.isConfirmed) {
+                    await this.openReceiptModal(newSale.venta_id, newSale);
+                }
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -1403,6 +1495,61 @@ function posModule() {
             } finally {
                 this.loading = false;
             }
+        },
+
+        // Carga y apertura del modal de comprobante (con soporte para datos precargados a 0ms)
+        async openReceiptModal(ventaId, preloadedData = null) {
+            // Si ya se tienen los datos precargados en memoria, abrir sin peticiones adicionales (0ms)
+            if (preloadedData && preloadedData.venta_detalles) {
+                this.receiptData = preloadedData;
+                this.receiptAnulada = Boolean(preloadedData.estado === 0);
+                this.showReceiptModal = true;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+                return;
+            }
+
+            if (this.receiptData && (this.receiptData.venta_id == ventaId || this.receiptData.codigo_venta == ventaId)) {
+                this.showReceiptModal = true;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+                return;
+            }
+
+            if (!ventaId) return;
+            this.loadingReceipt = true;
+            this.showReceiptModal = true;
+            this.receiptData = null;
+            try {
+                const res = await this.apiFetch(`/api/ventas/${ventaId}/comprobante`);
+                if (!res.ok) {
+                    throw new Error('No se pudo obtener el comprobante de la venta.');
+                }
+                const data = await res.json();
+                this.receiptData = data.comprobante;
+                this.receiptAnulada = Boolean(data.anulada);
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            } catch (error) {
+                this.showReceiptModal = false;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de Comprobante',
+                    text: error.message,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.loadingReceipt = false;
+            }
+        },
+
+        // Disparador de impresión nativa del sistema
+        printReceipt() {
+            window.print();
         },
 
         viewSaleDetails(sale) {
@@ -1624,7 +1771,8 @@ function app() {
                         await Promise.all([
                             this.fetchProductos(),
                             this.fetchCategorias(),
-                            this.fetchClientes()
+                            this.fetchClientes(),
+                            this.fetchVentas()
                         ]);
                         break;
                     case 'productos':

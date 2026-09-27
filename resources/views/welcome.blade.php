@@ -211,6 +211,9 @@
                 <!-- MODAL: DETALLE DE FACTURA / VENTA -->
                 @include('ventas.ventaForm')
 
+                <!-- MODAL: COMPROBANTE DE VENTA IMPRIMIBLE -->
+                @include('ventas.comprobanteModal')
+
             </main>
         </div>
     </div>

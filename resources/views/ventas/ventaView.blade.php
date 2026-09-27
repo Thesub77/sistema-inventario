@@ -84,6 +84,31 @@
                 </div>
             </div>
 
+            <!-- Identificador / Referencia de Pago (Transferencias y Tarjetas) -->
+            <div x-show="posSale.metodo_pago === 'Transferencia' || posSale.metodo_pago === 'Tarjeta'"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                class="space-y-1.5 p-3 rounded-xl bg-dark-900/60 border border-slate-700/80">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-semibold text-slate-300">
+                        <span x-text="posSale.metodo_pago === 'Transferencia' ? 'N° Referencia / Voucher' : 'N° Voucher / Autorización Tarjeta'"></span>
+                        <span class="text-rose-400 font-bold" x-show="posSale.metodo_pago === 'Transferencia'">*</span>
+                    </label>
+                    <span class="text-[10px] text-slate-500 font-mono" x-show="posSale.referencia_transferencia" x-text="posSale.referencia_transferencia.length + '/64'"></span>
+                </div>
+                <div class="relative">
+                    <input type="text"
+                        x-model="posSale.referencia_transferencia"
+                        :placeholder="posSale.metodo_pago === 'Transferencia' ? 'Ej. TRF-BAC-987654321' : 'Ej. VOUCHER-004521'"
+                        maxlength="64"
+                        class="w-full bg-dark-950 border border-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition-colors font-mono">
+                </div>
+                <p class="text-[10px] text-slate-400" x-show="posSale.metodo_pago === 'Transferencia'">
+                    * Obligatorio para conciliar transferencias bancarias.
+                </p>
+            </div>
+
             <!-- Cart Items List -->
             <div class="space-y-2 mt-3">
                 <template x-for="(item, index) in cart" :key="item.id_producto">

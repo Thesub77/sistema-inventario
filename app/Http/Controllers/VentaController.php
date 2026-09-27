@@ -246,7 +246,8 @@ class VentaController extends Controller
 
                 'metodo_pago' => $metodoPago,
 
-                'referencia_transferencia' => $metodoPago === 'Transferencia'
+                // Almacena la referencia o voucher para transferencias y tarjetas como soporte de pago
+                'referencia_transferencia' => in_array($metodoPago, ['Transferencia', 'Tarjeta'])
                     ? ($validated['referencia_transferencia'] ?? null)
                     : null,
 
