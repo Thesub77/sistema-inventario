@@ -28,6 +28,7 @@ export function app() {
         cajaMovimientos: [],
         movimientosInventario: [],
         bitacoras: [],
+        empresa: null,
 
         // Navigation Sidebar Configuration
         navItems: [
@@ -156,8 +157,73 @@ export function app() {
         },
 
         get cartTotal() {
+            if (this.posSale && this.posSale.tipo_descuento === 'porcentaje') {
+                const pct = Math.min(100, Math.max(0, Number(this.posSale.descuento_porcentaje) || 0));
+                this.posSale.descuento_venta = Number(((this.cartSubtotal * pct) / 100).toFixed(2));
+            }
             const total = this.cartSubtotal - (this.posSale.descuento_venta || 0);
             return Math.max(0, total);
+        },
+
+        setDiscountType(type) {
+            this.posSale.tipo_descuento = type;
+            if (type === 'porcentaje') {
+                if (this.cartSubtotal > 0 && this.posSale.descuento_venta > 0 && !this.posSale.descuento_porcentaje) {
+                    this.posSale.descuento_porcentaje = Number(((this.posSale.descuento_venta / this.cartSubtotal) * 100).toFixed(1));
+                }
+                this.updatePercentDiscount();
+            } else {
+                this.posSale.descuento_porcentaje = 0;
+            }
+        },
+
+        applyQuickPercent(pct) {
+            this.posSale.tipo_descuento = 'porcentaje';
+            this.posSale.descuento_porcentaje = pct;
+            this.updatePercentDiscount();
+        },
+
+        updatePercentDiscount() {
+            const pct = Math.min(100, Math.max(0, Number(this.posSale.descuento_porcentaje) || 0));
+            this.posSale.descuento_venta = Number(((this.cartSubtotal * pct) / 100).toFixed(2));
+        },
+
+        // Retorna el título descriptivo oficial de la operación para el comprobante / ticket
+        getReceiptOperationTitle(receipt) {
+            if (!receipt) return 'VENTA AL CONTADO';
+            if (receipt.tipo_operacion) return receipt.tipo_operacion.toUpperCase();
+            const metodo = (receipt.metodo_pago || '').trim().toLowerCase();
+            if (metodo === 'transferencia') {
+                return 'DEPÓSITO A CUENTA';
+            } else if (metodo === 'tarjeta') {
+                return 'PAGO CON TARJETA';
+            } else if (metodo === 'efectivo') {
+                return 'VENTA AL CONTADO';
+            }
+            return 'COMPROBANTE DE VENTA';
+        },
+
+        // Cálculo reactivo del cambio en efectivo
+        get cashChange() {
+            if (this.posSale.metodo_pago !== 'Efectivo') return 0;
+            const recibido = Number(this.posSale.monto_recibido);
+            if (!this.posSale.monto_recibido || isNaN(recibido)) return 0;
+            return Math.max(0, recibido - this.cartTotal);
+        },
+
+        get cashShortage() {
+            if (this.posSale.metodo_pago !== 'Efectivo') return 0;
+            const recibido = Number(this.posSale.monto_recibido);
+            if (!this.posSale.monto_recibido || isNaN(recibido)) return 0;
+            return Math.max(0, this.cartTotal - recibido);
+        },
+
+        setExactCash() {
+            this.posSale.monto_recibido = Number(this.cartTotal.toFixed(2));
+        },
+
+        setCashReceived(amount) {
+            this.posSale.monto_recibido = Number(amount);
         },
 
         // --- Lazy Loading de Pestañas ---
@@ -180,7 +246,8 @@ export function app() {
                             this.fetchProductos(),
                             this.fetchCategorias(),
                             this.fetchClientes(),
-                            this.fetchVentas()
+                            this.fetchVentas(),
+                            this.fetchEmpresa()
                         ]);
                         break;
                     case 'productos':
@@ -243,6 +310,7 @@ export function app() {
             // Si está autenticado, cargar pestaña activa inicial
             if (this.isAuthenticated) {
                 this.loadTab(this.currentTab);
+                this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
                     this.initDashboardCharts();
                 }
@@ -379,6 +447,19 @@ export function app() {
                 }
             } catch (e) {
                 console.error('Error cargando bitácora:', e);
+            }
+        },
+
+        async fetchEmpresa() {
+            try {
+                const res = await this.apiFetch('/api/empresa');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.empresa = data;
+                    this.receiptEmpresa = data;
+                }
+            } catch (e) {
+                console.error('Error cargando datos de empresa:', e);
             }
         },
 
