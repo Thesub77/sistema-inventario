@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Venta;
 use Carbon\Carbon;
@@ -64,12 +65,24 @@ class DashboardController extends Controller
             'pctTarjeta' => $pctTarjeta,
         ];
 
-        // 2. Estadísticas Generales (KPIs) - RF-30
+        // 2. Estadísticas Generales (KPIs) - RF-30 y RF-32
+        $carbonHoy = Carbon::parse($fechaHoy);
+        $inicioMes = (clone $carbonHoy)->startOfMonth()->toDateString();
+        $finMes = (clone $carbonHoy)->endOfMonth()->toDateString();
+
+        $totalPerdidasMermasMes = (float) (Movimiento_inventario::query()
+            ->where('estado', 1)
+            ->where('tipo_movimiento', 'Salida por Merma')
+            ->whereDate('fecha_movimiento', '>=', $inicioMes)
+            ->whereDate('fecha_movimiento', '<=', $finMes)
+            ->sum('costo_total_perdida') ?? 0);
+
         $stats = [
             'totalVentasMonto' => (float) (Venta::where('estado', 1)->sum('total_venta') ?? 0),
             'totalVentasCount' => (int) Venta::where('estado', 1)->count(),
             'totalProductos' => (int) Producto::where('estado', 1)->count(),
             'totalUnidades' => (int) (Producto::where('estado', 1)->sum('existencia_bodega') ?? 0),
+            'totalPerdidasMermasMes' => round($totalPerdidasMermasMes, 2),
         ];
 
         // 3. Alertas de Stock Bajo - RF-13
@@ -315,6 +328,7 @@ class DashboardController extends Controller
             'fecha' => $fechaHoy,
             'ventasTurnoStats' => $ventasTurnoStats,
             'stats' => $stats,
+            'totalPerdidasMermasMes' => round($totalPerdidasMermasMes, 2),
             'stockAlerts' => $stockAlerts,
             'topProductosVendidos' => $topProductosVendidos,
             'productosBajaRotacion' => $productosBajaRotacion,
