@@ -1276,14 +1276,19 @@ function posModule() {
             id_cliente: null,
             metodo_pago: 'Efectivo',
             referencia_transferencia: '',
+            monto_recibido: null,
             descuento_venta: 0,
+            tipo_descuento: 'monto',
+            descuento_porcentaje: 0,
         },
         showSaleDetailModal: false,
         selectedSale: null,
+        showCartDrawer: false,
 
         // Estado y control del comprobante de venta imprimible
         showReceiptModal: false,
         receiptData: null,
+        receiptEmpresa: null,
         receiptAnulada: false,
         loadingReceipt: false,
 
@@ -1320,8 +1325,17 @@ function posModule() {
                     cantidad: 1,
                     precio_unitario: Number(product.precio_venta),
                     subtotal_venta_detalle: Number(product.precio_venta),
+                    existencia_bodega: Number(product.existencia_bodega || 0),
                 });
             }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        getProductStock(productId) {
+            const p = this.productos.find(prod => prod.producto_id === productId);
+            return p ? (p.existencia_bodega ?? 0) : 0;
         },
 
         increaseCartQty(index) {
@@ -1358,7 +1372,33 @@ function posModule() {
         clearCart() {
             this.cart = [];
             this.posSale.descuento_venta = 0;
+            this.posSale.descuento_porcentaje = 0;
+            this.posSale.tipo_descuento = 'monto';
             this.posSale.referencia_transferencia = '';
+            this.posSale.monto_recibido = null;
+        },
+
+        setDiscountType(type) {
+            this.posSale.tipo_descuento = type;
+            if (type === 'porcentaje') {
+                if (this.cartSubtotal > 0 && this.posSale.descuento_venta > 0 && !this.posSale.descuento_porcentaje) {
+                    this.posSale.descuento_porcentaje = Number(((this.posSale.descuento_venta / this.cartSubtotal) * 100).toFixed(1));
+                }
+                this.updatePercentDiscount();
+            } else {
+                this.posSale.descuento_porcentaje = 0;
+            }
+        },
+
+        applyQuickPercent(pct) {
+            this.posSale.tipo_descuento = 'porcentaje';
+            this.posSale.descuento_porcentaje = pct;
+            this.updatePercentDiscount();
+        },
+
+        updatePercentDiscount() {
+            const pct = Math.min(100, Math.max(0, Number(this.posSale.descuento_porcentaje) || 0));
+            this.posSale.descuento_venta = Number(((this.cartSubtotal * pct) / 100).toFixed(2));
         },
 
         async processSale() {
@@ -1375,6 +1415,41 @@ function posModule() {
                 });
                 return;
             }
+
+            // Validación obligatoria de efectivo recibido para evitar errores humanos de cálculo
+            if (this.posSale.metodo_pago === 'Efectivo') {
+                const montoRecibidoNum = Number(this.posSale.monto_recibido);
+                if (!this.posSale.monto_recibido || isNaN(montoRecibidoNum) || montoRecibidoNum <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Efectivo Recibido Requerido',
+                        text: 'Debes ingresar el monto de efectivo entregado por el cliente (o pulsar "Paga Exacto") para calcular el cambio.',
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    return;
+                }
+
+                if (montoRecibidoNum < this.cartTotal) {
+                    const faltante = this.cartTotal - montoRecibidoNum;
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Efectivo Insuficiente',
+                        text: `El cliente entregó ${this.formatCurrency(montoRecibidoNum)}, pero el total es ${this.formatCurrency(this.cartTotal)}. Faltan ${this.formatCurrency(faltante)}.`,
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    return;
+                }
+            }
+
+            // Cálculo del efectivo entregado y cambio correspondiente
+            const efectivoRecibido = this.posSale.metodo_pago === 'Efectivo'
+                ? Number(this.posSale.monto_recibido)
+                : null;
+            const cambioCalculado = this.posSale.metodo_pago === 'Efectivo'
+                ? Math.max(0, (efectivoRecibido || 0) - this.cartTotal)
+                : 0;
 
             // Generar código de factura de inmediato en 0ms sin bloquear con peticiones de red
             let candidateCode = '';
@@ -1457,9 +1532,22 @@ function posModule() {
                     this.ventas.unshift(newSale);
                 }
 
-                // Precargar datos del comprobante para apertura inmediata (0ms sin esperas de red)
+                // Precargar datos del comprobante con efectivo y cambio para apertura inmediata (0ms)
+                newSale.monto_recibido = efectivoRecibido;
+                newSale.cambio = cambioCalculado;
                 this.receiptData = newSale;
                 this.receiptAnulada = Boolean(newSale.estado === 0);
+                this.showCartDrawer = false;
+
+                // Guardar en caché de sesión para recordar el monto entregado en el voucher
+                if (salePayload.metodo_pago === 'Efectivo' && efectivoRecibido) {
+                    try {
+                        const cashMap = JSON.parse(sessionStorage.getItem('pos_cash_records') || '{}');
+                        cashMap[newSale.venta_id] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
+                        cashMap[newSale.codigo_venta] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
+                        sessionStorage.setItem('pos_cash_records', JSON.stringify(cashMap));
+                    } catch (e) {}
+                }
 
                 // Sincronizaciones secundarias en background sin bloquear la interfaz
                 setTimeout(() => {
@@ -1467,11 +1555,19 @@ function posModule() {
                     this.fetchBitacoras();
                 }, 100);
 
-                // Notificación con opción inmediata de imprimir el comprobante oficial
+                // Notificación clara y prominente para el cajero
+                let alertHtml = `<p class="text-sm">Factura <strong>${newSale.codigo_venta}</strong> emitida por <strong>C$ ${newSale.total_venta}</strong></p>`;
+                if (salePayload.metodo_pago === 'Efectivo' && efectivoRecibido) {
+                    alertHtml += `<div class="mt-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-left space-y-1.5 font-mono">
+                        <div class="flex justify-between text-slate-300"><span>Monto Recibido:</span> <span>${this.formatCurrency(efectivoRecibido)}</span></div>
+                        <div class="flex justify-between font-bold text-emerald-400 text-sm border-t border-slate-700/80 pt-1"><span>Cambio a Entregar:</span> <span>${this.formatCurrency(cambioCalculado)}</span></div>
+                    </div>`;
+                }
+
                 const alertResult = await Swal.fire({
                     icon: 'success',
                     title: '¡Venta Registrada!',
-                    text: `Factura ${newSale.codigo_venta} emitida por C$ ${newSale.total_venta}`,
+                    html: alertHtml,
                     showCancelButton: true,
                     confirmButtonText: 'Imprimir Comprobante',
                     cancelButtonText: 'Continuar Vendiendo',
@@ -1499,9 +1595,27 @@ function posModule() {
 
         // Carga y apertura del modal de comprobante (con soporte para datos precargados a 0ms)
         async openReceiptModal(ventaId, preloadedData = null) {
+            // Asegurar que los datos del negocio estén cargados para el encabezado del comprobante
+            if (!this.receiptEmpresa && typeof this.fetchEmpresa === 'function') {
+                await this.fetchEmpresa();
+            }
+
             // Si ya se tienen los datos precargados en memoria, abrir sin peticiones adicionales (0ms)
             if (preloadedData && preloadedData.venta_detalles) {
                 this.receiptData = preloadedData;
+                if (preloadedData.empresa) {
+                    this.receiptEmpresa = preloadedData.empresa;
+                }
+                if (!this.receiptData.monto_recibido) {
+                    try {
+                        const cashMap = JSON.parse(sessionStorage.getItem('pos_cash_records') || '{}');
+                        const rec = cashMap[this.receiptData.venta_id] || cashMap[this.receiptData.codigo_venta];
+                        if (rec) {
+                            this.receiptData.monto_recibido = rec.monto_recibido;
+                            this.receiptData.cambio = rec.cambio;
+                        }
+                    } catch (e) {}
+                }
                 this.receiptAnulada = Boolean(preloadedData.estado === 0);
                 this.showReceiptModal = true;
                 this.$nextTick(() => {
@@ -1529,6 +1643,17 @@ function posModule() {
                 }
                 const data = await res.json();
                 this.receiptData = data.comprobante;
+                if (data.empresa) {
+                    this.receiptEmpresa = data.empresa;
+                }
+                try {
+                    const cashMap = JSON.parse(sessionStorage.getItem('pos_cash_records') || '{}');
+                    const rec = cashMap[this.receiptData.venta_id] || cashMap[this.receiptData.codigo_venta];
+                    if (rec) {
+                        this.receiptData.monto_recibido = rec.monto_recibido;
+                        this.receiptData.cambio = rec.cambio;
+                    }
+                } catch (e) {}
                 this.receiptAnulada = Boolean(data.anulada);
                 this.$nextTick(() => {
                     if (window.lucide) window.lucide.createIcons();
@@ -1545,6 +1670,21 @@ function posModule() {
             } finally {
                 this.loadingReceipt = false;
             }
+        },
+
+        // Retorna el título descriptivo oficial de la operación para el comprobante / ticket
+        getReceiptOperationTitle(receipt) {
+            if (!receipt) return 'VENTA AL CONTADO';
+            if (receipt.tipo_operacion) return receipt.tipo_operacion.toUpperCase();
+            const metodo = (receipt.metodo_pago || '').trim().toLowerCase();
+            if (metodo === 'transferencia') {
+                return 'DEPÓSITO A CUENTA';
+            } else if (metodo === 'tarjeta') {
+                return 'PAGO CON TARJETA';
+            } else if (metodo === 'efectivo') {
+                return 'VENTA AL CONTADO';
+            }
+            return 'COMPROBANTE DE VENTA';
         },
 
         // Disparador de impresión nativa del sistema
@@ -1663,6 +1803,7 @@ function app() {
         cajaMovimientos: [],
         movimientosInventario: [],
         bitacoras: [],
+        empresa: null,
 
         // Navegación
         navItems: [
@@ -1747,8 +1888,73 @@ function app() {
         },
 
         get cartTotal() {
+            if (this.posSale && this.posSale.tipo_descuento === 'porcentaje') {
+                const pct = Math.min(100, Math.max(0, Number(this.posSale.descuento_porcentaje) || 0));
+                this.posSale.descuento_venta = Number(((this.cartSubtotal * pct) / 100).toFixed(2));
+            }
             const total = this.cartSubtotal - (this.posSale.descuento_venta || 0);
             return Math.max(0, total);
+        },
+
+        setDiscountType(type) {
+            this.posSale.tipo_descuento = type;
+            if (type === 'porcentaje') {
+                if (this.cartSubtotal > 0 && this.posSale.descuento_venta > 0 && !this.posSale.descuento_porcentaje) {
+                    this.posSale.descuento_porcentaje = Number(((this.posSale.descuento_venta / this.cartSubtotal) * 100).toFixed(1));
+                }
+                this.updatePercentDiscount();
+            } else {
+                this.posSale.descuento_porcentaje = 0;
+            }
+        },
+
+        applyQuickPercent(pct) {
+            this.posSale.tipo_descuento = 'porcentaje';
+            this.posSale.descuento_porcentaje = pct;
+            this.updatePercentDiscount();
+        },
+
+        updatePercentDiscount() {
+            const pct = Math.min(100, Math.max(0, Number(this.posSale.descuento_porcentaje) || 0));
+            this.posSale.descuento_venta = Number(((this.cartSubtotal * pct) / 100).toFixed(2));
+        },
+
+        // Retorna el título descriptivo oficial de la operación para el comprobante / ticket
+        getReceiptOperationTitle(receipt) {
+            if (!receipt) return 'VENTA AL CONTADO';
+            if (receipt.tipo_operacion) return receipt.tipo_operacion.toUpperCase();
+            const metodo = (receipt.metodo_pago || '').trim().toLowerCase();
+            if (metodo === 'transferencia') {
+                return 'DEPÓSITO A CUENTA';
+            } else if (metodo === 'tarjeta') {
+                return 'PAGO CON TARJETA';
+            } else if (metodo === 'efectivo') {
+                return 'VENTA AL CONTADO';
+            }
+            return 'COMPROBANTE DE VENTA';
+        },
+
+        // Cálculo reactivo del cambio en efectivo
+        get cashChange() {
+            if (this.posSale.metodo_pago !== 'Efectivo') return 0;
+            const recibido = Number(this.posSale.monto_recibido);
+            if (!this.posSale.monto_recibido || isNaN(recibido)) return 0;
+            return Math.max(0, recibido - this.cartTotal);
+        },
+
+        get cashShortage() {
+            if (this.posSale.metodo_pago !== 'Efectivo') return 0;
+            const recibido = Number(this.posSale.monto_recibido);
+            if (!this.posSale.monto_recibido || isNaN(recibido)) return 0;
+            return Math.max(0, this.cartTotal - recibido);
+        },
+
+        setExactCash() {
+            this.posSale.monto_recibido = Number(this.cartTotal.toFixed(2));
+        },
+
+        setCashReceived(amount) {
+            this.posSale.monto_recibido = Number(amount);
         },
 
         // Lazy Loading de Pestañas
@@ -1772,7 +1978,8 @@ function app() {
                             this.fetchProductos(),
                             this.fetchCategorias(),
                             this.fetchClientes(),
-                            this.fetchVentas()
+                            this.fetchVentas(),
+                            this.fetchEmpresa()
                         ]);
                         break;
                     case 'productos':
@@ -1831,6 +2038,7 @@ function app() {
 
             if (this.isAuthenticated) {
                 this.loadTab(this.currentTab);
+                this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
                     this.initDashboardCharts();
                 }
@@ -1967,6 +2175,19 @@ function app() {
                 }
             } catch (e) {
                 console.error('Error cargando bitácora:', e);
+            }
+        },
+
+        async fetchEmpresa() {
+            try {
+                const res = await this.apiFetch('/api/empresa');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.empresa = data;
+                    this.receiptEmpresa = data;
+                }
+            } catch (e) {
+                console.error('Error cargando datos de empresa:', e);
             }
         },
 

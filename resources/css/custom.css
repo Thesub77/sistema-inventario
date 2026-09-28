@@ -101,24 +101,27 @@ html:not(.dark) main {
 }
 
 /* Fondos oscuros convertidos a claros */
-html:not(.dark) .bg-dark-950 {
+html:not(.dark) .bg-dark-950,
+html:not(.dark) .bg-dark-950\/90,
+html:not(.dark) .bg-dark-950\/80,
+html:not(.dark) .bg-dark-950\/60,
+html:not(.dark) .bg-dark-950\/50,
+html:not(.dark) .bg-dark-950\/40,
+html:not(.dark) .bg-dark-950\/20 {
     background-color: #f8fafc !important;
 }
 
-html:not(.dark) .bg-dark-950\/90 {
-    background-color: #f1f5f9 !important;
-}
-
-html:not(.dark) .bg-dark-950\/40 {
-    background-color: #f8fafc !important;
-}
-
-html:not(.dark) .bg-dark-900 {
+html:not(.dark) .bg-dark-900,
+html:not(.dark) .bg-dark-900\/95,
+html:not(.dark) .bg-dark-900\/90,
+html:not(.dark) .bg-dark-900\/80,
+html:not(.dark) .bg-dark-900\/70,
+html:not(.dark) .bg-dark-900\/60,
+html:not(.dark) .bg-dark-900\/50,
+html:not(.dark) .bg-dark-900\/40,
+html:not(.dark) .bg-dark-900\/30,
+html:not(.dark) .bg-dark-900\/20 {
     background-color: #ffffff !important;
-}
-
-html:not(.dark) .bg-dark-900\/80 {
-    background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
 html:not(.dark) .bg-dark-850 {
@@ -160,7 +163,8 @@ html:not(.dark) .border-slate-800,
 html:not(.dark) .border-slate-800\/80,
 html:not(.dark) .border-slate-800\/60,
 html:not(.dark) .border-slate-700,
-html:not(.dark) .border-slate-700\/80 {
+html:not(.dark) .border-slate-700\/80,
+html:not(.dark) .border-slate-700\/60 {
     border-color: #e2e8f0 !important;
 }
 
@@ -197,6 +201,16 @@ html:not(.dark) .hover\:text-white:hover {
 html:not(.dark) .text-brand-300,
 html:not(.dark) .text-brand-400 {
     color: #4f46e5 !important;
+}
+
+html:not(.dark) .text-emerald-300,
+html:not(.dark) .text-emerald-400 {
+    color: #059669 !important;
+}
+
+html:not(.dark) .text-rose-300,
+html:not(.dark) .text-rose-400 {
+    color: #e11d48 !important;
 }
 
 /* Excepciones para mantener texto blanco en botones y badges coloreados */
