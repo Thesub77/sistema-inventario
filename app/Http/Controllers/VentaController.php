@@ -545,7 +545,8 @@ class VentaController extends Controller
 
     /**
      * GET /api/ventas/{id}/comprobante: entrega datos JSON y la bandera anulada.
-     * Los importes proceden de la venta guardada; no se recalculan con precios actuales.
+     * Los importes proceden de la venta guardada; la información de la empresa (RUC, teléfono,
+     * dirección, nombre comercial) se obtiene dinámicamente de la tabla empresa.
      */
     public function comprobante($id)
     {
@@ -561,8 +562,12 @@ class VentaController extends Controller
             ?? Empresa::where('estado', 1)->first()
             ?? Empresa::first();
 
+        // Se adjunta la empresa a la venta para máxima compatibilidad con el frontend
+        $venta->setRelation('empresa', $empresa);
+
         return response()->json([
             'comprobante' => $venta,
+            'venta' => $venta,
             'empresa' => $empresa,
             'anulada' => (int) $venta->estado === 0,
         ]);
