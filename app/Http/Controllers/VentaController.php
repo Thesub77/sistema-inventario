@@ -33,8 +33,8 @@ class VentaController extends Controller
 {
     /**
      * GET /api/ventas: lista ventas, incluidas las anuladas, de más reciente a antigua.
-     * Admite fechas inclusivas, usuario y coincidencia parcial del código de venta.
-     * Devuelve un arreglo con usuario, cliente y detalles; no aplica paginación.
+     * Admite fechas inclusivas, usuario, coincidencia parcial del código de venta y paginación opcional.
+     * Devuelve una colección paginada si se especifica 'por_pagina' o el listado completo si se omite.
      */
     public function index(Request $request)
     {
@@ -44,6 +44,8 @@ class VentaController extends Controller
             'id_usuario' => 'nullable|exists:usuario,usuario_id',
             'codigo_venta' => 'nullable|string|max:32',
             'referencia_transferencia' => 'nullable|string|max:64',
+            'por_pagina' => 'sometimes|required|integer|min:1|max:100',
+            'page' => 'sometimes|required|integer|min:1',
         ]);
 
         $query = Venta::with([
@@ -90,9 +92,13 @@ class VentaController extends Controller
             );
         }
 
-        $ventas = $query
-            ->orderBy('venta_id', 'desc')
-            ->get();
+        $query->orderBy('venta_id', 'desc');
+
+        if (isset($validated['por_pagina'])) {
+            return response()->json($query->paginate((int) $validated['por_pagina'])->withQueryString());
+        }
+
+        $ventas = $query->get();
 
         return response()->json($ventas);
     }
