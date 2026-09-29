@@ -29,6 +29,18 @@ export function app() {
         movimientosInventario: [],
         bitacoras: [],
         empresa: null,
+        showEmpresaModal: false,
+        isSavingEmpresa: false,
+        empresaForm: {
+            nombre_comercial: '',
+            razon_social: '',
+            numero_ruc: '',
+            telefono_contacto: '',
+            correo_contacto: '',
+            direccion_fisica: '',
+            mensaje_pie_ticket: '',
+            moneda_simbolo: 'C$'
+        },
 
         // Navigation Sidebar Configuration
         navItems: [
@@ -96,6 +108,13 @@ export function app() {
             return found ? found.icon : 'layers';
         },
 
+        get isAdmin() {
+            if (!this.currentUser) return false;
+            const rol = String(this.currentUser.rol || '').toLowerCase();
+            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
+            return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
+        },
+
         get lowStockProducts() {
             return this.productos.filter(p => Number(p.existencia_bodega) <= Number(p.existencia_minima));
         },
@@ -134,12 +153,75 @@ export function app() {
 
         get filteredVentas() {
             return this.ventas.filter(v => {
-                if (!this.searchVenta) return true;
-                const term = this.searchVenta.toLowerCase();
-                const codeMatch = v.codigo_venta.toLowerCase().includes(term);
-                const clientMatch = v.cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term);
-                return codeMatch || clientMatch;
+                // 1. Filtro por número de comprobante, cliente o referencia (RF-21)
+                if (this.searchVenta) {
+                    const term = this.searchVenta.toLowerCase().trim();
+                    const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
+                    const clientMatch = v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term);
+                    const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
+                    if (!codeMatch && !clientMatch && !refMatch) {
+                        return false;
+                    }
+                }
+
+                // 2. Filtro por Usuario / Cajero (RF-21)
+                if (this.ventaUsuarioFilter) {
+                    if (Number(v.id_usuario) !== Number(this.ventaUsuarioFilter)) {
+                        return false;
+                    }
+                }
+
+                // 3. Filtro por Rango de Fechas (Desde y Hasta) (RF-21)
+                if (this.ventaFechaDesde || this.ventaFechaHasta) {
+                    const rawDate = v.fecha_hora_venta ? String(v.fecha_hora_venta).trim() : '';
+                    const dateOnly = rawDate.split('T')[0].split(' ')[0];
+
+                    if (this.ventaFechaDesde && dateOnly < this.ventaFechaDesde) {
+                        return false;
+                    }
+                    if (this.ventaFechaHasta && dateOnly > this.ventaFechaHasta) {
+                        return false;
+                    }
+                }
+
+                return true;
             });
+        },
+
+        get filteredVentasTotal() {
+            return this.filteredVentas
+                .filter(v => Number(v.estado) !== 0)
+                .reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
+        },
+
+        get hasActiveVentaFilters() {
+            return Boolean(this.searchVenta || this.ventaFechaDesde || this.ventaFechaHasta || this.ventaUsuarioFilter);
+        },
+
+        get ventasUsuarios() {
+            const map = new Map();
+            if (Array.isArray(this.usuarios)) {
+                this.usuarios.forEach(u => {
+                    if (u && u.usuario_id) {
+                        map.set(Number(u.usuario_id), {
+                            usuario_id: Number(u.usuario_id),
+                            nombre_apellido: u.nombre_apellido || ('Usuario #' + u.usuario_id)
+                        });
+                    }
+                });
+            }
+            if (Array.isArray(this.ventas)) {
+                this.ventas.forEach(v => {
+                    const uid = Number(v.id_usuario);
+                    if (uid && !map.has(uid)) {
+                        map.set(uid, {
+                            usuario_id: uid,
+                            nombre_apellido: (v.usuario && v.usuario.nombre_apellido) ? v.usuario.nombre_apellido : ('Usuario #' + uid)
+                        });
+                    }
+                });
+            }
+            return Array.from(map.values()).sort((a, b) => a.nombre_apellido.localeCompare(b.nombre_apellido));
         },
 
         get filteredClientes() {
@@ -260,6 +342,11 @@ export function app() {
                         await this.fetchCategorias();
                         break;
                     case 'ventas':
+                        await Promise.all([
+                            this.fetchVentas(),
+                            this.fetchUsuarios().catch(() => {})
+                        ]);
+                        break;
                     case 'caja':
                         await this.fetchVentas();
                         break;
@@ -450,6 +537,109 @@ export function app() {
             }
         },
 
+        openEmpresaModal() {
+            if (this.empresa) {
+                this.empresaForm = {
+                    nombre_comercial: this.empresa.nombre_comercial || '',
+                    razon_social: this.empresa.razon_social || '',
+                    numero_ruc: this.empresa.numero_ruc || '',
+                    telefono_contacto: this.empresa.telefono_contacto || '',
+                    correo_contacto: this.empresa.correo_contacto || '',
+                    direccion_fisica: this.empresa.direccion_fisica || '',
+                    mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
+                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$'
+                };
+            }
+            this.showEmpresaModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async saveEmpresa() {
+            if (!this.empresaForm.nombre_comercial?.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo Requerido',
+                    text: 'El nombre comercial de la empresa es obligatorio.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+            if (!this.empresaForm.telefono_contacto?.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo Requerido',
+                    text: 'El teléfono de contacto es obligatorio.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+            if (!this.empresaForm.direccion_fisica?.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo Requerido',
+                    text: 'La dirección física del establecimiento es obligatoria.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+            if (!this.empresaForm.moneda_simbolo?.trim()) {
+                this.empresaForm.moneda_simbolo = 'C$';
+            }
+
+            this.isSavingEmpresa = true;
+            try {
+                const payload = { ...this.empresaForm };
+                if (!payload.numero_ruc || !payload.numero_ruc.trim()) {
+                    delete payload.numero_ruc;
+                }
+
+                const res = await this.apiFetch('/api/empresa', {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok || data.success === false) {
+                    let errMsg = data.message || 'No se pudieron actualizar los datos del negocio.';
+                    if (data.errors) {
+                        const errorList = Object.values(data.errors).flat().join('<br>');
+                        errMsg = errorList || errMsg;
+                    }
+                    throw new Error(errMsg);
+                }
+
+                this.empresa = data.empresa || { ...this.empresaForm };
+                if (!this.empresaForm.numero_ruc?.trim()) {
+                    this.empresa.numero_ruc = '';
+                }
+                this.receiptEmpresa = this.empresa;
+                this.showEmpresaModal = false;
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: '¡Datos Guardados!',
+                    text: data.message || 'Los datos del negocio han sido actualizados con éxito.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al Guardar',
+                    html: error.message,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.isSavingEmpresa = false;
+            }
+        },
+
         async fetchEmpresa() {
             try {
                 const res = await this.apiFetch('/api/empresa');
@@ -457,6 +647,18 @@ export function app() {
                     const data = await res.json();
                     this.empresa = data;
                     this.receiptEmpresa = data;
+                    if (data && data.nombre_comercial && !this.empresaForm.nombre_comercial) {
+                        this.empresaForm = {
+                            nombre_comercial: data.nombre_comercial || '',
+                            razon_social: data.razon_social || '',
+                            numero_ruc: data.numero_ruc || '',
+                            telefono_contacto: data.telefono_contacto || '',
+                            correo_contacto: data.correo_contacto || '',
+                            direccion_fisica: data.direccion_fisica || '',
+                            mensaje_pie_ticket: data.mensaje_pie_ticket || '',
+                            moneda_simbolo: data.moneda_simbolo || 'C$'
+                        };
+                    }
                 }
             } catch (e) {
                 console.error('Error cargando datos de empresa:', e);

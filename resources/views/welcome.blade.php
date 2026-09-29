@@ -90,10 +90,16 @@
                             </p>
                         </div>
                     </div>
-                    <!-- Logout Button -->
-                    <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all flex-shrink-0 cursor-pointer active:scale-95">
-                        <i data-lucide="log-out" class="w-4 h-4"></i>
-                    </button>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <!-- Botón Configuración de Negocio (Solo Administrador) -->
+                        <button x-show="isAdmin" type="button" @click="openEmpresaModal()" title="Datos del Negocio / Facturación" class="p-2 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-all cursor-pointer active:scale-95">
+                            <i data-lucide="store" class="w-4 h-4"></i>
+                        </button>
+                        <!-- Logout Button -->
+                        <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer active:scale-95">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -121,6 +127,14 @@
                     <button @click="openProductModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-brand-600/20 transition-all">
                         <i data-lucide="plus" class="w-4 h-4"></i>
                         <span>Nuevo Producto</span>
+                    </button>
+
+                    <!-- Configuración de Datos del Negocio (Solo Administrador) -->
+                    <button x-show="isAdmin" @click="openEmpresaModal()" type="button"
+                        class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-700/80 transition-all cursor-pointer shadow-sm active:scale-95"
+                        title="Configurar Datos del Negocio para Facturación">
+                        <i data-lucide="store" class="w-4 h-4 text-brand-400"></i>
+                        <span class="hidden lg:inline">Datos del Negocio</span>
                     </button>
 
                     <!-- Switch Modo Claro / Modo Oscuro -->
@@ -213,6 +227,9 @@
 
                 <!-- MODAL: COMPROBANTE DE VENTA IMPRIMIBLE -->
                 @include('ventas.comprobanteModal')
+
+                <!-- MODAL: AJUSTES DE EMPRESA Y FACTURACIÓN -->
+                @include('sistema.empresaModal')
 
             </main>
         </div>

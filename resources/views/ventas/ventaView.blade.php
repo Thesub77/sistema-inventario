@@ -201,7 +201,7 @@
                         class="space-y-1 p-2 rounded-lg bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-700/80 shadow-xs">
                         <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-200">
                             <span x-text="posSale.metodo_pago === 'Transferencia' ? 'N° Referencia / Comprobante' : 'N° Voucher / Autorización Tarjeta'"></span>
-                            <span class="text-rose-500 font-bold ml-0.5" x-show="posSale.metodo_pago === 'Transferencia'">*</span>
+                            <span class="text-rose-500 font-bold ml-0.5" x-show="posSale.metodo_pago === 'Transferencia' || posSale.metodo_pago === 'Tarjeta'">*</span>
                         </label>
                         <input type="text"
                             x-model="posSale.referencia_transferencia"

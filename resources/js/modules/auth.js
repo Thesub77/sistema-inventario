@@ -78,8 +78,11 @@ export function authModule() {
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });
 
-                // Cargar datos del dashboard al iniciar sesión
+                // Cargar datos del dashboard y de la empresa al iniciar sesión
                 await this.loadTab(this.currentTab, true);
+                if (typeof this.fetchEmpresa === 'function') {
+                    await this.fetchEmpresa();
+                }
             } catch (error) {
                 this.loginError = error.message;
                 Swal.fire({

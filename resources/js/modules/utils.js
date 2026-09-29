@@ -1,7 +1,8 @@
 export function utilsModule() {
     return {
         formatCurrency(amount) {
-            return 'C$ ' + Number(amount || 0).toLocaleString('es-NI', {
+            const sym = (this.empresa && this.empresa.moneda_simbolo) ? this.empresa.moneda_simbolo : 'C$';
+            return sym + ' ' + Number(amount || 0).toLocaleString('es-NI', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
