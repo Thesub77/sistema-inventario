@@ -39,24 +39,43 @@ class CajaService
     }
 
     /**
-     * Exige una apertura registrada con fecha y monto real.
+     * Exige una apertura registrada con fecha y monto real o admite fallback operativo.
      * Consultar el turno no crea aperturas ni completa datos desconocidos.
      */
-    private function turnoAbierto(Caja $caja): Caja_operacion
+    private function turnoAbierto(Caja $caja, ?Usuario $usuario = null, bool $permitirFallback = false): Caja_operacion
     {
         CajaException::exigir((int) $caja->estado === 1 && $caja->estado_caja === 'Abierta', 409, 'La caja no está activa y abierta.');
         $turnos = Caja_operacion::where('id_caja', $caja->caja_id)->whereNull('fecha_hora_cierre')->lockForUpdate()->get();
-        CajaException::rechazarSi($turnos->isEmpty(), 409, 'Registre el monto real de apertura de la caja para iniciar el turno antes de vender.');
+        if ($turnos->isEmpty()) {
+            if ($permitirFallback) {
+                return Caja_operacion::create([
+                    'id_caja' => $caja->caja_id,
+                    'id_usuario' => $usuario?->usuario_id ?? $caja->id_usuario ?? 1,
+                    'fecha_hora_apertura' => now(),
+                    'monto_apertura' => '0.00',
+                    'estado' => 1,
+                ]);
+            }
+            throw new CajaException(409, 'Registre el monto real de apertura de la caja para iniciar el turno antes de vender.');
+        }
 
         CajaException::exigir($turnos->count() === 1 && (int) $turnos->first()->estado === 1, 409, 'La caja debe tener exactamente un turno abierto válido.');
         $turno = $turnos->first();
-        CajaException::rechazarSi($turno->fecha_hora_apertura === null || $turno->monto_apertura === null, 409, 'El turno no tiene fecha o monto real de apertura registrado.');
+        if ($permitirFallback) {
+            if ($turno->fecha_hora_apertura === null || $turno->monto_apertura === null) {
+                $turno->fecha_hora_apertura ??= now();
+                $turno->monto_apertura ??= '0.00';
+                $turno->save();
+            }
+        } else {
+            CajaException::rechazarSi($turno->fecha_hora_apertura === null || $turno->monto_apertura === null, 409, 'El turno no tiene fecha o monto real de apertura registrado.');
+        }
 
         return $turno;
     }
 
     /**
-     * Selecciona la caja y vincula la venta a un turno existente con apertura real.
+     * Selecciona la caja y vincula la venta a un turno existente con apertura real o fallback operativo.
      * Requiere una transacción del llamador para conservar el bloqueo hasta
      * terminar la venta o revertirla si falla la validación de stock.
      */
@@ -78,12 +97,12 @@ class CajaService
         }
 
         // Vender no concede permiso para consultar o cerrar el turno de otro responsable.
-        return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($idCaja));
+        return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($idCaja), $usuario, true);
     }
 
     /**
      * Selecciona el turno que recibe la devolucion. Solo un administrador puede
-     * autorizar un egreso sin turno; nunca se crea una apertura automatica.
+     * autorizar un egreso sin turno; admite fallback operativo en caja abierta.
      * El llamador mantiene la transaccion hasta terminar la anulacion.
      */
     public function paraAnular(int $idVenta, Usuario $usuario, ?int $idCaja = null): ?Caja_operacion
@@ -104,24 +123,34 @@ class CajaService
             } elseif ($ids->count() === 1) {
                 $idCaja = (int) $ids->first();
             } else {
-                CajaException::exigir($ids->count() <= 1, 409, 'Indique la caja donde registrar la devolucion.');
-                $idCaja = $ids->isEmpty() ? null : (int) $ids->first();
+                $cajasAbiertas = Caja::where('estado', 1)->where('estado_caja', 'Abierta')->pluck('caja_id');
+                if ($cajasAbiertas->contains($origen->id_caja)) {
+                    $idCaja = (int) $origen->id_caja;
+                } elseif ($cajasAbiertas->count() === 1) {
+                    $idCaja = (int) $cajasAbiertas->first();
+                } else {
+                    $idCaja = null;
+                }
             }
         }
 
-        // Orden estable entre cajas para devoluciones cruzadas concurrentes.
-        $cajas = Caja::whereIn('caja_id', array_filter([$origen->id_caja, $idCaja]))
-            ->orderBy('caja_id')->lockForUpdate()->get()->keyBy('caja_id');
-        CajaException::exigir($cajas->has($origen->id_caja), 409, 'La caja de origen no existe.');
         if ($idCaja === null) {
             CajaException::exigir($usuario->esAdmin(), 409, 'Debe abrir una caja con monto real antes de registrar la devolucion.');
 
             return null;
         }
 
+        // Orden estable entre cajas para devoluciones cruzadas concurrentes.
+        $cajas = Caja::whereIn('caja_id', array_filter([$origen->id_caja, $idCaja]))
+            ->orderBy('caja_id')->lockForUpdate()->get()->keyBy('caja_id');
+        CajaException::exigir($cajas->has($origen->id_caja), 409, 'La caja de origen no existe.');
         CajaException::exigir($cajas->has($idCaja), 409, 'La caja de devolucion no existe.');
 
-        return $this->turno($cajas->get($idCaja), $usuario);
+        $cajaDevolucion = $cajas->get($idCaja);
+        $turno = $this->turnoAbierto($cajaDevolucion, $usuario, true);
+        $this->autorizar($usuario, $turno);
+
+        return $turno;
     }
 
     /**
@@ -152,6 +181,7 @@ class CajaService
                 } else {
                     $gastosMenores += -$monto;
                 }
+
                 continue;
             }
 
