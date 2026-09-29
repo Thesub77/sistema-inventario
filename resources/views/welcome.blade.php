@@ -25,10 +25,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Capa de Presentación: Estilos Personalizados del Sistema -->
-    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
+    <link rel="stylesheet" href="/css/custom.css">
 
     <!-- Capa de Lógica Frontend: Módulos y Estado de la Aplicación -->
-    <script src="{{ asset('js/app.js') }}"></script>
+    <script src="/js/app.js"></script>
 
     <!-- Alpine.js (Motor de Reactividad) -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
