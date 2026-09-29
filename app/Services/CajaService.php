@@ -40,44 +40,23 @@ class CajaService
 
     /**
      * Exige una apertura registrada con fecha y monto real.
-     * Si permitirFallback es true y la caja está activa y abierta pero no tiene un turno registrado,
-     * inicializa transparentemente un turno operativo para evitar bloqueos en ventas directas.
+     * Consultar el turno no crea aperturas ni completa datos desconocidos.
      */
-    private function turnoAbierto(Caja $caja, ?Usuario $usuario = null, bool $permitirFallback = false): Caja_operacion
+    private function turnoAbierto(Caja $caja): Caja_operacion
     {
         CajaException::exigir((int) $caja->estado === 1 && $caja->estado_caja === 'Abierta', 409, 'La caja no está activa y abierta.');
         $turnos = Caja_operacion::where('id_caja', $caja->caja_id)->whereNull('fecha_hora_cierre')->lockForUpdate()->get();
-
-        if ($turnos->isEmpty()) {
-            if ($permitirFallback && $usuario) {
-                return Caja_operacion::create([
-                    'id_caja' => $caja->caja_id,
-                    'id_usuario' => $usuario->usuario_id,
-                    'fecha_hora_apertura' => now(),
-                    'monto_apertura' => '0.00',
-                    'estado' => 1,
-                ]);
-            }
-            throw new CajaException(409, 'Registre el monto real de apertura de la caja para iniciar el turno antes de vender.');
-        }
+        CajaException::rechazarSi($turnos->isEmpty(), 409, 'Registre el monto real de apertura de la caja para iniciar el turno antes de vender.');
 
         CajaException::exigir($turnos->count() === 1 && (int) $turnos->first()->estado === 1, 409, 'La caja debe tener exactamente un turno abierto válido.');
         $turno = $turnos->first();
-        if ($permitirFallback) {
-            if ($turno->fecha_hora_apertura === null || $turno->monto_apertura === null) {
-                $turno->fecha_hora_apertura ??= now();
-                $turno->monto_apertura ??= '0.00';
-                $turno->save();
-            }
-        } else {
-            CajaException::rechazarSi($turno->fecha_hora_apertura === null || $turno->monto_apertura === null, 409, 'El turno no tiene fecha o monto real de apertura registrado.');
-        }
+        CajaException::rechazarSi($turno->fecha_hora_apertura === null || $turno->monto_apertura === null, 409, 'El turno no tiene fecha o monto real de apertura registrado.');
 
         return $turno;
     }
 
     /**
-     * Selecciona la caja y vincula la venta a un turno existente con apertura real o fallback operativo.
+     * Selecciona la caja y vincula la venta a un turno existente con apertura real.
      * Requiere una transacción del llamador para conservar el bloqueo hasta
      * terminar la venta o revertirla si falla la validación de stock.
      */
@@ -99,12 +78,12 @@ class CajaService
         }
 
         // Vender no concede permiso para consultar o cerrar el turno de otro responsable.
-        return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($idCaja), $usuario, true);
+        return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($idCaja));
     }
 
     /**
      * Selecciona el turno que recibe la devolucion. Solo un administrador puede
-     * autorizar un egreso sin turno; admite fallback operativo en caja abierta.
+     * autorizar un egreso sin turno; nunca se crea una apertura automatica.
      * El llamador mantiene la transaccion hasta terminar la anulacion.
      */
     public function paraAnular(int $idVenta, Usuario $usuario, ?int $idCaja = null): ?Caja_operacion
@@ -125,50 +104,59 @@ class CajaService
             } elseif ($ids->count() === 1) {
                 $idCaja = (int) $ids->first();
             } else {
-                $cajasAbiertas = Caja::where('estado', 1)->where('estado_caja', 'Abierta')->pluck('caja_id');
-                if ($cajasAbiertas->contains($origen->id_caja)) {
-                    $idCaja = (int) $origen->id_caja;
-                } elseif ($cajasAbiertas->count() === 1) {
-                    $idCaja = (int) $cajasAbiertas->first();
-                } else {
-                    $idCaja = null;
-                }
+                CajaException::exigir($ids->count() <= 1, 409, 'Indique la caja donde registrar la devolucion.');
+                $idCaja = $ids->isEmpty() ? null : (int) $ids->first();
             }
-        }
-
-        if ($idCaja === null) {
-            CajaException::exigir($usuario->esAdmin(), 409, 'Debe abrir una caja con monto real antes de registrar la devolucion.');
-
-            return null;
         }
 
         // Orden estable entre cajas para devoluciones cruzadas concurrentes.
         $cajas = Caja::whereIn('caja_id', array_filter([$origen->id_caja, $idCaja]))
             ->orderBy('caja_id')->lockForUpdate()->get()->keyBy('caja_id');
         CajaException::exigir($cajas->has($origen->id_caja), 409, 'La caja de origen no existe.');
+        if ($idCaja === null) {
+            CajaException::exigir($usuario->esAdmin(), 409, 'Debe abrir una caja con monto real antes de registrar la devolucion.');
+
+            return null;
+        }
+
         CajaException::exigir($cajas->has($idCaja), 409, 'La caja de devolucion no existe.');
 
-        $cajaDevolucion = $cajas->get($idCaja);
-        $turno = $this->turnoAbierto($cajaDevolucion, $usuario, true);
-        $this->autorizar($usuario, $turno);
-
-        return $turno;
+        return $this->turno($cajas->get($idCaja), $usuario);
     }
 
     /**
-     * Agrupa ventas por medio de pago; solo el efectivo incrementa el dinero
-     * esperado en caja. Los cálculos usan centavos para evitar redondeos flotantes.
+     * Agrupa ventas por medio de pago e incorpora ingresos y egresos extraordinarios de efectivo (RF-28).
+     * Los cálculos usan centavos para evitar redondeos flotantes.
      * En turnos cerrados se conserva el monto esperado guardado durante el cierre.
      */
     public function arqueo(Caja_operacion $turno): array
     {
         $totales = ['Efectivo' => 0, 'Tarjeta' => 0, 'Transferencia' => 0];
         $devoluciones = $totales;
-        $movimientos = Caja_movimiento_venta::with(['venta' => fn ($query) => $query->lockForUpdate()])->where('id_caja_operacion', $turno->caja_operacion_id)->where('estado', 1)->lockForUpdate()->get();
+        $ingresosExtraordinarios = 0;
+        $gastosMenores = 0;
+
+        $movimientos = Caja_movimiento_venta::with(['venta' => fn ($query) => $query->lockForUpdate()])
+            ->where('id_caja_operacion', $turno->caja_operacion_id)
+            ->where('estado', 1)
+            ->lockForUpdate()
+            ->get();
+
         foreach ($movimientos as $movimiento) {
+            $monto = $this->centavos($movimiento->monto_movimiento);
+
+            // Movimiento extraordinario directo en efectivo (sin venta vinculada)
+            if ($movimiento->id_venta === null) {
+                if ($monto > 0) {
+                    $ingresosExtraordinarios += $monto;
+                } else {
+                    $gastosMenores += -$monto;
+                }
+                continue;
+            }
+
             $venta = $movimiento->venta;
             CajaException::exigir($venta && array_key_exists($venta->metodo_pago, $totales), 409, 'Existe un movimiento inconsistente en el turno.');
-            $monto = $this->centavos($movimiento->monto_movimiento);
             $totalVenta = $this->centavos($venta->total_venta);
             $esDevolucion = (int) $venta->estado === 0 && $monto <= 0;
             // Un ingreso compensado en otra caja o turno conserva su importe original.
@@ -189,7 +177,8 @@ class CajaService
             }
             CajaException::rechazarSi(max($totales[$venta->metodo_pago], $devoluciones[$venta->metodo_pago]) > 999999999999999999, 409, 'El total excede la capacidad del arqueo.');
         }
-        $esperado = $this->centavos($turno->monto_apertura) + $totales['Efectivo'] - $devoluciones['Efectivo'];
+
+        $esperado = $this->centavos($turno->monto_apertura) + $totales['Efectivo'] + $ingresosExtraordinarios - $devoluciones['Efectivo'] - $gastosMenores;
         CajaException::rechazarSi(abs($esperado) > 999999999999999999, 409, 'El efectivo excede la capacidad del arqueo.');
 
         return [
@@ -197,6 +186,8 @@ class CajaService
             'ventas_efectivo' => $this->importe($totales['Efectivo']),
             'ventas_tarjeta' => $this->importe($totales['Tarjeta']),
             'ventas_transferencia' => $this->importe($totales['Transferencia']),
+            'ingresos_extraordinarios' => $this->importe($ingresosExtraordinarios),
+            'gastos_menores' => $this->importe($gastosMenores),
             'devoluciones_efectivo' => $this->importe($devoluciones['Efectivo']),
             'devoluciones_tarjeta' => $this->importe($devoluciones['Tarjeta']),
             'devoluciones_transferencia' => $this->importe($devoluciones['Transferencia']),
