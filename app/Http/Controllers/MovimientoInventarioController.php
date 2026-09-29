@@ -17,12 +17,13 @@ class MovimientoInventarioController extends Controller
         $datos = $request->validate([
             'id_producto' => 'sometimes|required|integer|exists:producto,producto_id',
             'tipo_movimiento' => 'sometimes|required|string|max:24',
+            'tipo_merma' => 'nullable|string|max:32',
             'fecha_desde' => 'nullable|date',
             'fecha_hasta' => 'nullable|date'.($request->filled('fecha_desde') ? '|after_or_equal:fecha_desde' : ''),
         ]);
         $query = Movimiento_inventario::with(['producto', 'usuario']);
-        foreach (['id_producto', 'tipo_movimiento'] as $campo) {
-            if (isset($datos[$campo])) {
+        foreach (['id_producto', 'tipo_movimiento', 'tipo_merma'] as $campo) {
+            if (isset($datos[$campo]) && $datos[$campo] !== null && $datos[$campo] !== '') {
                 $query->where($campo, $datos[$campo]);
             }
         }
@@ -43,10 +44,18 @@ class MovimientoInventarioController extends Controller
             $request->merge(['cantidad_movimimiento' => $request->input('cantidad_movimiento')]);
         }
         $ajuste = $request->input('tipo_movimiento') === 'Ajuste Manual';
+        $esMerma = $request->input('tipo_movimiento') === 'Salida por Merma';
+
         $datos = $request->validate([
             'id_producto' => 'required|integer|exists:producto,producto_id',
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
             'tipo_movimiento' => ['required', Rule::in(['Entrada', 'Entrada por Compra', 'Salida', 'Salida por Merma', 'Ajuste Manual'])],
+            'tipo_merma' => [
+                Rule::requiredIf($esMerma),
+                'nullable',
+                'string',
+                Rule::in(Movimiento_inventario::TIPOS_MERMA),
+            ],
             'cantidad_movimimiento' => ($ajuste ? 'sometimes' : 'required').'|integer|min:1|max:2147483647',
             'stock_resultante_producto' => ($ajuste ? 'required' : 'sometimes').'|integer|min:0|max:2147483647',
             'stock_anterior_producto' => 'sometimes|integer|min:0|max:2147483647',
@@ -55,7 +64,7 @@ class MovimientoInventarioController extends Controller
             'justificacion' => [Rule::requiredIf($ajuste || in_array($request->input('tipo_movimiento'), ['Salida', 'Salida por Merma'], true)), 'nullable', 'string', 'max:90'],
         ]);
 
-        return DB::transaction(function () use ($datos, $ajuste) {
+        return DB::transaction(function () use ($datos, $ajuste, $esMerma) {
             $producto = Producto::lockForUpdate()->findOrFail($datos['id_producto']);
             $anterior = (int) $producto->existencia_bodega;
             $entrada = in_array($datos['tipo_movimiento'], ['Entrada', 'Entrada por Compra'], true);
@@ -73,11 +82,19 @@ class MovimientoInventarioController extends Controller
                 throw ValidationException::withMessages(['stock_resultante_producto' => 'El saldo enviado no coincide con el movimiento solicitado.']);
             }
 
+            $cantidad = abs($nuevo - $anterior);
+            $costoUnitario = $esMerma ? (float) $producto->costo_compra : null;
+            $costoTotalPerdida = $esMerma ? round($cantidad * (float) $producto->costo_compra, 2) : null;
+            $tipoMerma = $esMerma ? ($datos['tipo_merma'] ?? null) : null;
+
             $movimiento = Movimiento_inventario::create([
                 'id_producto' => $producto->producto_id,
                 'id_usuario' => $datos['id_usuario'],
                 'tipo_movimiento' => $datos['tipo_movimiento'],
-                'cantidad_movimimiento' => abs($nuevo - $anterior),
+                'tipo_merma' => $tipoMerma,
+                'costo_unitario' => $costoUnitario,
+                'costo_total_perdida' => $costoTotalPerdida,
+                'cantidad_movimimiento' => $cantidad,
                 'stock_anterior_producto' => $anterior,
                 'stock_resultante_producto' => $nuevo,
                 'fecha_movimiento' => $datos['fecha_movimiento'],

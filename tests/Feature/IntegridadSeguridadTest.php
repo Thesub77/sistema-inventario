@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Bitacora;
 use App\Models\Categoria;
 use App\Models\Cliente;
+use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
@@ -427,5 +428,247 @@ class IntegridadSeguridadTest extends TestCase
         $resBitPag = $this->getJson('/api/bitacoras?por_pagina=1&page=1');
         $resBitPag->assertStatus(200);
         $resBitPag->assertJsonStructure(['data', 'current_page', 'per_page', 'total']);
+    }
+
+    public function test_merma_requiere_tipo_merma_valido_y_justificacion(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-MERM-1',
+            'nombre_categoria' => 'Categoría Mermas',
+            'estado' => 1,
+        ]);
+
+        $prod = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-M1',
+            'nombre_producto' => 'Leche Entera 1L',
+            'descripcion_producto' => 'Leche pasteurizada 1L',
+            'costo_compra' => 20.00,
+            'precio_venta' => 28.00,
+            'existencia_bodega' => 15,
+            'existencia_minima' => 2,
+            'estado' => 1,
+        ]);
+
+        // 1. Falla si falta tipo_merma en Salida por Merma
+        $resSinTipo = $this->postJson('/api/movimientos-inventario', [
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'cantidad_movimiento' => 2,
+            'fecha_movimiento' => now()->toDateString(),
+            'justificacion' => 'Bolsas rotas',
+        ]);
+        $resSinTipo->assertStatus(422);
+        $resSinTipo->assertJsonValidationErrors(['tipo_merma']);
+
+        // 2. Falla si tipo_merma es un valor no permitido
+        $resTipoInvalido = $this->postJson('/api/movimientos-inventario', [
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Robo o Hurto Invalido',
+            'cantidad_movimiento' => 2,
+            'fecha_movimiento' => now()->toDateString(),
+            'justificacion' => 'Bolsas rotas',
+        ]);
+        $resTipoInvalido->assertStatus(422);
+        $resTipoInvalido->assertJsonValidationErrors(['tipo_merma']);
+
+        // 3. Falla si falta justificación en Salida por Merma
+        $resSinJust = $this->postJson('/api/movimientos-inventario', [
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Deterioro/Vencimiento',
+            'cantidad_movimiento' => 2,
+            'fecha_movimiento' => now()->toDateString(),
+        ]);
+        $resSinJust->assertStatus(422);
+        $resSinJust->assertJsonValidationErrors(['justificacion']);
+    }
+
+    public function test_merma_cuantifica_costo_unitario_y_total_de_perdidas_correctamente(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-MERM-2',
+            'nombre_categoria' => 'Lácteos y Derivados',
+            'estado' => 1,
+        ]);
+
+        $prod = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-M2',
+            'nombre_producto' => 'Yogurt Fresa 500ml',
+            'descripcion_producto' => 'Yogurt de fresa 500ml',
+            'costo_compra' => 15.50,
+            'precio_venta' => 22.00,
+            'existencia_bodega' => 20,
+            'existencia_minima' => 5,
+            'estado' => 1,
+        ]);
+
+        // Registrar merma de 4 unidades
+        $res = $this->postJson('/api/movimientos-inventario', [
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Rotura/Accidente',
+            'cantidad_movimiento' => 4,
+            'fecha_movimiento' => now()->toDateTimeString(),
+            'justificacion' => 'Frasco quebrado al descargar mercadería',
+        ]);
+
+        $res->assertStatus(201);
+        $res->assertJsonPath('success', true);
+
+        // Verificar cuantificación económica en la respuesta
+        $mov = $res->json('movimiento');
+        $this->assertEquals('Salida por Merma', $mov['tipo_movimiento']);
+        $this->assertEquals('Rotura/Accidente', $mov['tipo_merma']);
+        $this->assertEquals(15.50, (float) $mov['costo_unitario']);
+        $this->assertEquals(62.00, (float) $mov['costo_total_perdida']); // 4 * 15.50 = 62.00
+        $this->assertEquals(4, $mov['cantidad_movimimiento']);
+        $this->assertEquals(20, $mov['stock_anterior_producto']);
+        $this->assertEquals(16, $mov['stock_resultante_producto']);
+
+        // Verificar en base de datos tabla movimiento_inventario
+        $this->assertDatabaseHas('movimiento_inventario', [
+            'movimiento_inventario_id' => $mov['movimiento_inventario_id'],
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Rotura/Accidente',
+            'costo_unitario' => 15.50,
+            'costo_total_perdida' => 62.00,
+            'cantidad_movimimiento' => 4,
+            'stock_resultante_producto' => 16,
+        ]);
+
+        // Verificar que el stock físico del producto se redujo
+        $this->assertEquals(16, $prod->fresh()->existencia_bodega);
+
+        // Verificar registro de auditoría en bitácora
+        $this->assertDatabaseHas('bitacora', [
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'accion_bitacora' => 'MOVIMIENTO_INVENTARIO',
+        ]);
+    }
+
+    public function test_movimiento_no_merma_no_exige_ni_almacena_tipo_ni_costo_perdida(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-MERM-3',
+            'nombre_categoria' => 'Abarrotes',
+            'estado' => 1,
+        ]);
+
+        $prod = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-M3',
+            'nombre_producto' => 'Arroz 1lb',
+            'descripcion_producto' => 'Arroz blanco 1lb',
+            'costo_compra' => 12.00,
+            'precio_venta' => 18.00,
+            'existencia_bodega' => 10,
+            'existencia_minima' => 2,
+            'estado' => 1,
+        ]);
+
+        // Entrada normal sin tipo_merma
+        $resEntrada = $this->postJson('/api/movimientos-inventario', [
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Entrada',
+            'cantidad_movimiento' => 5,
+            'fecha_movimiento' => now()->toDateString(),
+        ]);
+        $resEntrada->assertStatus(201);
+        $movEntrada = $resEntrada->json('movimiento');
+        $this->assertNull($movEntrada['tipo_merma']);
+        $this->assertNull($movEntrada['costo_unitario']);
+        $this->assertNull($movEntrada['costo_total_perdida']);
+
+        $this->assertDatabaseHas('movimiento_inventario', [
+            'movimiento_inventario_id' => $movEntrada['movimiento_inventario_id'],
+            'tipo_movimiento' => 'Entrada',
+            'tipo_merma' => null,
+            'costo_unitario' => null,
+            'costo_total_perdida' => null,
+            'stock_resultante_producto' => 15,
+        ]);
+    }
+
+    public function test_dashboard_resumen_incluye_total_perdidas_mermas_del_mes_en_curso(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-DASH-M',
+            'nombre_categoria' => 'Frutas y Verduras',
+            'estado' => 1,
+        ]);
+
+        $prod = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-FRUT',
+            'nombre_producto' => 'Manzana Roja',
+            'descripcion_producto' => 'Manzana roja fresca',
+            'costo_compra' => 10.00,
+            'precio_venta' => 15.00,
+            'existencia_bodega' => 50,
+            'existencia_minima' => 5,
+            'estado' => 1,
+        ]);
+
+        // 1. Merma 1 del mes actual: 3 manzanas vencidas (3 * 10 = 30)
+        Movimiento_inventario::create([
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Deterioro/Vencimiento',
+            'costo_unitario' => 10.00,
+            'costo_total_perdida' => 30.00,
+            'cantidad_movimimiento' => 3,
+            'stock_anterior_producto' => 50,
+            'stock_resultante_producto' => 47,
+            'fecha_movimiento' => now()->startOfMonth()->addDays(2),
+            'estado' => 1,
+        ]);
+
+        // 2. Merma 2 del mes actual: 2 manzanas descartadas (2 * 10 = 20)
+        Movimiento_inventario::create([
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Descarte Tecnico',
+            'costo_unitario' => 10.00,
+            'costo_total_perdida' => 20.00,
+            'cantidad_movimimiento' => 2,
+            'stock_anterior_producto' => 47,
+            'stock_resultante_producto' => 45,
+            'fecha_movimiento' => now()->startOfMonth()->addDays(5),
+            'estado' => 1,
+        ]);
+
+        // 3. Merma de otro mes (hace 2 meses): NO debe contarse (5 * 10 = 50)
+        Movimiento_inventario::create([
+            'id_producto' => $prod->producto_id,
+            'id_usuario' => $this->adminPrincipal->usuario_id,
+            'tipo_movimiento' => 'Salida por Merma',
+            'tipo_merma' => 'Rotura/Accidente',
+            'costo_unitario' => 10.00,
+            'costo_total_perdida' => 50.00,
+            'cantidad_movimimiento' => 5,
+            'stock_anterior_producto' => 55,
+            'stock_resultante_producto' => 50,
+            'fecha_movimiento' => now()->subMonths(2)->startOfMonth(),
+            'estado' => 1,
+        ]);
+
+        // Consultar Dashboard
+        $res = $this->getJson('/api/dashboard/resumen');
+        $res->assertStatus(200);
+
+        // Validar que totalPerdidasMermasMes es exactamente 50 (30 + 20) y no 100
+        $data = $res->json();
+        $this->assertEquals(50.00, (float) $data['totalPerdidasMermasMes']);
+        $this->assertEquals(50.00, (float) $data['stats']['totalPerdidasMermasMes']);
     }
 }
