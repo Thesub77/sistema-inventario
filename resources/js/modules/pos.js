@@ -4,6 +4,9 @@ export function posModule() {
         posSearch: '',
         posCategoryFilter: '',
         searchVenta: '',
+        ventaFechaDesde: '',
+        ventaFechaHasta: '',
+        ventaUsuarioFilter: '',
         cart: [],
         posSale: {
             id_cliente: null,
@@ -138,16 +141,34 @@ export function posModule() {
         async processSale() {
             if (this.cart.length === 0) return;
 
-            // Validación de identificador / referencia en transferencias
-            if (this.posSale.metodo_pago === 'Transferencia' && (!this.posSale.referencia_transferencia || !this.posSale.referencia_transferencia.trim())) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Referencia Requerida',
-                    text: 'Debes ingresar el número de referencia o voucher para pagos por transferencia.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
-                return;
+            // Validación de voucher (Tarjeta) y referencia (Transferencia) con longitud mínima
+            if (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta') {
+                const ref = (this.posSale.referencia_transferencia || '').trim();
+                const isTarjeta = this.posSale.metodo_pago === 'Tarjeta';
+                const nombreCampo = isTarjeta ? 'número de voucher / autorización' : 'número de transferencia / referencia';
+                const minLength = 4;
+
+                if (!ref) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: isTarjeta ? 'Voucher Requerido' : 'Referencia Requerida',
+                        text: `Debes ingresar el ${nombreCampo} para procesar el pago con ${this.posSale.metodo_pago.toLowerCase()}.`,
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    return;
+                }
+
+                if (ref.length < minLength) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Mínimo Requerido No Alcanzado',
+                        text: `El ${nombreCampo} debe contener al menos ${minLength} caracteres.`,
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    return;
+                }
             }
 
             // Validación obligatoria de efectivo recibido para evitar errores humanos de cálculo
@@ -224,6 +245,68 @@ export function posModule() {
             };
 
             this.loading = true;
+
+            // Animación centrada en pantalla con barra de progreso mientras el backend emite la factura
+            let progressInterval = null;
+            Swal.fire({
+                title: 'Emitiendo Factura',
+                html: `
+                    <div class="py-3 px-1 space-y-4">
+                        <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full bg-brand-500/20 animate-ping"></div>
+                            <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/25">
+                                <svg class="w-7 h-7 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <p id="pos-billing-status" class="text-sm font-semibold ${this.darkMode ? 'text-slate-200' : 'text-slate-700'} transition-all">
+                                Procesando transacción...
+                            </p>
+                            <p class="text-xs ${this.darkMode ? 'text-slate-400' : 'text-slate-500'} font-mono">
+                                Código: ${salePayload.codigo_venta}
+                            </p>
+                        </div>
+
+                        <div class="w-full ${this.darkMode ? 'bg-slate-700/60 border-slate-600/50' : 'bg-slate-200 border-slate-300'} rounded-full h-3 overflow-hidden p-0.5 border shadow-inner">
+                            <div id="pos-billing-bar" class="bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-300 ease-out" style="width: 15%"></div>
+                        </div>
+
+                        <p class="text-[11px] ${this.darkMode ? 'text-slate-400' : 'text-slate-500'}">
+                            Generando comprobante fiscal y deduciendo inventario...
+                        </p>
+                    </div>
+                `,
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a',
+                didOpen: () => {
+                    const bar = document.getElementById('pos-billing-bar');
+                    const statusText = document.getElementById('pos-billing-status');
+                    const steps = [
+                        { pct: 35, text: 'Verificando existencias...' },
+                        { pct: 60, text: 'Registrando pago...' },
+                        { pct: 80, text: 'Generando comprobante...' },
+                        { pct: 92, text: 'Finalizando emisión...' }
+                    ];
+                    let stepIdx = 0;
+                    progressInterval = setInterval(() => {
+                        if (stepIdx < steps.length) {
+                            if (bar) bar.style.width = steps[stepIdx].pct + '%';
+                            if (statusText) statusText.textContent = steps[stepIdx].text;
+                            stepIdx++;
+                        }
+                    }, 220);
+                },
+                willClose: () => {
+                    if (progressInterval) clearInterval(progressInterval);
+                }
+            });
+
             try {
                 let res = await this.apiFetch('/api/ventas', {
                     method: 'POST',
@@ -252,6 +335,14 @@ export function posModule() {
 
                 const responseData = await res.json();
                 const newSale = responseData.venta;
+
+                // Completar la barra de progreso al 100% con feedback positivo
+                if (progressInterval) clearInterval(progressInterval);
+                const bar = document.getElementById('pos-billing-bar');
+                const statusText = document.getElementById('pos-billing-status');
+                if (bar) bar.style.width = '100%';
+                if (statusText) statusText.textContent = '¡Factura emitida exitosamente!';
+                await new Promise(r => setTimeout(r, 260));
 
                 // Descontar existencias localmente para respuesta visual instantánea (0ms)
                 salePayload.detalles.forEach(d => {
@@ -510,6 +601,38 @@ export function posModule() {
                 background: '#1e293b',
                 color: '#fff'
             });
+        },
+
+        // Métodos de control y filtrado del Historial de Ventas (RF-21)
+        clearVentaFilters() {
+            this.searchVenta = '';
+            this.ventaFechaDesde = '';
+            this.ventaFechaHasta = '';
+            this.ventaUsuarioFilter = '';
+        },
+
+        setVentaQuickDate(range) {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const toYmd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+            if (range === 'hoy') {
+                const todayStr = toYmd(now);
+                this.ventaFechaDesde = todayStr;
+                this.ventaFechaHasta = todayStr;
+            } else if (range === '7dias') {
+                const past = new Date();
+                past.setDate(past.getDate() - 6);
+                this.ventaFechaDesde = toYmd(past);
+                this.ventaFechaHasta = toYmd(now);
+            } else if (range === 'mes') {
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                this.ventaFechaDesde = toYmd(firstDay);
+                this.ventaFechaHasta = toYmd(now);
+            } else if (range === 'todos') {
+                this.ventaFechaDesde = '';
+                this.ventaFechaHasta = '';
+            }
         }
     };
 }
