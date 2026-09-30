@@ -33,29 +33,58 @@
 
     <!-- 2. RF-26: CONSULTA DE VENTAS DEL TURNO / DEL DÍA (DESGLOSE EFECTIVO Y TRANSFERENCIA) -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 relative overflow-hidden">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-800/80 pb-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-slate-800/80 pb-4">
             <div>
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                        <i data-lucide="calendar-check" class="w-4 h-4"></i>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                        <i data-lucide="calendar-check" class="w-5 h-5"></i>
                     </div>
                     <div>
-                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Ventas del Turno / Día Actual (RF-26)</h3>
-                        <p class="text-xs text-slate-400">Desglose en tiempo real por método de pago para cuadre de caja</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Ventas del Turno</h3>
+                            
+                            <!-- Indicador de Turno Activo -->
+                            <template x-if="ventasTurnoStats.turnoActivo">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span x-text="ventasTurnoStats.cajaNombre + ' • Turno Abierto'"></span>
+                                </span>
+                            </template>
+                            <template x-if="!ventasTurnoStats.turnoActivo">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                                    <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+                                    <span>Turno General (Día Actual)</span>
+                                </span>
+                            </template>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1" x-text="ventasTurnoStats.turnoActivo && ventasTurnoStats.cajeroNombre ? ('Cajero en turno: ' + ventasTurnoStats.cajeroNombre + (ventasTurnoStats.fechaApertura ? ' • Apertura: ' + formatDate(ventasTurnoStats.fechaApertura) : '')) : 'Desglose en tiempo real por método de pago para cuadre de caja'"></p>
                     </div>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div class="flex items-center gap-2 self-start md:self-center">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span x-text="ventasTurnoStats.totalTickets + ' tickets hoy'"></span>
+                    <span x-text="ventasTurnoStats.totalTickets + ' tickets registrados'"></span>
                 </span>
-                <button type="button" @click="currentTab = 'ventas'" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1 cursor-pointer">
-                    Ver ventas &rarr;
-                </button>
             </div>
         </div>
+
+        <!-- Banner Informativo del Turno Activo: Fondo de Apertura y Efectivo Esperado -->
+        <template x-if="ventasTurnoStats.turnoActivo">
+            <div class="mb-5 p-3.5 rounded-2xl bg-dark-900/90 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2.5 text-slate-300">
+                    <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    </div>
+                    <span>Fondo Inicial de Apertura en Caja: <strong class="text-white font-mono text-sm ml-1" x-text="formatCurrency(ventasTurnoStats.montoApertura)"></strong></span>
+                </div>
+                <div class="flex items-center gap-2 text-slate-300 bg-dark-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
+                    <span class="text-slate-400">Efectivo Esperado (Apertura + Ventas):</span>
+                    <strong class="text-emerald-400 font-mono text-sm" x-text="formatCurrency(ventasTurnoStats.efectivoEsperado)"></strong>
+                </div>
+            </div>
+        </template>
 
         <!-- Métricas del Turno: Total + Efectivo + Transferencia + Tarjeta -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -137,83 +166,6 @@
         </div>
     </div>
 
-    <!-- 3. KPI CARDS GRID GENERALES (RF-30) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <!-- KPI 1: Total Facturado Histórico -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-800 hover:border-brand-500/30 transition-all">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Facturación Total</p>
-                    <h3 class="text-2xl font-bold font-display text-white mt-1" x-text="formatCurrency(stats.totalVentasMonto)"></h3>
-                    <p class="text-xs text-emerald-400 mt-2 flex items-center gap-1 font-medium">
-                        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
-                        <span x-text="ventas.length + ' facturas acumuladas'"></span>
-                    </p>
-                </div>
-                <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center">
-                    <i data-lucide="dollar-sign" class="w-6 h-6"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI 2: Total Productos y Unidades -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-800 hover:border-indigo-500/30 transition-all">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Productos en Catálogo</p>
-                    <h3 class="text-2xl font-bold font-display text-white mt-1" x-text="stats.totalProductos !== undefined ? stats.totalProductos : productos.length"></h3>
-                    <p class="text-xs text-indigo-400 mt-2 flex items-center gap-1 font-medium">
-                        <i data-lucide="boxes" class="w-3.5 h-3.5"></i>
-                        <span x-text="stats.totalUnidades + ' unidades en almacén'"></span>
-                    </p>
-                </div>
-                <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
-                    <i data-lucide="package" class="w-6 h-6"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI 3: Alertas de Stock Bajo (RF-13) -->
-        <div class="glass-panel p-5 rounded-2xl border transition-all"
-            :class="stockAlerts.totalAlertas > 0 ? 'border-rose-500/30 bg-rose-500/5' : 'border-slate-800'">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Alertas de Stock (RF-13)</p>
-                    <h3 class="text-2xl font-bold font-display mt-1"
-                        :class="stockAlerts.totalAlertas > 0 ? 'text-rose-400' : 'text-emerald-400'"
-                        x-text="stockAlerts.totalAlertas"></h3>
-                    <p class="text-xs mt-2 flex items-center gap-1 font-medium"
-                        :class="stockAlerts.totalAlertas > 0 ? 'text-rose-400' : 'text-emerald-400'">
-                        <i :data-lucide="stockAlerts.totalAlertas > 0 ? 'alert-triangle' : 'check-circle-2'" class="w-3.5 h-3.5"></i>
-                        <span x-text="stockAlerts.totalAlertas > 0 ? (stockAlerts.criticos.length + ' agotados / ' + stockAlerts.urgentes.length + ' críticos') : 'Stock óptimo'"></span>
-                    </p>
-                </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center border"
-                    :class="stockAlerts.totalAlertas > 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'">
-                    <i data-lucide="alert-circle" class="w-6 h-6"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI 4: Capital Inmovilizado / Baja Rotación (RF-33) -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-800 hover:border-amber-500/30 transition-all">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Capital Inmovilizado (RF-33)</p>
-                    <h3 class="text-2xl font-bold font-display text-amber-400 mt-1" x-text="formatCurrency(capitalInmovilizadoTotal)"></h3>
-                    <p class="text-xs text-amber-300 mt-2 flex items-center gap-1 font-medium">
-                        <i data-lucide="trending-down" class="w-3.5 h-3.5"></i>
-                        <span x-text="productosBajaRotacion.length + ' productos con baja rotación'"></span>
-                    </p>
-                </div>
-                <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
-                    <i data-lucide="hourglass" class="w-6 h-6"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 4. SECCIÓN DE GRÁFICOS INTERACTIVOS (RF-31: INDICADOR DE VENTAS & RF-32: TOP 5 ROTACIÓN) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -226,7 +178,7 @@
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                         </div>
                         <div>
-                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Indicador de Ventas (RF-31)</h3>
+                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Indicador de Ventas</h3>
                             <p class="text-xs text-slate-400">Evolución de facturación por días y semanas</p>
                         </div>
                     </div>
@@ -279,7 +231,7 @@
                             <i data-lucide="flame" class="w-4 h-4"></i>
                         </div>
                         <div>
-                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Top 5 Rotación (RF-32)</h3>
+                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Top 5 Rotación</h3>
                             <p class="text-xs text-slate-400">Productos con mayor volumen vendido</p>
                         </div>
                     </div>
@@ -305,8 +257,8 @@
                                     }"
                                     x-text="p.posicion"></span>
                                 <div class="truncate">
-                                    <p class="font-semibold text-slate-200 truncate" x-text="p.nombre"></p>
-                                    <p class="text-[10px] text-slate-400" x-text="p.codigo"></p>
+                                    <p class="font-semibold text-slate-200 truncate" x-text="p.nombre || p.nombre_producto"></p>
+                                    <p class="text-[10px] text-slate-400 font-mono" x-text="p.codigo || p.codigo_producto"></p>
                                 </div>
                             </div>
                             <div class="text-right flex-shrink-0">
@@ -336,7 +288,7 @@
                         <i data-lucide="alert-triangle" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Alertas de Stock Bajo (RF-13)</h3>
+                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Alertas de Stock Bajo</h3>
                         <p class="text-xs text-slate-400">Productos con existencias &le; stock mínimo</p>
                     </div>
                 </div>
@@ -422,7 +374,7 @@
                         <i data-lucide="hourglass" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Baja Rotación Comercial (RF-33)</h3>
+                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Baja Rotación Comercial</h3>
                         <p class="text-xs text-slate-400">Productos con nulo o poco movimiento de ventas</p>
                     </div>
                 </div>
@@ -489,20 +441,27 @@
 
     <!-- 6. ÚLTIMAS VENTAS EN TIEMPO REAL (RF-30) -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center border border-brand-500/20">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center border border-brand-500/20">
                     <i data-lucide="receipt" class="w-4 h-4"></i>
                 </div>
                 <div>
-                    <h3 class="font-display font-bold text-base sm:text-lg text-white">Últimas Ventas Emitidas</h3>
-                    <p class="text-xs text-slate-400">Transacciones recientes registradas en el sistema</p>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-display font-bold text-base sm:text-lg text-white">Últimas Ventas Emitidas</h3>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                            Últimas 10 (Tiempo Real)
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Listado actualizado automáticamente al registrar ventas en el POS</p>
                 </div>
             </div>
-            <button type="button" @click="currentTab = 'ventas'" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1 cursor-pointer">
-                <span>Ver historial completo</span>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <button type="button" @click="currentTab = 'ventas'" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-xl bg-dark-900 border border-slate-800 hover:border-brand-500/30 transition-all">
+                    <span>Ver historial completo</span>
+                    <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-2xl border border-slate-800/60">
@@ -517,16 +476,16 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                    <template x-for="v in ultimasVentas" :key="v.venta_id">
+                    <template x-for="v in ultimasVentas" :key="v.venta_id || v.codigo_venta">
                         <tr class="hover:bg-slate-800/40 transition-colors">
                             <td class="py-3.5 px-4 font-semibold text-brand-300 font-mono" x-text="v.codigo_venta"></td>
-                            <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente_nombre || (v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final')"></td>
+                            <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente_nombre"></td>
                             <td class="py-3.5 px-4">
                                 <span class="px-2.5 py-1 text-xs rounded-lg font-medium inline-flex items-center gap-1"
                                     :class="{
-                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': v.metodo_pago === 'Efectivo',
-                                        'bg-sky-500/10 text-sky-400 border border-sky-500/20': v.metodo_pago === 'Transferencia',
-                                        'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20': v.metodo_pago === 'Tarjeta'
+                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': (v.metodo_pago || '').toLowerCase() === 'efectivo',
+                                        'bg-sky-500/10 text-sky-400 border border-sky-500/20': (v.metodo_pago || '').toLowerCase() === 'transferencia',
+                                        'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20': ['tarjeta', 'debito', 'credito'].includes((v.metodo_pago || '').toLowerCase())
                                     }">
                                     <i data-lucide="circle-dot" class="w-2.5 h-2.5"></i>
                                     <span x-text="v.metodo_pago"></span>

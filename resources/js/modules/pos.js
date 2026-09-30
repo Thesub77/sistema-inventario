@@ -7,6 +7,7 @@ export function posModule() {
         ventaFechaDesde: '',
         ventaFechaHasta: '',
         ventaUsuarioFilter: '',
+        ventaQuickRange: '',
         cart: [],
         posSale: {
             id_cliente: null,
@@ -354,7 +355,10 @@ export function posModule() {
 
                 // Actualizar historial en memoria de inmediato (0ms)
                 if (Array.isArray(this.ventas)) {
-                    this.ventas.unshift(newSale);
+                    this.ventas = [newSale, ...this.ventas];
+                    if (typeof this.renderDashboardCharts === 'function') {
+                        this.renderDashboardCharts();
+                    }
                 }
 
                 // Precargar datos del comprobante con efectivo y cambio para apertura inmediata (0ms)
@@ -609,12 +613,51 @@ export function posModule() {
             this.ventaFechaDesde = '';
             this.ventaFechaHasta = '';
             this.ventaUsuarioFilter = '';
+            this.ventaQuickRange = '';
+        },
+
+        getVentaLocalDate(dateStr) {
+            if (!dateStr) return '';
+            let normalized = String(dateStr).trim();
+            // Normalizar fechas UTC sin sufijo Z (ej: "2026-09-30 01:35:00") a ISO UTC para interpretar en hora local
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                return normalized.split('T')[0].split(' ')[0];
+            }
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        },
+
+        isVentaQuickActive(range) {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const toYmd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            const today = toYmd(now);
+
+            if (range === 'hoy') {
+                return Boolean(this.ventaFechaDesde && this.ventaFechaDesde === today && this.ventaFechaHasta === today);
+            }
+            if (range === '7dias') {
+                const past = new Date();
+                past.setDate(past.getDate() - 6);
+                return Boolean(this.ventaFechaDesde === toYmd(past) && this.ventaFechaHasta === today);
+            }
+            if (range === 'mes') {
+                const firstDay = toYmd(new Date(now.getFullYear(), now.getMonth(), 1));
+                return Boolean(this.ventaFechaDesde === firstDay && this.ventaFechaHasta === today);
+            }
+            return false;
         },
 
         setVentaQuickDate(range) {
             const now = new Date();
             const pad = n => String(n).padStart(2, '0');
             const toYmd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+            this.ventaQuickRange = range;
 
             if (range === 'hoy') {
                 const todayStr = toYmd(now);
@@ -632,6 +675,7 @@ export function posModule() {
             } else if (range === 'todos') {
                 this.ventaFechaDesde = '';
                 this.ventaFechaHasta = '';
+                this.ventaQuickRange = '';
             }
         }
     };

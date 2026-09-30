@@ -11,7 +11,7 @@
 --}}
 
 <div x-show="currentTab === 'ventas'" x-cloak
-    x-init="$watch('currentTab', v => { if (v === 'ventas') $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); })"
+    x-init="$watch('currentTab', v => { if (v === 'ventas') $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); }); $watch('filteredVentas', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }))"
     class="space-y-4">
 
     <!-- Panel Principal de Filtros de Consulta (RF-21) -->
@@ -116,17 +116,23 @@
                 <span class="text-[11px] font-bold text-slate-400">Atajos:</span>
                 <button type="button" @click="setVentaQuickDate('hoy')"
                     class="px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer"
-                    :class="(ventaFechaDesde && ventaFechaDesde === ventaFechaHasta && ventaFechaDesde === new Date().toISOString().slice(0, 10))
+                    :class="isVentaQuickActive('hoy')
                         ? 'bg-brand-600 text-white border-brand-500'
                         : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'">
                     Hoy
                 </button>
                 <button type="button" @click="setVentaQuickDate('7dias')"
-                    class="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
+                    class="px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer"
+                    :class="isVentaQuickActive('7dias')
+                        ? 'bg-brand-600 text-white border-brand-500'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'">
                     Últimos 7 días
                 </button>
                 <button type="button" @click="setVentaQuickDate('mes')"
-                    class="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
+                    class="px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer"
+                    :class="isVentaQuickActive('mes')
+                        ? 'bg-brand-600 text-white border-brand-500'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'">
                     Este mes
                 </button>
                 <button type="button" x-show="hasActiveVentaFilters" @click="clearVentaFilters()"
@@ -178,7 +184,10 @@
                                 x-text="v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final'"></td>
                             <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400">
                                 <span class="inline-flex items-center gap-1">
-                                    <i data-lucide="user" class="w-3 h-3 text-slate-400"></i>
+                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
                                     <span x-text="v.usuario ? v.usuario.nombre_apellido : 'N/A'"></span>
                                 </span>
                             </td>
@@ -196,13 +205,25 @@
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <button @click="openReceiptModal(v.venta_id, v)" class="p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Imprimir Comprobante (Ticket)">
-                                        <i data-lucide="printer" class="w-4 h-4"></i>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                            <rect x="6" y="14" width="12" height="8"></rect>
+                                        </svg>
                                     </button>
                                     <button @click="viewSaleDetails(v)" class="p-1.5 text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Detalles de Factura">
-                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
                                     </button>
                                     <button x-show="Number(v.estado) !== 0" @click="deleteSale(v)" class="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Anular Venta">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                        </svg>
                                     </button>
                                 </div>
                             </td>

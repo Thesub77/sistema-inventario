@@ -11,8 +11,17 @@ import { themeModule } from './modules/theme';
 import { authModule } from './modules/auth';
 import { dashboardModule } from './modules/dashboard';
 
+// Función auxiliar para combinar módulos preservando getters y setters reactivos de Alpine.js
+function mergeModules(target, ...sources) {
+    for (const source of sources) {
+        if (!source) continue;
+        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    }
+    return target;
+}
+
 export function app() {
-    return {
+    const appObj = {
         // Main State
         currentTab: 'dashboard',
         loading: false,
@@ -25,6 +34,7 @@ export function app() {
         roles: [],
         ventas: [],
         cajas: [],
+        turnos: [],
         cajaMovimientos: [],
         movimientosInventario: [],
         bitacoras: [],
@@ -120,14 +130,13 @@ export function app() {
         },
 
         get stats() {
-            if (this.dashboardData?.stats) {
-                return this.dashboardData.stats;
-            }
-            const totalVentasMonto = this.ventas.reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
-            const totalUnidades = this.productos.reduce((sum, p) => sum + Number(p.existencia_bodega || 0), 0);
+            const totalVentasMonto = (this.ventas || []).reduce((sum, v) => sum + (Number(v.estado) !== 0 ? Number(v.total_venta || 0) : 0), 0);
+            const totalUnidades = (this.productos || []).reduce((sum, p) => sum + Number(p.existencia_bodega || 0), 0);
             return {
-                totalVentasMonto,
-                totalUnidades
+                totalVentasMonto: totalVentasMonto > 0 ? totalVentasMonto : (this.dashboardData?.stats?.totalVentasMonto || 0),
+                totalVentasCount: (this.ventas || []).length || (this.dashboardData?.stats?.totalVentasCount || 0),
+                totalProductos: (this.productos || []).length || (this.dashboardData?.stats?.totalProductos || 0),
+                totalUnidades: totalUnidades > 0 ? totalUnidades : (this.dashboardData?.stats?.totalUnidades || 0)
             };
         },
 
@@ -151,6 +160,20 @@ export function app() {
             });
         },
 
+        getVentaLocalDate(dateStr) {
+            if (!dateStr) return '';
+            let normalized = String(dateStr).trim();
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                return normalized.split('T')[0].split(' ')[0];
+            }
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        },
+
         get filteredVentas() {
             return this.ventas.filter(v => {
                 // 1. Filtro por número de comprobante, cliente o referencia (RF-21)
@@ -171,10 +194,9 @@ export function app() {
                     }
                 }
 
-                // 3. Filtro por Rango de Fechas (Desde y Hasta) (RF-21)
+                // 3. Filtro por Rango de Fechas (Desde y Hasta) ajustado a fecha local del comprobante (RF-21)
                 if (this.ventaFechaDesde || this.ventaFechaHasta) {
-                    const rawDate = v.fecha_hora_venta ? String(v.fecha_hora_venta).trim() : '';
-                    const dateOnly = rawDate.split('T')[0].split(' ')[0];
+                    const dateOnly = this.getVentaLocalDate ? this.getVentaLocalDate(v.fecha_hora_venta) : (v.fecha_hora_venta ? String(v.fecha_hora_venta).slice(0, 10) : '');
 
                     if (this.ventaFechaDesde && dateOnly < this.ventaFechaDesde) {
                         return false;
@@ -320,7 +342,11 @@ export function app() {
             try {
                 switch (tab) {
                     case 'dashboard':
-                        await this.fetchDashboardData();
+                        await Promise.allSettled([
+                            this.fetchDashboardData(),
+                            this.fetchVentas(),
+                            this.fetchProductos()
+                        ]);
                         this.initDashboardCharts();
                         break;
                     case 'pos':
@@ -416,6 +442,13 @@ export function app() {
                 }
             });
 
+            // Observar ventas para actualizar gráficos del dashboard en tiempo real
+            this.$watch('ventas', () => {
+                if (this.currentTab === 'dashboard') {
+                    this.renderDashboardCharts();
+                }
+            });
+
             // Observar cambios de pestaña para cargar datos bajo demanda
             this.$watch('currentTab', (newTab) => {
                 this.loadTab(newTab);
@@ -491,22 +524,27 @@ export function app() {
 
         async fetchVentas() {
             try {
-                const [venRes, cajRes, movCajRes] = await Promise.all([
-                    this.apiFetch('/api/ventas'),
-                    this.apiFetch('/api/cajas'),
-                    this.apiFetch('/api/caja-movimientos-venta')
+                const [venRes, cajRes, movCajRes, turnosRes] = await Promise.all([
+                    this.apiFetch('/api/ventas').catch(() => ({ ok: false })),
+                    this.apiFetch('/api/cajas').catch(() => ({ ok: false })),
+                    this.apiFetch('/api/caja-movimientos-venta').catch(() => ({ ok: false })),
+                    this.apiFetch('/api/caja-operaciones').catch(() => ({ ok: false }))
                 ]);
-                if (venRes.ok) {
+                if (venRes && venRes.ok) {
                     const venData = await venRes.json();
                     this.ventas = Array.isArray(venData) ? venData : [];
                 }
-                if (cajRes.ok) {
+                if (cajRes && cajRes.ok) {
                     const cajData = await cajRes.json();
                     this.cajas = Array.isArray(cajData) ? cajData : [];
                 }
-                if (movCajRes.ok) {
+                if (movCajRes && movCajRes.ok) {
                     const movData = await movCajRes.json();
                     this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                }
+                if (turnosRes && turnosRes.ok) {
+                    const turnosData = await turnosRes.json();
+                    this.turnos = Array.isArray(turnosData) ? turnosData : [];
                 }
             } catch (e) {
                 console.error('Error cargando ventas y cajas:', e);
@@ -669,19 +707,21 @@ export function app() {
         async refreshAll() {
             this.loadedTabs = [];
             await this.loadTab(this.currentTab, true);
-        },
-
-        // Modulos desacoplados
-        ...posModule(),
-        ...productosModule(),
-        ...categoriasModule(),
-        ...clientesModule(),
-        ...usuariosModule(),
-        ...utilsModule(),
-        ...themeModule(),
-        ...authModule(),
-        ...dashboardModule(),
+        }
     };
+
+    return mergeModules(
+        appObj,
+        posModule(),
+        productosModule(),
+        categoriasModule(),
+        clientesModule(),
+        usuariosModule(),
+        utilsModule(),
+        themeModule(),
+        authModule(),
+        dashboardModule()
+    );
 }
 
 // Exponer la función app globalmente para Alpine.js
