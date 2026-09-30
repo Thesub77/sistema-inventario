@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
+use App\Http\Controllers\FiscalController;
 use Illuminate\Support\Facades\Route;
 
 // 1. Rutas de autenticación pública (login con rate limiting y endpoints de sesión)
@@ -39,5 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo de Ventas y Facturación
     Route::middleware('permission:pos.acceso,ventas.ver,ventas.crear')->group(function () {
         require __DIR__.'/api/venta_routes.php';
+    });
+
+    // Módulo de Reportes Fiscales (RF-27 - DGI Cuota Fija)
+    Route::middleware('permission:ventas.ver,pos.acceso')->group(function () {
+        Route::get('/fiscal/libro-diario', [FiscalController::class, 'libroDiario']);
     });
 });
