@@ -33,23 +33,43 @@
             </select>
         </div>
 
-        <!-- Botón sutil y elegante de Carrito / Factura -->
-        <button type="button" @click="showCartDrawer = true; $nextTick(() => typeof lucide !== 'undefined' && lucide.createIcons())"
-            class="relative inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer"
-            :class="cart.length > 0 
-                ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-500/25 ring-2 ring-brand-500/30' 
-                : 'bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'">
-            <div class="relative">
-                <i data-lucide="shopping-bag" class="w-4 h-4"></i>
-                <span x-show="cart.length > 0"
-                    class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs"
-                    x-text="cart.length"></span>
-            </div>
-            <span>Factura / Carrito</span>
-            <span class="font-mono text-xs px-2 py-0.5 rounded-lg"
-                :class="cart.length > 0 ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
-                x-text="formatCurrency(cartTotal)"></span>
-        </button>
+        <div class="flex items-center gap-2">
+            <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders - RF-16) -->
+            <button type="button" @click="openVentasEsperaModal()"
+                class="relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer border"
+                :class="ventasEspera.length > 0 
+                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 ring-2 ring-amber-500/20' 
+                    : 'bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'">
+                <div class="relative">
+                    <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
+                    <span x-show="ventasEspera.length > 0"
+                        class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs"
+                        x-text="ventasEspera.length"></span>
+                </div>
+                <span class="hidden sm:inline">En Espera</span>
+                <span class="font-mono text-xs px-1.5 py-0.5 rounded-lg font-bold"
+                    :class="ventasEspera.length > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'"
+                    x-text="ventasEspera.length"></span>
+            </button>
+
+            <!-- Botón sutil y elegante de Carrito / Factura -->
+            <button type="button" @click="showCartDrawer = true; $nextTick(() => typeof lucide !== 'undefined' && lucide.createIcons())"
+                class="relative inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer"
+                :class="cart.length > 0 
+                    ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-500/25 ring-2 ring-brand-500/30' 
+                    : 'bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'">
+                <div class="relative">
+                    <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                    <span x-show="cart.length > 0"
+                        class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs"
+                        x-text="cart.length"></span>
+                </div>
+                <span>Factura / Carrito</span>
+                <span class="font-mono text-xs px-2 py-0.5 rounded-lg"
+                    :class="cart.length > 0 ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
+                    x-text="formatCurrency(cartTotal)"></span>
+            </button>
+        </div>
     </div>
 
     <!-- Catálogo de Productos Amplio y Despejado (Sin abarrotar) -->
@@ -152,6 +172,15 @@
 
                 <!-- Drawer Body: Formulario Compacto & Lista Detallada de Productos -->
                 <div class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3">
+                    <!-- Banner de Orden en Espera activa -->
+                    <div x-show="resumedVentaEsperaId" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-700 dark:text-amber-300">
+                        <div class="flex items-center gap-1.5 font-bold">
+                            <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
+                            <span>Orden en espera activa</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 dark:text-slate-400">Se completará al facturar</span>
+                    </div>
+
                     <!-- Cliente y Método de Pago en 2 columnas compactas -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <!-- Cliente Selector -->
@@ -379,6 +408,14 @@
                         </div>
                     </div>
 
+                    <!-- Botón Pausar Venta (Poner en Espera - RF-16) -->
+                    <button type="button" @click="parkCurrentSale()"
+                        :disabled="cart.length === 0 || loading"
+                        class="w-full py-2 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs">
+                        <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
+                        <span x-text="resumedVentaEsperaId ? 'Guardar Cambios en Espera' : 'Pausar Venta (Poner en Espera)'"></span>
+                    </button>
+
                     <!-- Botón Emitir Factura y Cobrar (Bloqueado hasta ingresar el efectivo recibido) -->
                     <button type="button" @click="processSale()"
                         :disabled="cart.length === 0 || loading || (posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal))"
@@ -386,6 +423,131 @@
                         class="w-full py-2.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed font-bold rounded-xl flex items-center justify-center gap-2 text-sm transition-all cursor-pointer">
                         <i data-lucide="check-circle" class="w-4 h-4"></i>
                         <span x-text="posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal) ? 'Ingrese el Efectivo Recibido' : 'Emitir Factura y Cobrar'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Listado de Ventas en Espera / Cuentas Pendientes (RF-16) -->
+    <div x-show="showVentasEsperaModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <!-- Backdrop -->
+        <div x-show="showVentasEsperaModal"
+            x-transition:enter="transition-opacity ease-linear duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition-opacity ease-linear duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="showVentasEsperaModal = false"
+            class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs"></div>
+
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div x-show="showVentasEsperaModal"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-2xl bg-white dark:bg-dark-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative flex flex-col max-h-[85vh]">
+
+                <!-- Modal Header -->
+                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-dark-950/50 flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center">
+                            <i data-lucide="pause-circle" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-display font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                                <span>Ventas en Espera</span>
+                                <span class="px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono font-bold"
+                                    x-text="ventasEspera.length"></span>
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Órdenes pausadas temporalmente en el mostrador</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="showVentasEsperaModal = false"
+                        class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body: List of parked orders -->
+                <div class="p-5 flex-1 overflow-y-auto space-y-3">
+                    <template x-for="item in ventasEspera" :key="item.venta_espera_id">
+                        <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-dark-950/60 hover:border-amber-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div class="space-y-1 flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold text-xs font-mono"
+                                        x-text="item.identificador_cuenta"></span>
+                                    <span x-show="item.venta_espera_id === resumedVentaEsperaId"
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>En Carrito</span>
+                                    </span>
+                                    <span class="text-xs text-slate-400 font-medium"
+                                        x-text="item.fecha_creacion ? formatTime(item.fecha_creacion) : ''"></span>
+                                </div>
+
+                                <div class="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2 pt-0.5">
+                                    <span class="font-medium" x-show="item.cliente" x-text="item.cliente ? item.cliente.nombre_apellido_cliente : ''"></span>
+                                    <span class="text-slate-400" x-show="item.cliente && item.cliente.codigo_cliente" x-text="'(' + item.cliente.codigo_cliente + ')'"></span>
+                                    <span class="text-slate-400 dark:text-slate-500">•</span>
+                                    <span class="text-slate-500 dark:text-slate-400" x-text="(item.detalles ? item.detalles.length : 0) + ' productos'"></span>
+                                </div>
+
+                                <template x-if="item.observaciones">
+                                    <p class="text-[11px] text-slate-400 italic pt-0.5" x-text="item.observaciones"></p>
+                                </template>
+                            </div>
+
+                            <div class="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-800">
+                                <div class="text-right">
+                                    <span class="block text-[10px] text-slate-400 uppercase font-semibold">Total</span>
+                                    <span class="font-mono font-bold text-base text-emerald-600 dark:text-emerald-400" x-text="formatCurrency(item.total)"></span>
+                                </div>
+
+                                <div class="flex items-center gap-1.5">
+                                    <!-- Botón Descartar -->
+                                    <button type="button" @click="discardVentaEspera(item)"
+                                        class="p-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors cursor-pointer"
+                                        title="Descartar orden">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+
+                                    <!-- Botón Reanudar -->
+                                    <button type="button" @click="resumeVentaEspera(item)"
+                                        :class="item.venta_espera_id === resumedVentaEsperaId
+                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                            : 'bg-amber-500 hover:bg-amber-600 text-white'"
+                                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer">
+                                        <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+                                        <span x-text="item.venta_espera_id === resumedVentaEsperaId ? 'En Carrito' : 'Reanudar'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Estado Vacío -->
+                    <div x-show="ventasEspera.length === 0" class="py-12 flex flex-col items-center justify-center text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3 text-amber-500">
+                            <i data-lucide="pause-circle" class="w-7 h-7"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm">No hay ventas en espera</h4>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
+                            Cuando tengas una orden abierta en el carrito, pulsa el botón "Pausar Venta" para dejarla guardada y atender a otro cliente.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-dark-950/50 flex items-center justify-between flex-shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                    <span x-text="ventasEspera.length + ' orden(es) en espera'"></span>
+                    <button type="button" @click="showVentasEsperaModal = false"
+                        class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium transition-colors cursor-pointer">
+                        Cerrar
                     </button>
                 </div>
             </div>
