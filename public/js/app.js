@@ -845,7 +845,7 @@ function utilsModule() {
             if (!dateStr) return 'N/A';
             let normalized = String(dateStr).trim();
             // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
                 normalized = normalized.replace(' ', 'T') + 'Z';
             }
             const d = new Date(normalized);
@@ -869,6 +869,22 @@ function utilsModule() {
                 minute: '2-digit',
                 hour12: true
             });
+        },
+
+        formatTime(dateStr) {
+            if (!dateStr) return '';
+            let normalized = String(dateStr).trim();
+            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                const fallback = new Date(dateStr);
+                if (isNaN(fallback.getTime())) return dateStr;
+                return fallback.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            }
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         },
 
         async apiFetch(url, options = {}) {
@@ -1438,6 +1454,12 @@ function posModule() {
         receiptAnulada: false,
         loadingReceipt: false,
 
+        // Estado y control de ventas en espera (Parked Orders / RF-16)
+        ventasEspera: [],
+        showVentasEsperaModal: false,
+        loadingVentasEspera: false,
+        resumedVentaEsperaId: null,
+
         addToCart(product) {
             if (product.existencia_bodega <= 0) {
                 Swal.fire({
@@ -1517,6 +1539,7 @@ function posModule() {
 
         clearCart() {
             this.cart = [];
+            this.resumedVentaEsperaId = null;
             this.posSale.descuento_venta = 0;
             this.posSale.descuento_porcentaje = 0;
             this.posSale.tipo_descuento = 'monto';
@@ -1759,7 +1782,14 @@ function posModule() {
                     if (p) p.existencia_bodega = Math.max(0, p.existencia_bodega - d.cantidad);
                 });
 
+                // Si la venta provenía de una orden en espera reanudada, se cierra ahora que fue facturada
+                const prevResumedId = this.resumedVentaEsperaId;
                 this.clearCart();
+                if (prevResumedId) {
+                    this.apiFetch(`/api/ventas-espera/${prevResumedId}`, { method: 'DELETE' })
+                        .then(() => this.fetchVentasEspera())
+                        .catch(err => console.warn('Error al cerrar orden en espera procesada:', err));
+                }
 
                 // Actualizar historial en memoria de inmediato (0ms)
                 if (Array.isArray(this.ventas)) {
@@ -2090,6 +2120,227 @@ function posModule() {
                 this.ventaFechaHasta = '';
                 this.ventaQuickRange = '';
             }
+        },
+
+        // Métodos de Ventas en Espera / Cuentas Pendientes (Parked Orders - RF-16)
+        async fetchVentasEspera() {
+            try {
+                this.loadingVentasEspera = true;
+                const res = await this.apiFetch('/api/ventas-espera');
+                if (res.ok) {
+                    const json = await res.json();
+                    this.ventasEspera = Array.isArray(json.data) ? json.data : [];
+                }
+            } catch (e) {
+                console.error('Error cargando ventas en espera:', e);
+            } finally {
+                this.loadingVentasEspera = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }
+        },
+
+        openVentasEsperaModal() {
+            this.fetchVentasEspera();
+            this.showVentasEsperaModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async parkCurrentSale() {
+            if (this.cart.length === 0) return;
+
+            const clienteId = this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null);
+
+            const payload = {
+                id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_cliente: clienteId,
+                descuento: this.posSale.descuento_venta || 0,
+                detalles: this.cart.map(i => ({
+                    id_producto: i.id_producto,
+                    cantidad: i.cantidad,
+                    precio_unitario: i.precio_unitario,
+                }))
+            };
+
+            this.loading = true;
+            try {
+                let res;
+                // Si ya estábamos editando una orden en espera reanudada, actualizar en vez de duplicar
+                if (this.resumedVentaEsperaId) {
+                    res = await this.apiFetch(`/api/ventas-espera/${this.resumedVentaEsperaId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await this.apiFetch('/api/ventas-espera', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Error al poner la venta en espera');
+                }
+
+                const nombreAsignado = data.data?.identificador_cuenta || 'Venta en Espera';
+
+                this.resumedVentaEsperaId = null;
+                this.clearCart();
+                this.showCartDrawer = false;
+                await this.fetchVentasEspera();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Venta en Espera!',
+                    text: `La venta fue guardada exitosamente como "${nombreAsignado}".`,
+                    timer: 2500,
+                    showConfirmButton: false,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al pausar venta',
+                    text: error.message,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async resumeVentaEspera(venta) {
+            if (this.cart.length > 0 && this.resumedVentaEsperaId !== venta.venta_espera_id) {
+                const confirm = await Swal.fire({
+                    icon: 'question',
+                    title: '¿Reemplazar carrito actual?',
+                    text: 'Tienes productos en el carrito. Si continúas, se reemplazarán por los productos de esta orden pausada.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, reanudar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#f59e0b',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                if (!confirm.isConfirmed) return;
+            }
+
+            try {
+                this.loading = true;
+                const res = await this.apiFetch(`/api/ventas-espera/${venta.venta_espera_id}`);
+                if (!res.ok) {
+                    throw new Error('No se pudo cargar la venta en espera.');
+                }
+                const json = await res.json();
+                const v = json.data;
+
+                this.cart = (v.detalles || []).map(d => ({
+                    id_producto: d.id_producto,
+                    nombre_producto: d.producto?.nombre_producto || `Producto #${d.id_producto}`,
+                    cantidad: Number(d.cantidad),
+                    precio_unitario: Number(d.precio_unitario),
+                    subtotal_venta_detalle: Number(d.subtotal),
+                    existencia_bodega: Number(d.producto?.existencia_bodega || 0),
+                }));
+
+                if (v.id_cliente) {
+                    this.posSale.id_cliente = v.id_cliente;
+                }
+                this.posSale.descuento_venta = Number(v.descuento || 0);
+                this.posSale.tipo_descuento = 'monto';
+                this.posSale.descuento_porcentaje = 0;
+                this.posSale.monto_recibido = null;
+
+                // Marcar como orden activa en el carrito sin borrar de la base de datos
+                this.resumedVentaEsperaId = v.venta_espera_id;
+
+                this.showVentasEsperaModal = false;
+                this.showCartDrawer = true;
+
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: `Venta "${v.identificador_cuenta}" cargada al carrito`,
+                    showConfirmButton: false,
+                    timer: 2000,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async discardVentaEspera(venta) {
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: '¿Descartar orden en espera?',
+                text: `¿Estás seguro de descartar la venta "${venta.identificador_cuenta}"? Esta acción no se puede deshacer.`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, descartar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ef4444',
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                this.loading = true;
+                const res = await this.apiFetch(`/api/ventas-espera/${venta.venta_espera_id}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) {
+                    throw new Error('Error al descartar la venta en espera.');
+                }
+
+                if (this.resumedVentaEsperaId === venta.venta_espera_id) {
+                    this.resumedVentaEsperaId = null;
+                }
+
+                await this.fetchVentasEspera();
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'info',
+                    title: `Venta "${venta.identificador_cuenta}" descartada`,
+                    showConfirmButton: false,
+                    timer: 2000,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.loading = false;
+            }
         }
     };
 }
@@ -2139,7 +2390,7 @@ function app() {
         // Navegación
         navItems: [
             { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-            { id: 'pos', label: 'Punto de Venta (POS)', icon: 'shopping-cart' },
+            { id: 'pos', label: 'Punto de Venta (POS)', icon: 'shopping-cart', badge: () => (this.ventasEspera ? this.ventasEspera.length : 0) },
             { id: 'productos', label: 'Productos & Stock', icon: 'package', badge: () => this.lowStockProducts.length },
             { id: 'categorias', label: 'Categorías', icon: 'tags' },
             { id: 'ventas', label: 'Historial de Ventas', icon: 'receipt' },
@@ -2399,7 +2650,8 @@ function app() {
                             this.fetchCategorias(),
                             this.fetchClientes(),
                             this.fetchVentas(),
-                            this.fetchEmpresa()
+                            this.fetchEmpresa(),
+                            this.fetchVentasEspera()
                         ]);
                         break;
                     case 'productos':

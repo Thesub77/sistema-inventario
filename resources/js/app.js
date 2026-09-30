@@ -33,6 +33,7 @@ export function app() {
         usuarios: [],
         roles: [],
         ventas: [],
+        ventasEspera: [],
         cajas: [],
         turnos: [],
         cajaMovimientos: [],
@@ -62,7 +63,8 @@ export function app() {
             {
                 id: 'pos',
                 label: 'Punto de Venta (POS)',
-                icon: 'shopping-cart'
+                icon: 'shopping-cart',
+                badge: () => (this.ventasEspera ? this.ventasEspera.length : 0)
             },
             {
                 id: 'productos',
@@ -355,7 +357,8 @@ export function app() {
                             this.fetchCategorias(),
                             this.fetchClientes(),
                             this.fetchVentas(),
-                            this.fetchEmpresa()
+                            this.fetchEmpresa(),
+                            this.fetchVentasEspera()
                         ]);
                         break;
                     case 'productos':

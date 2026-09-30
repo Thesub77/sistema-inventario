@@ -74,4 +74,9 @@ class Usuario extends Authenticatable
     {
         return $this->hasMany(Movimiento_inventario::class, 'id_usuario', 'usuario_id');
     }
+
+    public function ventas_espera()
+    {
+        return $this->hasMany(Venta_espera::class, 'id_usuario', 'usuario_id');
+    }
 }

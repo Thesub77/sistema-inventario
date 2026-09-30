@@ -12,7 +12,7 @@ export function utilsModule() {
             if (!dateStr) return 'N/A';
             let normalized = String(dateStr).trim();
             // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
                 normalized = normalized.replace(' ', 'T') + 'Z';
             }
             const d = new Date(normalized);
@@ -37,6 +37,23 @@ export function utilsModule() {
                 hour12: true
             });
         },
+
+        formatTime(dateStr) {
+            if (!dateStr) return '';
+            let normalized = String(dateStr).trim();
+            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                const fallback = new Date(dateStr);
+                if (isNaN(fallback.getTime())) return dateStr;
+                return fallback.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            }
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        },
+
         async apiFetch(url, options = {}) {
             const opts = { ...options };
             opts.headers = opts.headers || {};
