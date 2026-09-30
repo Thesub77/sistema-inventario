@@ -25,10 +25,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Capa de Presentación: Estilos Personalizados del Sistema -->
-    <link rel="stylesheet" href="/css/custom.css">
+    <link rel="stylesheet" href="/css/custom.css?v={{ file_exists(public_path('css/custom.css')) ? filemtime(public_path('css/custom.css')) : time() }}">
 
     <!-- Capa de Lógica Frontend: Módulos y Estado de la Aplicación -->
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v={{ file_exists(public_path('js/app.js')) ? filemtime(public_path('js/app.js')) : time() }}"></script>
 
     <!-- Alpine.js (Motor de Reactividad) -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -121,12 +121,6 @@
                     <button @click="currentTab = 'pos'" class="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-emerald-600/20 transition-all">
                         <i data-lucide="shopping-cart" class="w-4 h-4"></i>
                         <span>Punto de Venta (POS)</span>
-                    </button>
-
-                    <!-- Quick New Product -->
-                    <button @click="openProductModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-brand-600/20 transition-all">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                        <span>Nuevo Producto</span>
                     </button>
 
                     <!-- Configuración de Datos del Negocio (Solo Administrador) -->
