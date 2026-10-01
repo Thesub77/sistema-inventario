@@ -11,28 +11,34 @@
 
 <div x-show="currentTab === 'bitacora'" x-cloak class="space-y-5">
     <div class="glass-panel p-5 rounded-2xl">
-        <h4 class="font-display font-bold text-base text-white mb-4 flex items-center gap-2">
-            <i data-lucide="shield-check" class="w-4 h-4 text-brand-400"></i>
+        <h4 class="font-display font-bold text-base text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-4 h-4 text-brand-500 dark:text-brand-400"></i>
             Registro de Bitácora de Acciones
         </h4>
         <div class="space-y-3">
             <template x-for="b in bitacoras" :key="b.id_bitacora">
-                <div class="p-4 rounded-xl bg-dark-900/60 border border-slate-800 flex items-start justify-between gap-4">
+                <div class="p-4 rounded-xl bg-slate-50 dark:bg-dark-900/60 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 shadow-xs">
                     <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                             <i data-lucide="terminal" class="w-4 h-4"></i>
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono font-bold text-slate-200" x-text="b.accion_bitacora"></span>
-                                <span class="text-[11px] text-slate-400" x-text="'por ' + (b.usuario ? b.usuario.nombre_apellido : 'Usuario #' + b.id_usuario)"></span>
+                                <span class="text-xs font-mono font-bold text-slate-800 dark:text-slate-200" x-text="b.accion_bitacora"></span>
+                                <span class="text-[11px] text-slate-500 dark:text-slate-400" x-text="'por ' + (b.usuario ? b.usuario.nombre_apellido : 'Usuario #' + b.id_usuario)"></span>
                             </div>
-                            <p class="text-xs text-slate-300 mt-1" x-text="b.descripcion_bitacora"></p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300 mt-1" x-text="b.descripcion_bitacora"></p>
                         </div>
                     </div>
-                    <span class="text-xs text-slate-500 whitespace-nowrap" x-text="formatDate(b.fecha_hora_bitacora)"></span>
+                    <span class="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap" x-text="formatDate(b.fecha_hora_bitacora)"></span>
                 </div>
             </template>
+
+            <!-- Estado Vacío -->
+            <div x-show="bitacoras.length === 0" class="py-12 text-center text-slate-400">
+                <i data-lucide="shield-check" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+                <p class="font-medium text-slate-700 dark:text-slate-300">No hay registros de auditoría en la bitácora todavía</p>
+            </div>
         </div>
     </div>
 </div>

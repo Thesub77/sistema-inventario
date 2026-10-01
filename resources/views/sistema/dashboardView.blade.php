@@ -296,7 +296,7 @@
                 <!-- Filtro de Alertas -->
                 <div class="inline-flex p-1 rounded-xl bg-dark-900 border border-slate-800 text-[11px]">
                     <button type="button" @click="stockAlertFiltro = 'todos'"
-                        :class="stockAlertFiltro === 'todos' ? 'bg-slate-750 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                        :class="stockAlertFiltro === 'todos' ? 'bg-brand-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'"
                         class="px-2.5 py-1 rounded-lg transition-all cursor-pointer">
                         Todos (<span x-text="stockAlerts.totalAlertas"></span>)
                     </button>
@@ -382,7 +382,7 @@
                 <!-- Filtro de Baja Rotación -->
                 <div class="inline-flex p-1 rounded-xl bg-dark-900 border border-slate-800 text-[11px]">
                     <button type="button" @click="bajaRotacionFiltro = 'todos'"
-                        :class="bajaRotacionFiltro === 'todos' ? 'bg-slate-750 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                        :class="bajaRotacionFiltro === 'todos' ? 'bg-brand-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'"
                         class="px-2.5 py-1 rounded-lg transition-all cursor-pointer">
                         Todos (<span x-text="productosBajaRotacion.length"></span>)
                     </button>
@@ -478,7 +478,7 @@
                 <tbody class="divide-y divide-slate-800/60">
                     <template x-for="v in ultimasVentas" :key="v.venta_id || v.codigo_venta">
                         <tr class="hover:bg-slate-800/40 transition-colors">
-                            <td class="py-3.5 px-4 font-semibold text-brand-300 font-mono" x-text="v.codigo_venta"></td>
+                            <td class="py-3.5 px-4 font-semibold text-brand-300 dark:text-indigo-400 font-mono" x-text="v.codigo_venta"></td>
                             <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente_nombre"></td>
                             <td class="py-3.5 px-4">
                                 <span class="px-2.5 py-1 text-xs rounded-lg font-medium inline-flex items-center gap-1"

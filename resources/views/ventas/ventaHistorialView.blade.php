@@ -173,7 +173,7 @@
                     <template x-for="v in filteredVentas" :key="v.venta_id">
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                             :class="{'opacity-60 bg-rose-50/30 dark:bg-rose-950/10': Number(v.estado) === 0}">
-                            <td class="py-3.5 px-4 font-mono font-bold text-brand-600 dark:text-brand-300">
+                            <td class="py-3.5 px-4 font-mono font-bold text-brand-600 dark:text-indigo-400">
                                 <div class="flex items-center gap-1.5">
                                     <span x-text="v.codigo_venta"></span>
                                     <span x-show="Number(v.estado) === 0"
@@ -199,7 +199,7 @@
                             </td>
                             <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400 font-mono" x-text="formatDate(v.fecha_hora_venta)"></td>
                             <td class="py-3.5 px-4 text-right text-slate-600 dark:text-slate-400 font-mono" x-text="formatCurrency(v.subtotal_venta)"></td>
-                            <td class="py-3.5 px-4 text-right font-bold font-mono text-slate-900 dark:text-white"
+                            <td class="py-3.5 px-4 text-right font-bold font-mono text-emerald-600 dark:text-emerald-400"
                                 :class="{'line-through text-rose-500': Number(v.estado) === 0}"
                                 x-text="formatCurrency(v.total_venta)"></td>
                             <td class="py-3.5 px-4 text-center">

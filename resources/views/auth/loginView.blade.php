@@ -20,7 +20,7 @@
             @click="toggleTheme()"
             :title="darkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'"
             class="relative inline-flex h-8 w-16 items-center rounded-full p-1 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 border shadow-inner"
-            :class="darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-750' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'"
+            :class="darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'"
             role="switch"
             :aria-checked="darkMode">
             <span class="sr-only">Cambiar tema</span>
@@ -76,7 +76,7 @@
                         x-model="loginForm.nombre_usuario"
                         required
                         autocomplete="username"
-                        placeholder="Ej. si_dquiroz"
+                        placeholder="Ej. f_davila"
                         class="w-full bg-dark-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all">
                 </div>
             </div>

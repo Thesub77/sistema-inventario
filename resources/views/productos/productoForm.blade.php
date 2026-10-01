@@ -76,8 +76,8 @@
             </div>
 
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
-                <button type="button" @click="showProductModal = false" class="px-4 py-2 text-sm text-slate-400 hover:text-white">Cancelar</button>
-                <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/20">Guardar Producto</button>
+                <button type="button" @click="showProductModal = false" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/20 cursor-pointer">Guardar Producto</button>
             </div>
         </form>
     </div>

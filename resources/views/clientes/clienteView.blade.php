@@ -36,26 +36,32 @@
             <tbody class="divide-y divide-slate-800/60">
                 <template x-for="c in filteredClientes" :key="c.cliente_id">
                     <tr class="hover:bg-slate-800/40 transition-colors">
-                        <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-300" x-text="c.codigo_cliente || 'N/A'"></td>
+                        <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-300 dark:text-emerald-400" x-text="c.codigo_cliente || 'N/A'"></td>
                         <td class="py-3.5 px-4 font-semibold text-slate-100" x-text="c.nombre_apellido_cliente"></td>
                         <td class="py-3.5 px-4 text-slate-400" x-text="c.telefono_cliente || 'Sin teléfono'"></td>
                         <td class="py-3.5 px-4 text-center">
-                            <span class="px-2 py-0.5 text-xs rounded-full"
-                                :class="c.estado == 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700 text-slate-400'"
+                            <span class="px-2 py-0.5 text-xs rounded-full font-medium"
+                                :class="c.estado == 1 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
                                 x-text="c.estado == 1 ? 'Activo' : 'Inactivo'"></span>
                         </td>
                         <td class="py-3.5 px-4 text-center">
                             <div class="flex items-center justify-center gap-1.5">
-                                <button @click="openCustomerModal(c)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg">
+                                <button @click="openCustomerModal(c)" class="p-1.5 text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" title="Editar Cliente">
                                     <i data-lucide="edit-3" class="w-4 h-4"></i>
                                 </button>
-                                <button @click="deleteCustomer(c)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg">
+                                <button @click="deleteCustomer(c)" class="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" title="Eliminar Cliente">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
                         </td>
                     </tr>
                 </template>
+                <tr x-show="filteredClientes.length === 0">
+                    <td colspan="5" class="py-12 text-center text-slate-400">
+                        <i data-lucide="users" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+                        <p class="font-medium text-slate-700 dark:text-slate-300">No se encontraron clientes coincidentes</p>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>

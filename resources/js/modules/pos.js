@@ -149,6 +149,26 @@ export function posModule() {
         async processSale() {
             if (this.cart.length === 0) return;
 
+            // Bloqueo estricto del POS: No se puede facturar sin turno activo
+            if (!this.turnoActivo) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Caja Cerrada',
+                    text: 'No se puede generar la factura porque la caja no está abierta. Debe abrir un turno operativo primero.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Abrir Caja Ahora',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#10b981',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        this.openCajaAperturaModal();
+                    }
+                });
+                return;
+            }
+
             // Validación de voucher (Tarjeta) y referencia (Transferencia) con longitud mínima
             if (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta') {
                 const ref = (this.posSale.referencia_transferencia || '').trim();
