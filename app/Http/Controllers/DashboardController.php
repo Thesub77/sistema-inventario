@@ -381,7 +381,7 @@ class DashboardController extends Controller
             ],
         ];
 
-        // 8. Flujo de Demanda Horaria y Patrones de Consumo 
+        // 8. Flujo de Demanda Horaria y Patrones de Consumo
         $horasMap = [];
         for ($h = 0; $h < 24; $h++) {
             $horaKey = str_pad((string) $h, 2, '0', STR_PAD_LEFT).':00';
