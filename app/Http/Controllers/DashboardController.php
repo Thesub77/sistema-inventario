@@ -10,6 +10,18 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controlador del Panel de Control Analítico y Operativo (Dashboard).
+ *
+ * Procesa y consolida métricas financieras, operativas y de inventario del negocio:
+ * - RF-26: Métricas de ventas del turno y desglose por método de pago.
+ * - RF-29: Análisis de rentabilidad real (utilidad bruta mensual y top productos por margen).
+ * - RF-30: Flujo de demanda horaria (patrones de consumo por hora del día) y últimas transacciones.
+ * - RF-31: Gráficos de tendencias de ventas (últimos 7 días y últimas 4 semanas).
+ * - RF-32: Ranking de los 5 productos más vendidos por volumen.
+ * - RF-33: Detección de productos de baja/nula rotación y cuantificación de capital inmovilizado.
+ * - RF-13: Alertas de stock bajo (críticos, urgentes y advertencias).
+ */
 class DashboardController extends Controller
 {
     /**
@@ -65,7 +77,7 @@ class DashboardController extends Controller
             'pctTarjeta' => $pctTarjeta,
         ];
 
-        // 2. Estadísticas Generales (KPIs) - RF-30 y RF-32
+        // 2. Estadísticas Generales (KPIs) - RF-29, RF-30 y RF-32
         $carbonHoy = Carbon::parse($fechaHoy);
         $inicioMes = (clone $carbonHoy)->startOfMonth()->toDateString();
         $finMes = (clone $carbonHoy)->endOfMonth()->toDateString();
@@ -77,12 +89,23 @@ class DashboardController extends Controller
             ->whereDate('fecha_movimiento', '<=', $finMes)
             ->sum('costo_total_perdida') ?? 0);
 
+        // Ganancia líquida real en córdobas del mes (RF-29)
+        $utilidadBrutaMes = (float) (DB::table('venta_detalle as vd')
+            ->join('venta as v', 'vd.id_venta', '=', 'v.venta_id')
+            ->join('producto as p', 'vd.id_producto', '=', 'p.producto_id')
+            ->where('v.estado', 1)
+            ->whereDate('v.fecha_hora_venta', '>=', $inicioMes)
+            ->whereDate('v.fecha_hora_venta', '<=', $finMes)
+            ->sum(DB::raw('(vd.subtotal_venta_detalle) - (p.costo_compra * vd.cantidad)')) ?? 0);
+
         $stats = [
             'totalVentasMonto' => (float) (Venta::where('estado', 1)->sum('total_venta') ?? 0),
             'totalVentasCount' => (int) Venta::where('estado', 1)->count(),
             'totalProductos' => (int) Producto::where('estado', 1)->count(),
             'totalUnidades' => (int) (Producto::where('estado', 1)->sum('existencia_bodega') ?? 0),
             'totalPerdidasMermasMes' => round($totalPerdidasMermasMes, 2),
+            'utilidad_bruta_mes' => round($utilidadBrutaMes, 2),
+            'utilidadBrutaMes' => round($utilidadBrutaMes, 2),
         ];
 
         // 3. Alertas de Stock Bajo - RF-13
@@ -184,7 +207,59 @@ class DashboardController extends Controller
             ];
         }
 
-        // 5. Productos con Baja o Nula Rotación y Capital Inmovilizado - RF-33
+        // 5. Top Productos por Rentabilidad y Margen Real (RF-29)
+        $topRentabilidadQuery = DB::table('venta_detalle as vd')
+            ->join('venta as v', 'vd.id_venta', '=', 'v.venta_id')
+            ->join('producto as p', 'vd.id_producto', '=', 'p.producto_id')
+            ->leftJoin('categoria as c', 'p.id_categoria', '=', 'c.categoria_id')
+            ->where('v.estado', 1)
+            ->select(
+                'p.producto_id',
+                'p.codigo_producto',
+                'p.nombre_producto',
+                'p.precio_venta',
+                'p.costo_compra',
+                DB::raw('COALESCE(c.nombre_categoria, \'General\') as categoria_nombre'),
+                DB::raw('SUM(vd.cantidad) as cantidad_vendida'),
+                DB::raw('SUM(vd.subtotal_venta_detalle) as total_recaudado'),
+                DB::raw('SUM((vd.subtotal_venta_detalle) - (p.costo_compra * vd.cantidad)) as utilidad_total')
+            )
+            ->groupBy(
+                'p.producto_id',
+                'p.codigo_producto',
+                'p.nombre_producto',
+                'p.precio_venta',
+                'p.costo_compra',
+                'c.nombre_categoria'
+            )
+            ->orderByDesc('utilidad_total')
+            ->limit(5)
+            ->get();
+
+        $topRentabilidad = [];
+        foreach ($topRentabilidadQuery as $idx => $p) {
+            $utilidadTotal = (float) $p->utilidad_total;
+            $totalRecaudado = (float) $p->total_recaudado;
+            $margenPct = $totalRecaudado > 0 ? round(($utilidadTotal / $totalRecaudado) * 100, 2) : 0.0;
+
+            $topRentabilidad[] = [
+                'producto_id' => $p->producto_id,
+                'posicion' => $idx + 1,
+                'codigo' => $p->codigo_producto,
+                'nombre' => $p->nombre_producto,
+                'categoria' => $p->categoria_nombre,
+                'precio' => (float) $p->precio_venta,
+                'costo' => (float) $p->costo_compra,
+                'cantidadVendida' => (int) $p->cantidad_vendida,
+                'totalRecaudado' => $totalRecaudado,
+                'utilidad_total' => round($utilidadTotal, 2),
+                'utilidadTotal' => round($utilidadTotal, 2),
+                'margen_pct' => $margenPct,
+                'margenPct' => $margenPct,
+            ];
+        }
+
+        // 6. Productos con Baja o Nula Rotación y Capital Inmovilizado - RF-33
         $subqueryVentas = DB::table('venta_detalle as vd')
             ->join('venta as v', 'vd.id_venta', '=', 'v.venta_id')
             ->where('v.estado', 1)
@@ -238,7 +313,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // 6. Gráficos de Ventas por Días y Semanas - RF-31
+        // 7. Gráficos de Ventas por Días y Semanas - RF-31
         // Últimos 7 Días
         $diasMap = [];
         $carbonHoy = Carbon::parse($fechaHoy);
@@ -306,7 +381,35 @@ class DashboardController extends Controller
             ],
         ];
 
-        // 7. Últimas 6 Ventas Emitidas - RF-30
+        // 8. Flujo de Demanda Horaria y Patrones de Consumo
+        $horasMap = [];
+        for ($h = 0; $h < 24; $h++) {
+            $horaKey = str_pad((string) $h, 2, '0', STR_PAD_LEFT).':00';
+            $horasMap[$h] = [
+                'hora' => $h,
+                'label' => $horaKey,
+                'monto' => 0.0,
+                'tickets' => 0,
+            ];
+        }
+
+        $ventasHorarias = (clone $ventasHoyQuery)->get(['fecha_hora_venta', 'total_venta']);
+        foreach ($ventasHorarias as $v) {
+            $hora = (int) Carbon::parse($v->fecha_hora_venta)->format('G');
+            if (isset($horasMap[$hora])) {
+                $horasMap[$hora]['monto'] += (float) $v->total_venta;
+                $horasMap[$hora]['tickets'] += 1;
+            }
+        }
+
+        $distribucionHoraria = [
+            'labels' => array_values(array_column($horasMap, 'label')),
+            'dataMonto' => array_values(array_map(fn ($item) => round($item['monto'], 2), $horasMap)),
+            'dataTickets' => array_values(array_column($horasMap, 'tickets')),
+            'horas' => array_values($horasMap),
+        ];
+
+        // 9. Últimas 6 Ventas Emitidas - RF-30
         $ultimasVentas = Venta::with('cliente:cliente_id,nombre_apellido_cliente')
             ->where('estado', 1)
             ->orderByDesc('venta_id')
@@ -328,12 +431,17 @@ class DashboardController extends Controller
             'fecha' => $fechaHoy,
             'ventasTurnoStats' => $ventasTurnoStats,
             'stats' => $stats,
+            'utilidad_bruta_mes' => round($utilidadBrutaMes, 2),
+            'utilidadBrutaMes' => round($utilidadBrutaMes, 2),
             'totalPerdidasMermasMes' => round($totalPerdidasMermasMes, 2),
             'stockAlerts' => $stockAlerts,
             'topProductosVendidos' => $topProductosVendidos,
+            'topRentabilidad' => $topRentabilidad,
             'productosBajaRotacion' => $productosBajaRotacion,
             'capitalInmovilizadoTotal' => $capitalInmovilizadoTotal,
             'chartVentas' => $chartVentas,
+            'distribucionHoraria' => $distribucionHoraria,
+            'demandaHoraria' => $distribucionHoraria,
             'ultimasVentas' => $ultimasVentas,
         ]);
     }
