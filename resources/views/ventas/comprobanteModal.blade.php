@@ -51,7 +51,7 @@
 
             <!-- Banner de Alerta si la venta está anulada -->
             <template x-if="receiptAnulada">
-                <div class="py-1.5 px-3 bg-black text-white font-sans font-black text-center text-xs uppercase tracking-widest rounded-md shadow-sm">
+                <div class="py-1.5 px-3 bg-black font-sans font-black text-center text-xs uppercase tracking-widest rounded-md shadow-sm" style="color: #ffffff !important; background-color: #000000 !important;">
                     *** COMPROBANTE ANULADO ***
                 </div>
             </template>
@@ -200,7 +200,7 @@
         <!-- Botones de Acción Inferiores (No imprimibles) -->
         <div class="pt-3 border-t border-slate-800 flex justify-end gap-2.5 no-print">
             <button type="button" @click="showReceiptModal = false"
-                class="px-4 py-2 bg-dark-950 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-all">
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-950 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs font-semibold transition-all cursor-pointer">
                 Cerrar
             </button>
             <button type="button" @click="printReceipt()"

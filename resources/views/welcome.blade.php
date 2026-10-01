@@ -136,7 +136,7 @@
                         @click="toggleTheme()"
                         :title="darkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'"
                         class="relative inline-flex h-8 w-16 items-center rounded-full p-1 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 border shadow-inner"
-                        :class="darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-750' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'"
+                        :class="darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'"
                         role="switch"
                         :aria-checked="darkMode">
                         <span class="sr-only">Cambiar tema</span>
@@ -224,6 +224,18 @@
 
                 <!-- MODAL: AJUSTES DE EMPRESA Y FACTURACIÓN -->
                 @include('sistema.empresaModal')
+
+                <!-- MODAL: REGISTRO DE MOVIMIENTO DE CAJA (RF-25) -->
+                @include('cajas.cajaMovimientoModal')
+
+                <!-- MODAL: APERTURA DE TURNO DE CAJA (RF-28) -->
+                @include('cajas.cajaAperturaModal')
+
+                <!-- MODAL: ARQUEO Y CIERRE DE TURNO DE CAJA (RF-28) -->
+                @include('cajas.cajaCierreModal')
+
+                <!-- MODAL: CREAR / EDITAR CAJA FÍSICA -->
+                @include('cajas.cajaFormModal')
 
             </main>
         </div>

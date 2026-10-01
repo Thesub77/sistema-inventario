@@ -34,6 +34,26 @@
         </div>
 
         <div class="flex items-center gap-2">
+            <!-- Indicador Dinámico de Estado de Caja (Turno Activo / Cerrado) -->
+            <button type="button" @click="turnoActivo ? openCajaCierreModal() : openCajaAperturaModal()"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border"
+                :class="turnoActivo 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20' 
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 animate-pulse'"
+                :title="turnoActivo ? 'Caja abierta con turno activo. Clic para arqueo y cierre.' : 'Caja cerrada. Clic para aperturar turno.'">
+                <span class="w-2 h-2 rounded-full" :class="turnoActivo ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                <span class="hidden md:inline" x-text="turnoActivo ? ('Caja Abierta #' + turnoActivo.caja_operacion_id) : 'Caja Cerrada'"></span>
+                <span class="md:hidden" x-text="turnoActivo ? 'Abierta' : 'Cerrada'"></span>
+            </button>
+
+            <!-- Botón de Movimiento de Caja (RF-25) -->
+            <button type="button" @click="openCajaMovimientoModal()"
+                title="Registrar Ingreso o Egreso Extraordinario de Caja (RF-25)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs cursor-pointer border bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-500"></i>
+                <span class="hidden xl:inline text-xs">Mov. Caja</span>
+            </button>
+
             <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders - RF-16) -->
             <button type="button" @click="openVentasEsperaModal()"
                 class="relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer border"
@@ -48,7 +68,7 @@
                 </div>
                 <span class="hidden sm:inline">En Espera</span>
                 <span class="font-mono text-xs px-1.5 py-0.5 rounded-lg font-bold"
-                    :class="ventasEspera.length > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'"
+                    :class="ventasEspera.length > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
                     x-text="ventasEspera.length"></span>
             </button>
 
@@ -71,6 +91,30 @@
             </button>
         </div>
     </div>
+
+    <!-- Banner Superior de Alerta Dinámica: Caja Cerrada -->
+    <template x-if="!turnoActivo">
+        <div class="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs sm:text-sm text-amber-900 dark:text-amber-200">
+                        Caja Cerrada — Emisión de Facturas Bloqueada
+                    </h4>
+                    <p class="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300/80 mt-0.5">
+                        Para poder procesar pagos y emitir comprobantes en el POS es obligatorio abrir un turno con su fondo de caja.
+                    </p>
+                </div>
+            </div>
+            <button type="button" @click="openCajaAperturaModal()"
+                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0">
+                <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                <span>Abrir Caja Ahora</span>
+            </button>
+        </div>
+    </template>
 
     <!-- Catálogo de Productos Amplio y Despejado (Sin abarrotar) -->
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3.5 flex-1 min-h-0 overflow-y-auto pr-1.5 pb-16 auto-rows-max content-start">
@@ -408,6 +452,24 @@
                         </div>
                     </div>
 
+                    <!-- Alerta si la caja está cerrada -->
+                    <template x-if="!turnoActivo">
+                        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1.5">
+                            <div class="flex items-center gap-1.5 font-bold text-xs">
+                                <i data-lucide="lock" class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0"></i>
+                                <span>Caja Cerrada: Facturación bloqueada</span>
+                            </div>
+                            <p class="text-[11px] text-amber-700 dark:text-amber-300/80 leading-snug">
+                                Debe abrir un turno operativo para poder emitir la factura y registrar el cobro.
+                            </p>
+                            <button type="button" @click="openCajaAperturaModal()"
+                                class="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                                <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                                <span>Abrir Turno de Caja</span>
+                            </button>
+                        </div>
+                    </template>
+
                     <!-- Botón Pausar Venta (Poner en Espera - RF-16) -->
                     <button type="button" @click="parkCurrentSale()"
                         :disabled="cart.length === 0 || loading"
@@ -416,13 +478,17 @@
                         <span x-text="resumedVentaEsperaId ? 'Guardar Cambios en Espera' : 'Pausar Venta (Poner en Espera)'"></span>
                     </button>
 
-                    <!-- Botón Emitir Factura y Cobrar (Bloqueado hasta ingresar el efectivo recibido) -->
+                    <!-- Botón Emitir Factura y Cobrar (Bloqueado si la caja no está abierta o si falta efectivo recibido) -->
                     <button type="button" @click="processSale()"
-                        :disabled="cart.length === 0 || loading || (posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal))"
-                        :class="(posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal)) ? 'bg-slate-700/80 text-slate-300 shadow-none' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20'"
+                        :disabled="!turnoActivo || cart.length === 0 || loading || (posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal))"
+                        :class="!turnoActivo 
+                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none cursor-not-allowed' 
+                            : ((posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal)) 
+                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none' 
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20')"
                         class="w-full py-2.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed font-bold rounded-xl flex items-center justify-center gap-2 text-sm transition-all cursor-pointer">
-                        <i data-lucide="check-circle" class="w-4 h-4"></i>
-                        <span x-text="posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal) ? 'Ingrese el Efectivo Recibido' : 'Emitir Factura y Cobrar'"></span>
+                        <i :data-lucide="!turnoActivo ? 'lock' : 'check-circle'" class="w-4 h-4"></i>
+                        <span x-text="!turnoActivo ? 'Caja Cerrada - Abrir Turno para Cobrar' : ((posSale.metodo_pago === 'Efectivo' && (!posSale.monto_recibido || Number(posSale.monto_recibido) < cartTotal)) ? 'Ingrese el Efectivo Recibido' : 'Emitir Factura y Cobrar')"></span>
                     </button>
                 </div>
             </div>

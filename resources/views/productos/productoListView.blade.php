@@ -54,7 +54,7 @@
                 <tbody class="divide-y divide-slate-800/60">
                     <template x-for="p in filteredProducts" :key="p.producto_id">
                         <tr class="hover:bg-slate-800/40 transition-colors">
-                            <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-300" x-text="p.codigo_producto"></td>
+                            <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-600 dark:text-indigo-400" x-text="p.codigo_producto"></td>
                             <td class="py-3.5 px-4">
                                 <div class="font-semibold text-slate-100" x-text="p.nombre_producto"></div>
                                 <div class="text-xs text-slate-400 truncate max-w-xs" x-text="p.descripcion_producto"></div>
@@ -75,8 +75,8 @@
                                 </span>
                             </td>
                             <td class="py-3.5 px-4 text-center">
-                                <span class="px-2 py-0.5 text-xs rounded-full"
-                                    :class="p.estado == 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700 text-slate-400'"
+                                <span class="px-2 py-0.5 text-xs rounded-full font-medium"
+                                    :class="p.estado == 1 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
                                     x-text="p.estado == 1 ? 'Activo' : 'Inactivo'"></span>
                             </td>
                             <td class="py-3.5 px-4 text-center">

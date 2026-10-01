@@ -51,8 +51,8 @@
             </div>
 
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
-                <button type="button" @click="showStockModal = false" class="px-4 py-2 text-sm text-slate-400 hover:text-white">Cancelar</button>
-                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl">Aplicar Ajuste</button>
+                <button type="button" @click="showStockModal = false" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl cursor-pointer">Aplicar Ajuste</button>
             </div>
         </form>
     </div>

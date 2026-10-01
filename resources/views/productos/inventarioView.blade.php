@@ -38,16 +38,22 @@
                             <td class="py-3 px-4">
                                 <span class="px-2.5 py-0.5 text-xs rounded-full font-medium"
                                     :class="m.tipo_movimiento.includes('Entrada') || m.tipo_movimiento.includes('Inicial') 
-                                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'"
+                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'"
                                     x-text="m.tipo_movimiento"></span>
                             </td>
                             <td class="py-3 px-4 text-center font-bold" x-text="m.cantidad_movimimiento + ' uds.'"></td>
                             <td class="py-3 px-4 text-center text-slate-400" x-text="m.stock_anterior_producto"></td>
-                            <td class="py-3 px-4 text-center font-bold text-white" x-text="m.stock_resultante_producto"></td>
+                            <td class="py-3 px-4 text-center font-bold text-slate-900 dark:text-white" x-text="m.stock_resultante_producto"></td>
                             <td class="py-3 px-4 text-xs text-slate-400" x-text="m.usuario ? m.usuario.nombre_apellido : 'N/A'"></td>
                         </tr>
                     </template>
+                    <tr x-show="movimientosInventario.length === 0">
+                        <td colspan="7" class="py-12 text-center text-slate-400">
+                            <i data-lucide="package-search" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+                            <p class="font-medium text-slate-700 dark:text-slate-300">No se han registrado movimientos de inventario todavía</p>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>

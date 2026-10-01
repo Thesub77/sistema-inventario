@@ -37,6 +37,45 @@ export function app() {
         cajas: [],
         turnos: [],
         cajaMovimientos: [],
+        cajaSearch: '',
+        cajaMovimientoFiltro: 'todos',
+        showCajaMovimientoModal: false,
+        isSavingCajaMovimiento: false,
+        cajaMovimientoForm: {
+            id_caja: '',
+            id_caja_operacion: '',
+            tipo_movimiento: 'Egreso',
+            monto: '',
+            justificacion: ''
+        },
+
+        // Estado de Apertura de Turno (RF-28)
+        showCajaAperturaModal: false,
+        isSavingCajaApertura: false,
+        cajaAperturaForm: {
+            id_caja: '',
+            monto_apertura: '0.00'
+        },
+
+        // Estado de Arqueo y Cierre de Turno (RF-28)
+        showCajaCierreModal: false,
+        isSavingCajaCierre: false,
+        loadingArqueo: false,
+        cajaCierreData: null,
+        cajaCierreForm: {
+            monto_cierre: '',
+            observacion_cierre: ''
+        },
+
+        // Estado de Gestión de Cajas Físicas
+        showCajaFormModal: false,
+        isSavingCaja: false,
+        cajaForm: {
+            caja_id: null,
+            descripcion_caja: '',
+            tipo_apertura: 'Manual',
+            estado: 1
+        },
         movimientosInventario: [],
         bitacoras: [],
         empresa: null,
@@ -377,7 +416,10 @@ export function app() {
                         ]);
                         break;
                     case 'caja':
-                        await this.fetchVentas();
+                        await Promise.all([
+                            this.fetchVentas(),
+                            this.fetchBitacoras().catch(() => {})
+                        ]);
                         break;
                     case 'clientes':
                         await this.fetchClientes();
@@ -703,6 +745,536 @@ export function app() {
                 }
             } catch (e) {
                 console.error('Error cargando datos de empresa:', e);
+            }
+        },
+
+        // Getters de Movimientos de Caja (RF-25)
+        get filteredCajaMovimientos() {
+            const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
+            const term = (this.cajaSearch || '').trim().toLowerCase();
+            const filtro = this.cajaMovimientoFiltro || 'todos';
+
+            return list.filter(m => {
+                if (filtro === 'ingreso') {
+                    if (m.id_venta !== null || Number(m.monto_movimiento) <= 0) return false;
+                } else if (filtro === 'egreso') {
+                    if (m.id_venta !== null || Number(m.monto_movimiento) >= 0) return false;
+                } else if (filtro === 'venta') {
+                    if (m.id_venta === null) return false;
+                }
+
+                if (term) {
+                    const idStr = String(m.caja_movimiento_venta_id || '');
+                    const cajaDesc = m.caja && m.caja.descripcion_caja ? m.caja.descripcion_caja.toLowerCase() : '';
+                    const ventaCod = m.venta && m.venta.codigo_venta ? m.venta.codigo_venta.toLowerCase() : '';
+                    const concepto = this.getMovimientoConcepto(m).toLowerCase();
+                    return idStr.includes(term) || cajaDesc.includes(term) || ventaCod.includes(term) || concepto.includes(term);
+                }
+
+                return true;
+            });
+        },
+
+        get resumenCajaMovimientos() {
+            const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
+            let ingresosExtra = 0;
+            let egresosGastos = 0;
+            let countIngresos = 0;
+            let countEgresos = 0;
+
+            list.forEach(m => {
+                const monto = Number(m.monto_movimiento || 0);
+                if (m.id_venta === null) {
+                    if (monto > 0) {
+                        ingresosExtra += monto;
+                        countIngresos++;
+                    } else if (monto < 0) {
+                        egresosGastos += Math.abs(monto);
+                        countEgresos++;
+                    }
+                }
+            });
+
+            return {
+                ingresosExtra,
+                egresosGastos,
+                countIngresos,
+                countEgresos
+            };
+        },
+
+        getMovimientoConcepto(mov) {
+            if (!mov) return 'Movimiento';
+            if (mov.venta && mov.venta.codigo_venta) {
+                return (Number(mov.monto_movimiento) < 0 ? 'Devolución Factura ' : 'Cobro Factura ') + mov.venta.codigo_venta;
+            }
+            if (mov.id_venta) {
+                return (Number(mov.monto_movimiento) < 0 ? 'Devolución Venta #' : 'Venta #') + mov.id_venta;
+            }
+
+            if (Array.isArray(this.bitacoras)) {
+                const needle = `Movimiento extraordinario #${mov.caja_movimiento_venta_id}`;
+                const b = this.bitacoras.find(bit => bit.descripcion_bitacora && bit.descripcion_bitacora.includes(needle));
+                if (b) {
+                    const motivoIndex = b.descripcion_bitacora.indexOf('Motivo:');
+                    if (motivoIndex !== -1) {
+                        return b.descripcion_bitacora.substring(motivoIndex + 7).trim();
+                    }
+                    return b.descripcion_bitacora;
+                }
+            }
+
+            return Number(mov.monto_movimiento) >= 0 ? 'Ingreso de Efectivo / Sencillo' : 'Egreso / Gasto Menor';
+        },
+
+        openCajaMovimientoModal(tipo = 'Egreso', cajaId = null) {
+            const turno = this.turnoActivo;
+            let selectedCaja = cajaId;
+            if (!selectedCaja && turno) {
+                selectedCaja = turno.id_caja;
+            } else if (!selectedCaja && this.cajas && this.cajas.length > 0) {
+                const abierta = this.cajas.find(c => c.estado_caja === 'Abierta');
+                selectedCaja = abierta ? abierta.caja_id : this.cajas[0].caja_id;
+            }
+
+            this.cajaMovimientoForm = {
+                id_caja: selectedCaja || '',
+                id_caja_operacion: (turno && (!selectedCaja || turno.id_caja == selectedCaja)) ? turno.caja_operacion_id : '',
+                tipo_movimiento: tipo,
+                monto: '',
+                justificacion: ''
+            };
+
+            this.showCajaMovimientoModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        setCajaMovimientoJustificacion(texto) {
+            this.cajaMovimientoForm.justificacion = texto;
+        },
+
+        async saveCajaMovimiento() {
+            if (this.isSavingCajaMovimiento) return;
+
+            const form = this.cajaMovimientoForm;
+            const montoNum = Number(form.monto);
+
+            if (isNaN(montoNum) || montoNum <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Monto requerido',
+                    text: 'El monto del movimiento debe ser un importe mayor a cero.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const just = (form.justificacion || '').trim();
+            if (just.length < 3) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Motivo obligatorio',
+                    text: 'Debe ingresar una justificación o motivo de al menos 3 caracteres (RF-25).',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            this.isSavingCajaMovimiento = true;
+
+            try {
+                const payload = {
+                    tipo_movimiento: form.tipo_movimiento,
+                    monto: montoNum,
+                    justificacion: just
+                };
+
+                if (form.id_caja) {
+                    payload.id_caja = Number(form.id_caja);
+                }
+                if (form.id_caja_operacion) {
+                    payload.id_caja_operacion = Number(form.id_caja_operacion);
+                }
+
+                const res = await this.apiFetch('/api/caja-movimientos-venta', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Error al registrar el movimiento en caja.');
+                }
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: '¡Movimiento Registrado!',
+                    text: `${form.tipo_movimiento === 'Ingreso' ? 'Ingreso' : 'Egreso'} de C$ ${montoNum.toFixed(2)} registrado exitosamente en caja.`,
+                    timer: 2000,
+                    showConfirmButton: false,
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+
+                this.showCajaMovimientoModal = false;
+
+                await Promise.all([
+                    this.fetchVentas(),
+                    this.fetchBitacoras().catch(() => {}),
+                    this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
+                ]);
+
+            } catch (error) {
+                console.error('Error registrando movimiento de caja:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo registrar',
+                    text: error.message || 'Ocurrió un error al procesar la operación.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.isSavingCajaMovimiento = false;
+            }
+        },
+
+        getTurnoIdForCaja(cajaId) {
+            if (!Array.isArray(this.turnos)) return null;
+            const t = this.turnos.find(turno => Number(turno.id_caja) === Number(cajaId) && !turno.fecha_hora_cierre && (turno.estado === undefined || Number(turno.estado) === 1));
+            return t ? t.caja_operacion_id : null;
+        },
+
+        get cajaCierreDiferencia() {
+            if (!this.cajaCierreData || this.cajaCierreForm.monto_cierre === '' || this.cajaCierreForm.monto_cierre === null) {
+                return null;
+            }
+            const contado = Number(this.cajaCierreForm.monto_cierre);
+            if (isNaN(contado)) return null;
+            const esperado = Number(this.cajaCierreData.arqueo?.monto_esperado ?? this.cajaCierreData.monto_esperado ?? 0);
+            return Number((contado - esperado).toFixed(2));
+        },
+
+        openCajaAperturaModal(cajaId = null) {
+            let targetCaja = cajaId;
+            if (!targetCaja) {
+                const cerrada = (this.cajas || []).find(c => c.estado_caja !== 'Abierta' && Number(c.estado) === 1);
+                targetCaja = cerrada ? cerrada.caja_id : ((this.cajas && this.cajas[0]) ? this.cajas[0].caja_id : '');
+            }
+
+            this.cajaAperturaForm = {
+                id_caja: targetCaja || '',
+                monto_apertura: '0.00'
+            };
+            this.showCajaAperturaModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async saveCajaApertura() {
+            if (this.isSavingCajaApertura) return;
+            if (!this.cajaAperturaForm.id_caja) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Seleccione una Caja',
+                    text: 'Debe seleccionar una caja física para aperturar el turno.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const monto = Number(this.cajaAperturaForm.monto_apertura);
+            if (isNaN(monto) || monto < 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Monto Inválido',
+                    text: 'El fondo inicial de apertura debe ser un número mayor o igual a 0.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            this.isSavingCajaApertura = true;
+            try {
+                const res = await this.apiFetch('/api/caja-operaciones', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id_caja: Number(this.cajaAperturaForm.id_caja),
+                        monto_apertura: Number(monto.toFixed(2))
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Error al aperturar el turno.');
+                }
+
+                this.showCajaAperturaModal = false;
+                await Promise.all([
+                    this.fetchVentas(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
+                ]);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Turno Aperturado!',
+                    text: 'La caja ha sido abierta exitosamente. El POS ya está listo para facturar.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+            } catch (err) {
+                console.error('Error al aperturar turno:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo abrir el turno',
+                    text: err.message || 'Ocurrió un error inesperado.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.isSavingCajaApertura = false;
+            }
+        },
+
+        async openCajaCierreModal(turnoId = null) {
+            let targetTurnoId = turnoId;
+            if (!targetTurnoId && this.turnoActivo) {
+                targetTurnoId = this.turnoActivo.caja_operacion_id;
+            }
+
+            if (!targetTurnoId) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sin Turno Abierto',
+                    text: 'No se encontró ningún turno activo para cerrar.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            this.loadingArqueo = true;
+            this.cajaCierreData = null;
+            this.cajaCierreForm = {
+                monto_cierre: '',
+                observacion_cierre: ''
+            };
+            this.showCajaCierreModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            try {
+                const res = await this.apiFetch(`/api/caja-operaciones/${targetTurnoId}`);
+                if (!res.ok) {
+                    throw new Error('No se pudo obtener el arqueo del turno.');
+                }
+                const data = await res.json();
+                this.cajaCierreData = data;
+            } catch (err) {
+                console.error('Error cargando arqueo:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al consultar arqueo',
+                    text: err.message || 'No se pudieron calcular los datos del arqueo.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                this.showCajaCierreModal = false;
+            } finally {
+                this.loadingArqueo = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }
+        },
+
+        async saveCajaCierre() {
+            if (this.isSavingCajaCierre || !this.cajaCierreData) return;
+
+            const contado = Number(this.cajaCierreForm.monto_cierre);
+            if (this.cajaCierreForm.monto_cierre === '' || isNaN(contado) || contado < 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Efectivo Contado Requerido',
+                    text: 'Debe ingresar el monto total de efectivo físico contado en caja.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const diff = this.cajaCierreDiferencia;
+            if (diff !== null && diff !== 0 && (!this.cajaCierreForm.observacion_cierre || !this.cajaCierreForm.observacion_cierre.trim())) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Justificación Obligatoria',
+                    text: 'Existe un descuadre en el arqueo (diferencia de ' + (diff > 0 ? '+' : '') + this.formatCurrency(diff) + '). Debe ingresar una justificación u observación obligatoria.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const confirmResult = await Swal.fire({
+                icon: 'question',
+                title: '¿Confirmar Cierre de Turno?',
+                html: `Se registrará el cierre con un efectivo contado de <b>${this.formatCurrency(contado)}</b>.<br>${diff !== 0 ? `<span class="text-amber-500 font-bold">Diferencia: ${diff > 0 ? '+' : ''}${this.formatCurrency(diff)}</span>` : '<span class="text-emerald-500 font-bold">Cuadre exacto</span>'}<br><br>Esta acción bloqueará las operaciones del turno de forma auditada.`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, Cerrar Turno',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#e11d48',
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
+            });
+
+            if (!confirmResult.isConfirmed) return;
+
+            this.isSavingCajaCierre = true;
+            try {
+                const turnoId = this.cajaCierreData.caja_operacion_id;
+                const payload = {
+                    monto_cierre: Number(contado.toFixed(2)),
+                    observacion_cierre: this.cajaCierreForm.observacion_cierre ? this.cajaCierreForm.observacion_cierre.trim() : null
+                };
+
+                const res = await this.apiFetch(`/api/caja-operaciones/${turnoId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Error al cerrar el turno de caja.');
+                }
+
+                this.showCajaCierreModal = false;
+                await Promise.all([
+                    this.fetchVentas(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
+                ]);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Turno Cerrado Exitosamente!',
+                    text: 'El arqueo y cierre del turno han quedado registrados y auditados en el sistema.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+
+            } catch (err) {
+                console.error('Error cerrando turno:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al cerrar turno',
+                    text: err.message || 'Ocurrió un error inesperado al procesar el cierre.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.isSavingCajaCierre = false;
+            }
+        },
+
+        openCajaFormModal(caja = null) {
+            if (caja) {
+                this.cajaForm = {
+                    caja_id: caja.caja_id,
+                    descripcion_caja: caja.descripcion_caja || '',
+                    tipo_apertura: caja.tipo_apertura || 'Manual',
+                    estado: caja.estado !== undefined ? Number(caja.estado) : 1
+                };
+            } else {
+                this.cajaForm = {
+                    caja_id: null,
+                    descripcion_caja: '',
+                    tipo_apertura: 'Manual',
+                    estado: 1
+                };
+            }
+            this.showCajaFormModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async saveCaja() {
+            if (this.isSavingCaja) return;
+
+            const desc = (this.cajaForm.descripcion_caja || '').trim();
+            if (!desc) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo Obligatorio',
+                    text: 'Debe ingresar el nombre o descripción de la caja.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            this.isSavingCaja = true;
+            try {
+                const isEdit = Boolean(this.cajaForm.caja_id);
+                const url = isEdit ? `/api/cajas/${this.cajaForm.caja_id}` : '/api/cajas';
+                const method = isEdit ? 'PUT' : 'POST';
+                const payload = {
+                    descripcion_caja: desc,
+                    tipo_apertura: this.cajaForm.tipo_apertura
+                };
+                if (isEdit) {
+                    payload.estado = this.cajaForm.estado;
+                }
+
+                const res = await this.apiFetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || (data.errors ? Object.values(data.errors).flat().join('<br>') : 'Error al guardar la caja.'));
+                }
+
+                this.showCajaFormModal = false;
+                await this.fetchVentas();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: isEdit ? '¡Caja Actualizada!' : '¡Caja Creada!',
+                    text: data.message || 'La caja física ha sido guardada exitosamente.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a',
+                    timer: 1800,
+                    showConfirmButton: false
+                });
+
+            } catch (err) {
+                console.error('Error guardando caja:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo guardar la caja',
+                    html: err.message || 'Ocurrió un error inesperado.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+            } finally {
+                this.isSavingCaja = false;
             }
         },
 
