@@ -66,11 +66,15 @@ export function dashboardModule() {
             return 'Buenas noches';
         },
 
-        // Turno Activo detectado desde /api/caja-operaciones
+        // Turno Activo detectado desde /api/caja-operaciones (asociado al usuario en sesión)
         get turnoActivo() {
             if (!Array.isArray(this.turnos)) return null;
-            return this.turnos.find(t => !t.fecha_hora_cierre && (t.estado === undefined || Number(t.estado) === 1)) ||
-                   this.turnos.find(t => !t.fecha_hora_cierre) || null;
+            const currentUserId = this.currentUser?.usuario_id;
+            if (currentUserId) {
+                const myShift = this.turnos.find(t => Number(t.id_usuario) === Number(currentUserId) && !t.fecha_hora_cierre && (t.estado === undefined || Number(t.estado) === 1));
+                if (myShift) return myShift;
+            }
+            return null;
         },
 
         // RF-26: Consulta y métricas de ventas del turno en tiempo real

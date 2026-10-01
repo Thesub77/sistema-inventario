@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\FiscalController;
+use App\Http\Controllers\MovimientoInventarioController;
+use App\Http\Controllers\ProductoController;
 use Illuminate\Support\Facades\Route;
 
 // 1. Rutas de autenticación pública (login con rate limiting y endpoints de sesión)
@@ -25,10 +28,23 @@ Route::middleware('auth:sanctum')->group(function () {
         require __DIR__.'/api/rol_routes.php';
     });
 
-    // Módulo de Catálogo e Inventario
+    // Módulo de Catálogo e Inventario (Consulta / Lectura para POS, Ventas y Gestión)
+    Route::middleware('permission:inventario.gestionar,productos.gestionar,pos.acceso,ventas.ver,productos.ver,categorias.ver')->group(function () {
+        Route::get('/productos', [ProductoController::class, 'index']);
+        Route::get('/productos/{producto}', [ProductoController::class, 'show']);
+        Route::get('/categorias', [CategoriaController::class, 'index']);
+        Route::get('/categorias/{categoria}', [CategoriaController::class, 'show']);
+    });
+
+    // Módulo de Catálogo e Inventario (Creación, Modificación, Eliminación y Kardex)
     Route::middleware('permission:inventario.gestionar,productos.gestionar')->group(function () {
-        require __DIR__.'/api/producto_routes.php';
-        require __DIR__.'/api/categoria_routes.php';
+        Route::post('/productos', [ProductoController::class, 'store']);
+        Route::match(['put', 'patch'], '/productos/{producto}', [ProductoController::class, 'update']);
+        Route::delete('/productos/{producto}', [ProductoController::class, 'destroy']);
+        Route::post('/categorias', [CategoriaController::class, 'store']);
+        Route::match(['put', 'patch'], '/categorias/{categoria}', [CategoriaController::class, 'update']);
+        Route::delete('/categorias/{categoria}', [CategoriaController::class, 'destroy']);
+        Route::apiResource('movimientos-inventario', MovimientoInventarioController::class);
     });
 
     // Módulo de Cajas y Clientes

@@ -175,9 +175,16 @@ class AuthAndRoleTest extends TestCase
     {
         Sanctum::actingAs($this->cajero);
 
-        // El cajero sí tiene 'ventas.ver' y 'cajas.gestionar'
+        // El cajero sí tiene 'ventas.ver', 'cajas.gestionar' y 'pos.acceso'
         $this->getJson('/api/ventas')->assertStatus(200);
         $this->getJson('/api/cajas')->assertStatus(200);
+        $this->getJson('/api/productos')->assertStatus(200);
+        $this->getJson('/api/categorias')->assertStatus(200);
+
+        // Pero no puede crear productos sin permiso 'inventario.gestionar' o 'productos.gestionar'
+        $this->postJson('/api/productos', [
+            'nombre_producto' => 'Producto no autorizado',
+        ])->assertStatus(403);
     }
 
     public function test_perfil_usuario_autenticado_me(): void

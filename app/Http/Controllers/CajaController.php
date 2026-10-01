@@ -34,7 +34,14 @@ class CajaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
 
-        return response()->json(Caja::with('empresa')->orderBy('caja_id', 'desc')->get());
+        return response()->json(
+            Caja::with([
+                'empresa',
+                'caja_operaciones' => function ($q) {
+                    $q->where('estado', 1)->whereNull('fecha_hora_cierre')->with('usuario');
+                },
+            ])->orderBy('caja_id', 'desc')->get()
+        );
     }
 
     /**

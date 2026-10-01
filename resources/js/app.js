@@ -641,33 +641,15 @@ export function app() {
 
         async saveEmpresa() {
             if (!this.empresaForm.nombre_comercial?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'El nombre comercial de la empresa es obligatorio.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'El nombre comercial de la empresa es obligatorio.', 'warning');
                 return;
             }
             if (!this.empresaForm.telefono_contacto?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'El teléfono de contacto es obligatorio.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'El teléfono de contacto es obligatorio.', 'warning');
                 return;
             }
             if (!this.empresaForm.direccion_fisica?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'La dirección física del establecimiento es obligatoria.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'La dirección física del establecimiento es obligatoria.', 'warning');
                 return;
             }
             if (!this.empresaForm.moneda_simbolo?.trim()) {
@@ -703,21 +685,9 @@ export function app() {
                 this.receiptEmpresa = this.empresa;
                 this.showEmpresaModal = false;
 
-                await Swal.fire({
-                    icon: 'success',
-                    title: '¡Datos Guardados!',
-                    text: data.message || 'Los datos del negocio han sido actualizados con éxito.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al Guardar',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al Guardar', error.message, 'error');
             } finally {
                 this.isSavingEmpresa = false;
             }
@@ -862,25 +832,13 @@ export function app() {
             const montoNum = Number(form.monto);
 
             if (isNaN(montoNum) || montoNum <= 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Monto requerido',
-                    text: 'El monto del movimiento debe ser un importe mayor a cero.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Monto requerido', 'El monto del movimiento debe ser un importe mayor a cero.', 'warning');
                 return;
             }
 
             const just = (form.justificacion || '').trim();
             if (just.length < 3) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Motivo obligatorio',
-                    text: 'Debe ingresar una justificación o motivo de al menos 3 caracteres (RF-25).',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Motivo obligatorio', 'Debe ingresar una justificación o motivo de al menos 3 caracteres.', 'warning');
                 return;
             }
 
@@ -911,15 +869,7 @@ export function app() {
                     throw new Error(data.message || 'Error al registrar el movimiento en caja.');
                 }
 
-                await Swal.fire({
-                    icon: 'success',
-                    title: '¡Movimiento Registrado!',
-                    text: `${form.tipo_movimiento === 'Ingreso' ? 'Ingreso' : 'Egreso'} de C$ ${montoNum.toFixed(2)} registrado exitosamente en caja.`,
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Movimiento Registrado!', `${form.tipo_movimiento === 'Ingreso' ? 'Ingreso' : 'Egreso'} de C$ ${montoNum.toFixed(2)} registrado exitosamente.`, 'success');
 
                 this.showCajaMovimientoModal = false;
 
@@ -931,22 +881,36 @@ export function app() {
 
             } catch (error) {
                 console.error('Error registrando movimiento de caja:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo registrar',
-                    text: error.message || 'Ocurrió un error al procesar la operación.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo registrar', error.message || 'Ocurrió un error al procesar la operación.', 'error');
             } finally {
                 this.isSavingCajaMovimiento = false;
             }
         },
 
         getTurnoIdForCaja(cajaId) {
-            if (!Array.isArray(this.turnos)) return null;
-            const t = this.turnos.find(turno => Number(turno.id_caja) === Number(cajaId) && !turno.fecha_hora_cierre && (turno.estado === undefined || Number(turno.estado) === 1));
+            const t = this.getTurnoForCaja(cajaId);
             return t ? t.caja_operacion_id : null;
+        },
+
+        getTurnoForCaja(cajaId) {
+            if (!Array.isArray(this.turnos)) return null;
+            return this.turnos.find(turno => Number(turno.id_caja) === Number(cajaId) && !turno.fecha_hora_cierre && (turno.estado === undefined || Number(turno.estado) === 1)) || null;
+        },
+
+        isCajaMine(cajaId) {
+            const t = this.getTurnoForCaja(cajaId);
+            if (!t) return false;
+            const currentUserId = this.currentUser?.usuario_id;
+            return Number(t.id_usuario) === Number(currentUserId);
+        },
+
+        getCajaCashierName(cajaId) {
+            const t = this.getTurnoForCaja(cajaId);
+            if (!t) return null;
+            if (t.usuario?.nombre_usuario) return t.usuario.nombre_usuario;
+            if (t.usuario?.nombre_apellido) return t.usuario.nombre_apellido;
+            const u = (this.usuarios || []).find(usr => Number(usr.usuario_id) === Number(t.id_usuario));
+            return u ? (u.nombre_usuario || u.nombre_apellido) : `Usuario #${t.id_usuario}`;
         },
 
         get cajaCierreDiferencia() {
@@ -960,6 +924,11 @@ export function app() {
         },
 
         openCajaAperturaModal(cajaId = null) {
+            if (this.turnoActivo) {
+                this.notify('Turno ya activo', `Ya tienes un turno activo en la caja #${this.turnoActivo.id_caja}. Debes cerrarlo antes de abrir uno nuevo.`, 'warning');
+                return;
+            }
+
             let targetCaja = cajaId;
             if (!targetCaja) {
                 const cerrada = (this.cajas || []).find(c => c.estado_caja !== 'Abierta' && Number(c.estado) === 1);
@@ -979,25 +948,13 @@ export function app() {
         async saveCajaApertura() {
             if (this.isSavingCajaApertura) return;
             if (!this.cajaAperturaForm.id_caja) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Seleccione una Caja',
-                    text: 'Debe seleccionar una caja física para aperturar el turno.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Seleccione una Caja', 'Debe seleccionar una caja física para aperturar el turno.', 'warning');
                 return;
             }
 
             const monto = Number(this.cajaAperturaForm.monto_apertura);
             if (isNaN(monto) || monto < 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Monto Inválido',
-                    text: 'El fondo inicial de apertura debe ser un número mayor o igual a 0.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Monto Inválido', 'El fondo inicial de apertura debe ser un número mayor o igual a 0.', 'warning');
                 return;
             }
 
@@ -1024,25 +981,11 @@ export function app() {
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Turno Aperturado!',
-                    text: 'La caja ha sido abierta exitosamente. El POS ya está listo para facturar.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                this.notify('¡Turno Aperturado!', 'La caja ha sido abierta exitosamente.', 'success', 2500);
 
             } catch (err) {
                 console.error('Error al aperturar turno:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo abrir el turno',
-                    text: err.message || 'Ocurrió un error inesperado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo abrir el turno', err.message || 'Ocurrió un error inesperado.', 'error');
             } finally {
                 this.isSavingCajaApertura = false;
             }
@@ -1055,13 +998,7 @@ export function app() {
             }
 
             if (!targetTurnoId) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Sin Turno Abierto',
-                    text: 'No se encontró ningún turno activo para cerrar.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Sin Turno Abierto', 'No se encontró ningún turno activo para cerrar.', 'info');
                 return;
             }
 
@@ -1085,13 +1022,7 @@ export function app() {
                 this.cajaCierreData = data;
             } catch (err) {
                 console.error('Error cargando arqueo:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al consultar arqueo',
-                    text: err.message || 'No se pudieron calcular los datos del arqueo.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al consultar arqueo', err.message || 'No se pudieron calcular los datos del arqueo.', 'error');
                 this.showCajaCierreModal = false;
             } finally {
                 this.loadingArqueo = false;
@@ -1106,25 +1037,13 @@ export function app() {
 
             const contado = Number(this.cajaCierreForm.monto_cierre);
             if (this.cajaCierreForm.monto_cierre === '' || isNaN(contado) || contado < 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Efectivo Contado Requerido',
-                    text: 'Debe ingresar el monto total de efectivo físico contado en caja.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Efectivo Contado Requerido', 'Debe ingresar el monto total de efectivo físico contado en caja.', 'warning');
                 return;
             }
 
             const diff = this.cajaCierreDiferencia;
             if (diff !== null && diff !== 0 && (!this.cajaCierreForm.observacion_cierre || !this.cajaCierreForm.observacion_cierre.trim())) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Justificación Obligatoria',
-                    text: 'Existe un descuadre en el arqueo (diferencia de ' + (diff > 0 ? '+' : '') + this.formatCurrency(diff) + '). Debe ingresar una justificación u observación obligatoria.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Justificación Obligatoria', 'Existe un descuadre en el arqueo (' + (diff > 0 ? '+' : '') + this.formatCurrency(diff) + '). Debe ingresar una justificación.', 'warning');
                 return;
             }
 
@@ -1168,23 +1087,11 @@ export function app() {
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Turno Cerrado Exitosamente!',
-                    text: 'El arqueo y cierre del turno han quedado registrados y auditados en el sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre del turno han quedado registrados.', 'success', 2500);
 
             } catch (err) {
                 console.error('Error cerrando turno:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al cerrar turno',
-                    text: err.message || 'Ocurrió un error inesperado al procesar el cierre.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cerrar turno', err.message || 'Ocurrió un error inesperado al procesar el cierre.', 'error');
             } finally {
                 this.isSavingCajaCierre = false;
             }
@@ -1217,13 +1124,7 @@ export function app() {
 
             const desc = (this.cajaForm.descripcion_caja || '').trim();
             if (!desc) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Obligatorio',
-                    text: 'Debe ingresar el nombre o descripción de la caja.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Obligatorio', 'Debe ingresar el nombre o descripción de la caja.', 'warning');
                 return;
             }
 
@@ -1254,25 +1155,11 @@ export function app() {
                 this.showCajaFormModal = false;
                 await this.fetchVentas();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: isEdit ? '¡Caja Actualizada!' : '¡Caja Creada!',
-                    text: data.message || 'La caja física ha sido guardada exitosamente.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a',
-                    timer: 1800,
-                    showConfirmButton: false
-                });
+                this.notify(isEdit ? '¡Caja Actualizada!' : '¡Caja Creada!', data.message || 'La caja física ha sido guardada exitosamente.', 'success', 2000);
 
             } catch (err) {
                 console.error('Error guardando caja:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo guardar la caja',
-                    html: err.message || 'Ocurrió un error inesperado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo guardar la caja', err.message || 'Ocurrió un error inesperado.', 'error');
             } finally {
                 this.isSavingCaja = false;
             }

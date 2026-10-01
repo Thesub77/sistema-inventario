@@ -57,21 +57,10 @@ export function categoriasModule() {
                 }
 
                 this.showCategoryModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Categoría guardada!',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Categoría guardada!', `La categoría "${this.categoryForm.nombre_categoria}" fue guardada.`, 'success');
                 await this.fetchCategorias();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al guardar',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al guardar categoría', error.message, 'error');
             } finally {
                 this.isSavingCategory = false;
             }
@@ -84,6 +73,8 @@ export function categoriasModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
             });
@@ -92,6 +83,7 @@ export function categoriasModule() {
                 await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
                 await this.fetchCategorias();
             }
         }

@@ -66,8 +66,7 @@
                 </label>
                 <select x-model="cajaForm.tipo_apertura" required
                     class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer">
-                    <option value="Manual">Manual (El cajero ingresa monto y abre el turno)</option>
-                    <option value="Automatica">Automática (Apertura al primer cobro o inicio de día)</option>
+                    <option value="Manual">Manual</option>
                 </select>
             </div>
 

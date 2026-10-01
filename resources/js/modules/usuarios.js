@@ -56,21 +56,10 @@ export function usuariosModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el usuario');
                 this.showUserModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Usuario guardado',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Usuario guardado', `"${this.userForm.nombre_usuario}" se guardó correctamente.`, 'success');
                 await this.fetchUsuarios();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Error al guardar usuario', error.message, 'error');
             }
         },
 
@@ -81,14 +70,17 @@ export function usuariosModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
-                background: '#1e293b',
-                color: '#fff'
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
             });
 
             if (result.isConfirmed) {
                 await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Usuario Eliminado', `"${u.nombre_usuario}" fue eliminado.`, 'success');
                 await this.fetchUsuarios();
             }
         }

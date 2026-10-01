@@ -83,21 +83,38 @@ class CajaService
     {
         CajaException::exigir((int) $usuario->estado === 1, 403, 'El usuario está inactivo.');
         CajaException::exigir($usuario->esAdmin() || $usuario->tienePermiso('ventas.crear') || $usuario->tienePermiso('pos.acceso'), 403, 'Sin permiso para registrar ventas.');
-        if (! $idCaja) {
-            $candidatas = Caja_operacion::where('id_usuario', $usuario->usuario_id)
-                ->where('estado', 1)->whereNull('fecha_hora_cierre')
-                ->whereHas('caja', fn ($q) => $q->where('estado', 1)->where('estado_caja', 'Abierta'))
-                ->pluck('id_caja');
-            // Conserva la selección del turno propio; si no tiene uno, busca una única caja abierta.
-            if ($candidatas->isEmpty()) {
-                $candidatas = Caja::where('estado', 1)->where('estado_caja', 'Abierta')->pluck('caja_id');
+
+        // 1. Buscar si el usuario autenticado tiene un turno propio abierto
+        $turnoPropio = Caja_operacion::where('id_usuario', $usuario->usuario_id)
+            ->where('estado', 1)
+            ->whereNull('fecha_hora_cierre')
+            ->whereHas('caja', fn ($q) => $q->where('estado', 1)->where('estado_caja', 'Abierta'))
+            ->first();
+
+        if ($turnoPropio) {
+            if ($idCaja && (int) $idCaja !== (int) $turnoPropio->id_caja) {
+                throw new CajaException(409, 'No puedes registrar ventas en una caja distinta a la asignada en tu turno activo.');
             }
+
+            return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($turnoPropio->id_caja), $usuario, true);
+        }
+
+        // 2. Si no tiene turno propio, verificar la caja solicitada o fallback de única caja abierta
+        if (! $idCaja) {
+            $candidatas = Caja::where('estado', 1)->where('estado_caja', 'Abierta')->pluck('caja_id');
             CajaException::exigir($candidatas->count() === 1, 409, 'Indique la caja: debe existir un único turno propio o una única caja activa y abierta.');
             $idCaja = (int) $candidatas->first();
         }
 
-        // Vender no concede permiso para consultar o cerrar el turno de otro responsable.
-        return $this->turnoAbierto(Caja::lockForUpdate()->findOrFail($idCaja), $usuario, true);
+        $caja = Caja::lockForUpdate()->findOrFail($idCaja);
+        $turno = $this->turnoAbierto($caja, $usuario, true);
+
+        // Bloqueo estricto: Un cajero no puede vender en la caja física que está en turno por otro usuario
+        if ((int) $turno->id_usuario !== (int) $usuario->usuario_id) {
+            throw new CajaException(409, 'Esta caja física está asignada al turno de otro cajero. No puedes realizar ventas en ella.');
+        }
+
+        return $turno;
     }
 
     /**
