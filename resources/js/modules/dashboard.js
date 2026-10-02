@@ -77,28 +77,20 @@ export function dashboardModule() {
             return null;
         },
 
-        // RF-26: Consulta y métricas de ventas del turno en tiempo real
+        // RF-26: Consulta y métricas de ventas del turno en tiempo real (Aislamiento por turno actual)
         get ventasTurno() {
             const turno = this.turnoActivo;
-            if (turno && turno.fecha_hora_apertura) {
-                const aperturaTime = new Date(turno.fecha_hora_apertura.replace(' ', 'T')).getTime();
-                const turnoVentas = (this.ventas || []).filter(v => {
-                    if (!v.fecha_hora_venta || Number(v.estado) === 0) return false;
-                    const ventaTime = new Date(v.fecha_hora_venta.replace(' ', 'T')).getTime();
-                    return !isNaN(ventaTime) && ventaTime >= aperturaTime;
-                });
-                if (turnoVentas.length > 0) return turnoVentas;
+            if (!turno) {
+                return [];
             }
-
-            // Fallback: Ventas con fecha de hoy (comparando fecha local y fecha UTC)
-            const hoyLocal = new Date().toLocaleDateString('en-CA');
-            const hoyUTC = new Date().toISOString().slice(0, 10);
-
+            const aperturaTime = turno.fecha_hora_apertura ? new Date(turno.fecha_hora_apertura.replace(' ', 'T')).getTime() : 0;
             return (this.ventas || []).filter(v => {
                 if (!v.fecha_hora_venta || Number(v.estado) === 0) return false;
-                const vDate = v.fecha_hora_venta.slice(0, 10);
-                const vLocalDate = this.getVentaLocalDate ? this.getVentaLocalDate(v.fecha_hora_venta) : vDate;
-                return vDate === hoyLocal || vDate === hoyUTC || vLocalDate === hoyLocal;
+                const matchesCaja = v.id_caja ? Number(v.id_caja) === Number(turno.id_caja) : true;
+                const matchesUser = Number(v.id_usuario) === Number(turno.id_usuario);
+                const ventaTime = new Date(v.fecha_hora_venta.replace(' ', 'T')).getTime();
+                const matchesTime = !isNaN(ventaTime) && (!aperturaTime || ventaTime >= aperturaTime);
+                return matchesCaja && matchesUser && matchesTime;
             });
         },
 
@@ -106,30 +98,28 @@ export function dashboardModule() {
             const list = this.ventasTurno;
             const turno = this.turnoActivo;
             const montoApertura = turno ? Number(turno.monto_apertura || 0) : 0;
+            const ingresosExtra = this.resumenCajaMovimientos ? Number(this.resumenCajaMovimientos.ingresosExtra || 0) : 0;
+            const egresosGastos = this.resumenCajaMovimientos ? Number(this.resumenCajaMovimientos.egresosGastos || 0) : 0;
 
-            // Si no hay ventas en memoria pero el endpoint /api/dashboard/resumen devolvió estadísticas del turno/día
-            if (list.length === 0 && this.dashboardData?.ventasTurnoStats && Number(this.dashboardData.ventasTurnoStats.total || 0) > 0) {
-                const dbStats = this.dashboardData.ventasTurnoStats;
-                const total = Number(dbStats.total || 0);
-                const efectivo = Number(dbStats.efectivo || 0);
+            if (!turno) {
                 return {
-                    turnoActivo: Boolean(turno),
-                    cajaNombre: turno?.caja?.nombre_caja || (turno ? `Caja #${turno.id_caja}` : 'Caja Principal'),
-                    cajeroNombre: turno?.usuario?.nombre_apellido || '',
-                    fechaApertura: turno?.fecha_hora_apertura || null,
-                    montoApertura,
-                    efectivoEsperado: montoApertura + efectivo,
-                    total,
-                    totalTickets: Number(dbStats.totalTickets || 0),
-                    efectivo,
-                    countEfectivo: Number(dbStats.countEfectivo || 0),
-                    pctEfectivo: Number(dbStats.pctEfectivo || 0),
-                    transferencia: Number(dbStats.transferencia || 0),
-                    countTransferencia: Number(dbStats.countTransferencia || 0),
-                    pctTransferencia: Number(dbStats.pctTransferencia || 0),
-                    tarjeta: Number(dbStats.tarjeta || 0),
-                    countTarjeta: Number(dbStats.countTarjeta || 0),
-                    pctTarjeta: Number(dbStats.pctTarjeta || 0)
+                    turnoActivo: false,
+                    cajaNombre: 'Ninguna',
+                    cajeroNombre: '',
+                    fechaApertura: null,
+                    montoApertura: 0,
+                    efectivoEsperado: 0,
+                    total: 0,
+                    totalTickets: 0,
+                    efectivo: 0,
+                    countEfectivo: 0,
+                    pctEfectivo: 0,
+                    transferencia: 0,
+                    countTransferencia: 0,
+                    pctTransferencia: 0,
+                    tarjeta: 0,
+                    countTarjeta: 0,
+                    pctTarjeta: 0
                 };
             }
 
@@ -156,13 +146,15 @@ export function dashboardModule() {
             const pctTransferencia = total > 0 ? Math.round((transferencia / safeTotal) * 100) : 0;
             const pctTarjeta = total > 0 ? Math.round((tarjeta / safeTotal) * 100) : 0;
 
+            const efectivoEsperado = montoApertura + efectivo + ingresosExtra - egresosGastos;
+
             return {
-                turnoActivo: Boolean(turno),
-                cajaNombre: turno?.caja?.nombre_caja || (turno ? `Caja #${turno.id_caja}` : 'Caja Principal'),
-                cajeroNombre: turno?.usuario?.nombre_apellido || '',
-                fechaApertura: turno?.fecha_hora_apertura || null,
+                turnoActivo: true,
+                cajaNombre: turno.caja?.descripcion_caja || turno.caja?.nombre_caja || `Caja #${turno.id_caja}`,
+                cajeroNombre: turno.usuario?.nombre_apellido || (this.currentUser ? this.currentUser.nombre_apellido : ''),
+                fechaApertura: turno.fecha_hora_apertura || null,
                 montoApertura,
-                efectivoEsperado: montoApertura + efectivo,
+                efectivoEsperado,
                 total,
                 totalTickets: list.length,
                 efectivo,

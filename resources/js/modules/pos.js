@@ -612,7 +612,9 @@ export function posModule() {
         async fetchVentasEspera() {
             try {
                 this.loadingVentasEspera = true;
-                const res = await this.apiFetch('/api/ventas-espera');
+                const cajaId = this.turnoActivo?.id_caja || '';
+                const url = cajaId ? `/api/ventas-espera?id_caja=${cajaId}` : '/api/ventas-espera';
+                const res = await this.apiFetch(url);
                 if (res.ok) {
                     const json = await res.json();
                     this.ventasEspera = Array.isArray(json.data) ? json.data : [];
@@ -636,12 +638,17 @@ export function posModule() {
         },
 
         async parkCurrentSale() {
+            if (!this.turnoActivo) {
+                this.notify('Caja Cerrada', 'Debes tener un turno de caja abierto para poner ventas en espera.', 'warning');
+                return;
+            }
             if (this.cart.length === 0) return;
 
             const clienteId = this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null);
 
             const payload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_caja: this.turnoActivo?.id_caja || null,
                 id_cliente: clienteId,
                 descuento: this.posSale.descuento_venta || 0,
                 detalles: this.cart.map(i => ({

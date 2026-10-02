@@ -15,7 +15,8 @@ require __DIR__.'/api/auth_routes.php';
 Route::middleware('auth:sanctum')->group(function () {
 
     // Panel y Métricas Analíticas del Dashboard
-    Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
+    Route::get('/dashboard/resumen', [DashboardController::class, 'resumen'])
+        ->middleware('permission:usuarios.gestionar,dashboard.ver');
 
     // Identidad y Datos del Negocio (RF-21)
     Route::get('/empresa', [EmpresaController::class, 'show']);

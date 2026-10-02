@@ -153,12 +153,12 @@ class AuthAndRoleTest extends TestCase
     {
         Sanctum::actingAs($this->cajero);
 
-        // El cajero no tiene permiso 'usuarios.gestionar'
-        $resUsuarios = $this->getJson('/api/usuarios');
-        $resUsuarios->assertStatus(403);
-
-        $resRoles = $this->getJson('/api/roles');
-        $resRoles->assertStatus(403);
+        // El cajero no tiene permiso 'usuarios.gestionar' ni 'dashboard.ver' ni 'inventario.gestionar'
+        $this->getJson('/api/usuarios')->assertStatus(403);
+        $this->getJson('/api/roles')->assertStatus(403);
+        $this->getJson('/api/bitacoras')->assertStatus(403);
+        $this->getJson('/api/dashboard/resumen')->assertStatus(403);
+        $this->getJson('/api/movimientos-inventario')->assertStatus(403);
     }
 
     public function test_administrador_accede_a_todas_las_rutas_protegidas(): void
@@ -167,6 +167,9 @@ class AuthAndRoleTest extends TestCase
 
         $this->getJson('/api/usuarios')->assertStatus(200);
         $this->getJson('/api/roles')->assertStatus(200);
+        $this->getJson('/api/bitacoras')->assertStatus(200);
+        $this->getJson('/api/dashboard/resumen')->assertStatus(200);
+        $this->getJson('/api/movimientos-inventario')->assertStatus(200);
         $this->getJson('/api/ventas')->assertStatus(200);
         $this->getJson('/api/productos')->assertStatus(200);
     }

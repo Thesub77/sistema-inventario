@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
+use App\Models\Caja;
+use App\Models\Caja_operacion;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Venta_espera;
@@ -17,20 +19,37 @@ class VentaEsperaController extends Controller
 {
     /**
      * GET /api/ventas-espera
-     * Lista todas las ventas en espera activas (estado = 1).
+     * Lista todas las ventas en espera activas (estado = 1), filtradas por caja o turno activo.
      */
     public function index(Request $request)
     {
-        $ventas = Venta_espera::with([
+        $user = $request->user() ?? Auth::user();
+        $idCaja = $request->query('id_caja');
+
+        $query = Venta_espera::with([
             'cliente',
             'usuario',
+            'caja',
             'detalles' => function ($q) {
                 $q->where('estado', 1)->with('producto');
             },
-        ])
-            ->where('estado', 1)
-            ->orderBy('venta_espera_id', 'desc')
-            ->get();
+        ])->where('estado', 1);
+
+        if ($idCaja) {
+            $query->where('id_caja', $idCaja);
+        } elseif ($user) {
+            $turnoActivo = Caja_operacion::where('id_usuario', $user->usuario_id)
+                ->where('estado', 1)
+                ->whereNull('fecha_hora_cierre')
+                ->first();
+            if ($turnoActivo) {
+                $query->where('id_caja', $turnoActivo->id_caja);
+            } elseif (! $user->esAdmin()) {
+                $query->where('id_usuario', $user->usuario_id);
+            }
+        }
+
+        $ventas = $query->orderBy('venta_espera_id', 'desc')->get();
 
         return response()->json([
             'success' => true,
@@ -46,6 +65,7 @@ class VentaEsperaController extends Controller
     {
         $validated = $request->validate([
             'id_usuario' => ['nullable', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
+            'id_caja' => ['nullable', 'integer', Rule::exists('caja', 'caja_id')->where('estado', 1)],
             'id_cliente' => ['nullable', 'integer', Rule::exists('cliente', 'cliente_id')->where('estado', 1)],
             'identificador_cuenta' => ['nullable', 'string', 'max:64'],
             'observaciones' => ['nullable', 'string', 'max:255'],
@@ -59,6 +79,15 @@ class VentaEsperaController extends Controller
         $idUsuario = $validated['id_usuario'] ?? Auth::id() ?? $request->user()?->usuario_id;
         if (! $idUsuario) {
             $idUsuario = 1; // Fallback para tests sin usuario autenticado explícito
+        }
+
+        $idCaja = $validated['id_caja'] ?? null;
+        if (! $idCaja && $idUsuario) {
+            $turnoActivo = Caja_operacion::where('id_usuario', $idUsuario)
+                ->where('estado', 1)
+                ->whereNull('fecha_hora_cierre')
+                ->first();
+            $idCaja = $turnoActivo?->id_caja;
         }
 
         // Determinar si el cliente es genérico (código con '0000' o nombre 'Consumidor Final' / 'Cliente Final')
@@ -87,7 +116,7 @@ class VentaEsperaController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($validated, $idUsuario, $identificador, $idCliente) {
+        return DB::transaction(function () use ($validated, $idUsuario, $idCaja, $identificador, $idCliente) {
             $subtotalVenta = 0;
             $detallesParaCrear = [];
 
@@ -118,6 +147,7 @@ class VentaEsperaController extends Controller
 
             $ventaEspera = Venta_espera::create([
                 'id_usuario' => $idUsuario,
+                'id_caja' => $idCaja,
                 'id_cliente' => $idCliente,
                 'identificador_cuenta' => $identificador,
                 'observaciones' => $validated['observaciones'] ?? null,
@@ -144,7 +174,7 @@ class VentaEsperaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Venta pausada exitosamente como '{$ventaEspera->identificador_cuenta}'",
-                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario']),
+                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario', 'caja']),
             ], 201);
         });
     }
@@ -158,6 +188,7 @@ class VentaEsperaController extends Controller
         $ventaEspera = Venta_espera::with([
             'cliente',
             'usuario',
+            'caja',
             'detalles' => function ($q) {
                 $q->where('estado', 1)->with('producto');
             },
@@ -193,6 +224,7 @@ class VentaEsperaController extends Controller
 
         $validated = $request->validate([
             'id_usuario' => ['nullable', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
+            'id_caja' => ['nullable', 'integer', Rule::exists('caja', 'caja_id')->where('estado', 1)],
             'id_cliente' => ['nullable', 'integer', Rule::exists('cliente', 'cliente_id')->where('estado', 1)],
             'identificador_cuenta' => ['nullable', 'string', 'max:64'],
             'observaciones' => ['nullable', 'string', 'max:255'],
@@ -237,6 +269,7 @@ class VentaEsperaController extends Controller
                 : $ventaEspera->identificador_cuenta;
 
             $ventaEspera->update([
+                'id_caja' => array_key_exists('id_caja', $validated) ? $validated['id_caja'] : $ventaEspera->id_caja,
                 'id_cliente' => array_key_exists('id_cliente', $validated) ? $validated['id_cliente'] : $ventaEspera->id_cliente,
                 'identificador_cuenta' => $identificador,
                 'observaciones' => array_key_exists('observaciones', $validated) ? $validated['observaciones'] : $ventaEspera->observaciones,
@@ -255,7 +288,7 @@ class VentaEsperaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Venta en espera '{$ventaEspera->identificador_cuenta}' actualizada exitosamente.",
-                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario']),
+                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario', 'caja']),
             ]);
         });
     }

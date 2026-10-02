@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Exceptions\CajaException;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,24 @@ class Caja_movimiento_venta extends Model
         'fecha_hora_movimiento',
         'estado',
     ];
+
+    protected $appends = [
+        'codigo_movimiento',
+    ];
+
+    /**
+     * Genera un código estructurado representativo: DDMMAA-CAJA-MOVIMIENTO
+     * Ejemplo: 021026-001-00010
+     */
+    public function getCodigoMovimientoAttribute(): string
+    {
+        $fecha = $this->fecha_hora_movimiento ? Carbon::parse($this->fecha_hora_movimiento) : now();
+        $fechaStr = $fecha->format('dmy');
+        $cajaStr = str_pad((string) ($this->id_caja ?? 1), 3, '0', STR_PAD_LEFT);
+        $idStr = str_pad((string) $this->caja_movimiento_venta_id, 5, '0', STR_PAD_LEFT);
+
+        return "{$fechaStr}-{$cajaStr}-{$idStr}";
+    }
 
     /**
      * El turno es la fuente de la caja para movimientos asociados.

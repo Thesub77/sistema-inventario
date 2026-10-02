@@ -40,7 +40,7 @@ class CajaController extends Controller
                 'caja_operaciones' => function ($q) {
                     $q->where('estado', 1)->whereNull('fecha_hora_cierre')->with('usuario');
                 },
-            ])->orderBy('caja_id', 'desc')->get()
+            ])->orderBy('caja_id', 'asc')->get()
         );
     }
 

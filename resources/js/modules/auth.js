@@ -70,7 +70,12 @@ export function authModule() {
 
                 this.notify(`¡Bienvenido, ${data.usuario.nombre_apellido}!`, 'Has iniciado sesión correctamente.', 'success', 2000);
 
-                // Cargar datos del dashboard y de la empresa al iniciar sesión
+                // Validar y activar la pestaña correspondiente según permisos del usuario
+                if (typeof this.canAccessTab === 'function' && !this.canAccessTab(this.currentTab)) {
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                }
+
+                // Cargar datos de la pestaña activa y de la empresa al iniciar sesión
                 await this.loadTab(this.currentTab, true);
                 if (typeof this.fetchEmpresa === 'function') {
                     await this.fetchEmpresa();

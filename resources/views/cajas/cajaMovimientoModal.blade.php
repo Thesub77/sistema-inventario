@@ -97,10 +97,10 @@
                 </div>
             </div>
 
-            <!-- Selección de Caja Destino -->
+            <!-- Selección de Caja Destino (Restringida a la caja del turno activo actual) -->
             <div class="space-y-1.5">
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    <span>Caja Física / Turno</span>
+                    <span>Caja Física / Turno Activo</span>
                     <span class="text-rose-500">*</span>
                 </label>
                 <div class="relative">
@@ -108,11 +108,13 @@
                         <i data-lucide="wallet" class="w-4 h-4"></i>
                     </div>
                     <select x-model="cajaMovimientoForm.id_caja" required
-                        class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors">
-                        <option value="">Seleccione una caja abierta...</option>
-                        <template x-for="c in cajas" :key="c.caja_id">
-                            <option :value="c.caja_id"
-                                x-text="'Caja #' + c.caja_id + ' - ' + (c.descripcion_caja || 'Principal') + ' (' + c.estado_caja + ')'"></option>
+                        class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors cursor-pointer">
+                        <template x-if="turnoActivo">
+                            <option :value="turnoActivo.id_caja" selected
+                                x-text="(turnoActivo.caja ? turnoActivo.caja.descripcion_caja : ('Caja #' + turnoActivo.id_caja)) + ' — Turno #' + turnoActivo.caja_operacion_id + (turnoActivo.fecha_hora_apertura ? ' (Jornada ' + formatDateOnly(turnoActivo.fecha_hora_apertura) + ')' : '')"></option>
+                        </template>
+                        <template x-if="!turnoActivo">
+                            <option value="" disabled selected>No tienes ningún turno activo abierto</option>
                         </template>
                     </select>
                 </div>
@@ -121,7 +123,7 @@
                 <template x-if="turnoActivo">
                     <p class="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-1 font-medium">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span x-text="'Turno activo #' + turnoActivo.caja_operacion_id + ' en ' + (turnoActivo.caja?.descripcion_caja || ('Caja #' + turnoActivo.id_caja)) + ' por ' + (turnoActivo.usuario?.nombre_apellido || currentUser.nombre_apellido)"></span>
+                        <span x-text="'Turno activo #' + turnoActivo.caja_operacion_id + (turnoActivo.fecha_hora_apertura ? ' (Jornada ' + formatDateOnly(turnoActivo.fecha_hora_apertura) + ')' : '') + ' en ' + (turnoActivo.caja?.descripcion_caja || ('Caja #' + turnoActivo.id_caja))"></span>
                     </p>
                 </template>
             </div>
