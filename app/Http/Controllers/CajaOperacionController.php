@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CajaException;
+use App\Models\Bitacora;
 use App\Models\Caja;
 use App\Models\Caja_operacion;
+use App\Models\Venta_espera;
 use App\Services\CajaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -153,6 +155,7 @@ class CajaOperacionController extends Controller
         $datos = $request->validate([
             'monto_cierre' => 'required|numeric|decimal:0,2|min:0|max:999999999.99',
             'observacion_cierre' => 'nullable|string|max:255',
+            'descartar_ventas_espera' => 'sometimes|boolean',
             'id_caja' => 'prohibited',
             'id_usuario' => 'prohibited',
             'monto_apertura' => 'prohibited',
@@ -169,6 +172,35 @@ class CajaOperacionController extends Controller
             $esAdminCierre = (int) $turno->id_usuario !== (int) $request->user()->usuario_id;
             if ($esAdminCierre) {
                 CajaException::exigir($request->user()->esAdmin(), 403, 'No tienes permiso para cerrar el turno de otro cajero.');
+            }
+
+            // Verificar si existen ventas en espera pendientes asociadas a la caja o al cajero
+            $ventasEsperaQuery = Venta_espera::where('estado', 1)
+                ->where(function ($q) use ($turno) {
+                    $q->where('id_caja', $turno->id_caja)
+                        ->orWhere('id_usuario', $turno->id_usuario);
+                });
+
+            $hayVentasEspera = (clone $ventasEsperaQuery)->exists();
+
+            if ($hayVentasEspera) {
+                if ($request->user()->esAdmin() && $request->boolean('descartar_ventas_espera')) {
+                    $ventasADescartar = $ventasEsperaQuery->get();
+                    foreach ($ventasADescartar as $v) {
+                        $v->update(['estado' => 0]);
+                        $v->detalles()->update(['estado' => 0]);
+                    }
+
+                    Bitacora::create([
+                        'id_usuario' => $request->user()->usuario_id,
+                        'accion_bitacora' => 'DESCARTE_ESPERA_CIERRE',
+                        'descripcion_bitacora' => mb_substr("Admin descartó {$ventasADescartar->count()} ventas en espera en Caja #{$turno->id_caja} para Cierre de Turno #{$turno->caja_operacion_id}", 0, 128),
+                        'fecha_hora_bitacora' => now(),
+                        'estado' => 1,
+                    ]);
+                } else {
+                    throw new CajaException(422, 'No puedes cerrar el turno mientras tengas ventas en espera activas. Debes reanudarlas o descartarlas antes de continuar.');
+                }
             }
 
             // El historial sin turno se consulta por separado. Su existencia no bloquea

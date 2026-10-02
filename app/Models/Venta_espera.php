@@ -14,6 +14,7 @@ class Venta_espera extends Model
 
     protected $fillable = [
         'id_usuario',
+        'id_caja',
         'id_cliente',
         'identificador_cuenta',
         'observaciones',
@@ -31,6 +32,11 @@ class Venta_espera extends Model
     public function usuario()
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'usuario_id');
+    }
+
+    public function caja()
+    {
+        return $this->belongsTo(Caja::class, 'id_caja', 'caja_id');
     }
 
     public function cliente()

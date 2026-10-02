@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\CajaException;
 use App\Models\Bitacora;
+use App\Models\Caja;
 use App\Models\Caja_movimiento_venta;
 use App\Models\Caja_operacion;
 use App\Services\CajaService;
@@ -47,7 +48,7 @@ class CajaMovimientoVentaController extends Controller
         // Filtro de lectura para conservar el historial sin reasignarlo a una apertura.
         $soloHistorico = $datos['sin_turno'] ?? false;
         unset($datos['sin_turno']);
-        $query = Caja_movimiento_venta::visiblesPara($request->user())->with(['caja', 'venta', 'turno']);
+        $query = Caja_movimiento_venta::visiblesPara($request->user())->with(['caja', 'venta.usuario', 'turno.usuario']);
         if ($soloHistorico) {
             $query->whereNull('id_caja_operacion');
         }
@@ -68,7 +69,7 @@ class CajaMovimientoVentaController extends Controller
     {
         app(CajaService::class)->autorizar($request->user());
 
-        return response()->json(Caja_movimiento_venta::visiblesPara($request->user())->with(['caja', 'venta', 'turno'])->findOrFail($id));
+        return response()->json(Caja_movimiento_venta::visiblesPara($request->user())->with(['caja', 'venta.usuario', 'turno.usuario'])->findOrFail($id));
     }
 
     /**
@@ -105,9 +106,29 @@ class CajaMovimientoVentaController extends Controller
                 $turno = Caja_operacion::lockForUpdate()->findOrFail($datos['id_caja_operacion']);
                 $service->autorizar($usuario, $turno);
                 CajaException::exigir($turno->fecha_hora_cierre === null && (int) $turno->estado === 1, 409, 'El turno indicado no está abierto.');
+                $caja = Caja::lockForUpdate()->findOrFail($turno->id_caja);
+                CajaException::exigir((int) $caja->estado === 1 && $caja->estado_caja === 'Abierta', 409, 'La caja física se encuentra cerrada.');
             } else {
                 $idCaja = $datos['id_caja'] ?? null;
-                $turno = $service->paraVenta($idCaja, $usuario);
+                if ($idCaja) {
+                    $caja = Caja::lockForUpdate()->findOrFail($idCaja);
+                    CajaException::exigir((int) $caja->estado === 1 && $caja->estado_caja === 'Abierta', 409, 'La caja física se encuentra cerrada.');
+                    $turno = Caja_operacion::where('id_caja', $idCaja)
+                        ->where('estado', 1)
+                        ->whereNull('fecha_hora_cierre')
+                        ->lockForUpdate()
+                        ->first();
+                    CajaException::exigir($turno !== null, 409, 'La caja seleccionada no cuenta con un turno abierto.');
+                    $service->autorizar($usuario, $turno);
+                } else {
+                    $turno = Caja_operacion::where('id_usuario', $usuario->usuario_id)
+                        ->where('estado', 1)
+                        ->whereNull('fecha_hora_cierre')
+                        ->whereHas('caja', fn ($q) => $q->where('estado', 1)->where('estado_caja', 'Abierta'))
+                        ->lockForUpdate()
+                        ->first();
+                    CajaException::exigir($turno !== null, 409, 'Debes tener un turno de caja abierto para registrar movimientos de efectivo.');
+                }
             }
 
             $esIngreso = in_array($datos['tipo_movimiento'], ['Ingreso', 'Entrada'], true);
@@ -126,7 +147,7 @@ class CajaMovimientoVentaController extends Controller
             Bitacora::create([
                 'id_usuario' => $usuario->usuario_id,
                 'accion_bitacora' => $esIngreso ? 'INGRESO_EFECTIVO_CAJA' : 'EGRESO_EFECTIVO_CAJA',
-                'descripcion_bitacora' => "Movimiento extraordinario #{$movimiento->caja_movimiento_venta_id} en Caja #{$turno->id_caja} (Turno #{$turno->caja_operacion_id}): ".($esIngreso ? 'Ingreso' : 'Egreso')." de C$ {$datos['monto']}. Motivo: {$datos['justificacion']}",
+                'descripcion_bitacora' => mb_substr("Mov. #{$movimiento->caja_movimiento_venta_id} en Caja #{$turno->id_caja} (Turno #{$turno->caja_operacion_id}): ".($esIngreso ? 'Ingreso' : 'Egreso')." C$ {$datos['monto']}. Motivo: {$datos['justificacion']}", 0, 128),
                 'fecha_hora_bitacora' => now(),
                 'estado' => 1,
             ]);

@@ -57,7 +57,7 @@
                                 </span>
                             </template>
                         </div>
-                        <p class="text-xs text-slate-400 mt-1" x-text="ventasTurnoStats.turnoActivo && ventasTurnoStats.cajeroNombre ? ('Cajero en turno: ' + ventasTurnoStats.cajeroNombre + (ventasTurnoStats.fechaApertura ? ' • Apertura: ' + formatDate(ventasTurnoStats.fechaApertura) : '')) : 'Desglose en tiempo real por método de pago para cuadre de caja'"></p>
+                        <p class="text-xs text-slate-400 mt-1" x-text="ventasTurnoStats.turnoActivo && ventasTurnoStats.cajeroNombre ? ((ventasTurnoStats.fechaApertura ? ' Apertura: ' + formatDate(ventasTurnoStats.fechaApertura) : '')) : 'Desglose en tiempo real por método de pago para cuadre de caja'"></p>
                     </div>
                 </div>
             </div>
@@ -465,23 +465,23 @@
         </div>
 
         <div class="overflow-x-auto rounded-2xl border border-slate-800/60">
-            <table class="w-full text-left text-sm">
+            <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="text-xs uppercase bg-dark-900/80 text-slate-400 border-b border-slate-800">
                     <tr>
-                        <th class="py-3 px-4 font-semibold">Código</th>
-                        <th class="py-3 px-4 font-semibold">Cliente</th>
-                        <th class="py-3 px-4 font-semibold">Método de Pago</th>
-                        <th class="py-3 px-4 font-semibold">Fecha y Hora</th>
-                        <th class="py-3 px-4 text-right font-semibold">Total</th>
+                        <th class="py-2.5 px-3 font-semibold">Código</th>
+                        <th class="py-2.5 px-3 font-semibold">Cliente</th>
+                        <th class="py-2.5 px-3 font-semibold">Método de Pago</th>
+                        <th class="py-2.5 px-3 font-semibold">Fecha y Hora</th>
+                        <th class="py-2.5 px-3 text-right font-semibold">Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                     <template x-for="v in ultimasVentas" :key="v.venta_id || v.codigo_venta">
                         <tr class="hover:bg-slate-800/40 transition-colors">
-                            <td class="py-3.5 px-4 font-semibold text-brand-300 dark:text-indigo-400 font-mono" x-text="v.codigo_venta"></td>
-                            <td class="py-3.5 px-4 text-slate-200" x-text="v.cliente_nombre"></td>
-                            <td class="py-3.5 px-4">
-                                <span class="px-2.5 py-1 text-xs rounded-lg font-medium inline-flex items-center gap-1"
+                            <td class="py-2.5 px-3 font-semibold text-brand-300 dark:text-indigo-400 font-mono" x-text="v.codigo_venta"></td>
+                            <td class="py-2.5 px-3 text-slate-200" x-text="v.cliente_nombre"></td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 text-xs rounded-md font-medium inline-flex items-center gap-1"
                                     :class="{
                                         'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': (v.metodo_pago || '').toLowerCase() === 'efectivo',
                                         'bg-sky-500/10 text-sky-400 border border-sky-500/20': (v.metodo_pago || '').toLowerCase() === 'transferencia',
@@ -491,8 +491,8 @@
                                     <span x-text="v.metodo_pago"></span>
                                 </span>
                             </td>
-                            <td class="py-3.5 px-4 text-xs text-slate-400" x-text="formatDate(v.fecha_hora_venta)"></td>
-                            <td class="py-3.5 px-4 text-right font-bold text-white font-mono" x-text="formatCurrency(v.total_venta)"></td>
+                            <td class="py-2.5 px-3 text-xs text-slate-400" x-text="formatDate(v.fecha_hora_venta)"></td>
+                            <td class="py-2.5 px-3 text-right font-bold text-white font-mono" x-text="formatCurrency(v.total_venta)"></td>
                         </tr>
                     </template>
                     <tr x-show="ultimasVentas.length === 0">

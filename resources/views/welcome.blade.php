@@ -59,7 +59,7 @@
 
                 <!-- Navigation Links -->
                 <nav class="p-3 space-y-1">
-                    <template x-for="item in navItems" :key="item.id">
+                    <template x-for="item in visibleNavItems" :key="item.id">
                         <button @click="currentTab = item.id"
                             :class="currentTab === item.id 
                                     ? 'bg-gradient-to-r from-brand-600/90 to-brand-700 text-white shadow-md shadow-brand-600/20 font-semibold' 

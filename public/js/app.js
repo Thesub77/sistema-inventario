@@ -151,28 +151,20 @@ function dashboardModule() {
             return null;
         },
 
-        // RF-26: Consulta y métricas de ventas del turno en tiempo real
+        // RF-26: Consulta y métricas de ventas del turno en tiempo real (Aislamiento por turno actual)
         get ventasTurno() {
             const turno = this.turnoActivo;
-            if (turno && turno.fecha_hora_apertura) {
-                const aperturaTime = new Date(turno.fecha_hora_apertura.replace(' ', 'T')).getTime();
-                const turnoVentas = (this.ventas || []).filter(v => {
-                    if (!v.fecha_hora_venta || Number(v.estado) === 0) return false;
-                    const ventaTime = new Date(v.fecha_hora_venta.replace(' ', 'T')).getTime();
-                    return !isNaN(ventaTime) && ventaTime >= aperturaTime;
-                });
-                if (turnoVentas.length > 0) return turnoVentas;
+            if (!turno) {
+                return [];
             }
-
-            // Fallback: Ventas con fecha de hoy (comparando fecha local y fecha UTC)
-            const hoyLocal = new Date().toLocaleDateString('en-CA');
-            const hoyUTC = new Date().toISOString().slice(0, 10);
-
+            const aperturaTime = turno.fecha_hora_apertura ? new Date(turno.fecha_hora_apertura.replace(' ', 'T')).getTime() : 0;
             return (this.ventas || []).filter(v => {
                 if (!v.fecha_hora_venta || Number(v.estado) === 0) return false;
-                const vDate = v.fecha_hora_venta.slice(0, 10);
-                const vLocalDate = this.getVentaLocalDate ? this.getVentaLocalDate(v.fecha_hora_venta) : vDate;
-                return vDate === hoyLocal || vDate === hoyUTC || vLocalDate === hoyLocal;
+                const matchesCaja = v.id_caja ? Number(v.id_caja) === Number(turno.id_caja) : true;
+                const matchesUser = Number(v.id_usuario) === Number(turno.id_usuario);
+                const ventaTime = new Date(v.fecha_hora_venta.replace(' ', 'T')).getTime();
+                const matchesTime = !isNaN(ventaTime) && (!aperturaTime || ventaTime >= aperturaTime);
+                return matchesCaja && matchesUser && matchesTime;
             });
         },
 
@@ -180,30 +172,28 @@ function dashboardModule() {
             const list = this.ventasTurno;
             const turno = this.turnoActivo;
             const montoApertura = turno ? Number(turno.monto_apertura || 0) : 0;
+            const ingresosExtra = this.resumenCajaMovimientos ? Number(this.resumenCajaMovimientos.ingresosExtra || 0) : 0;
+            const egresosGastos = this.resumenCajaMovimientos ? Number(this.resumenCajaMovimientos.egresosGastos || 0) : 0;
 
-            // Si no hay ventas en memoria pero el endpoint /api/dashboard/resumen devolvió estadísticas del turno/día
-            if (list.length === 0 && this.dashboardData?.ventasTurnoStats && Number(this.dashboardData.ventasTurnoStats.total || 0) > 0) {
-                const dbStats = this.dashboardData.ventasTurnoStats;
-                const total = Number(dbStats.total || 0);
-                const efectivo = Number(dbStats.efectivo || 0);
+            if (!turno) {
                 return {
-                    turnoActivo: Boolean(turno),
-                    cajaNombre: turno?.caja?.nombre_caja || (turno ? `Caja #${turno.id_caja}` : 'Caja Principal'),
-                    cajeroNombre: turno?.usuario?.nombre_apellido || '',
-                    fechaApertura: turno?.fecha_hora_apertura || null,
-                    montoApertura,
-                    efectivoEsperado: montoApertura + efectivo,
-                    total,
-                    totalTickets: Number(dbStats.totalTickets || 0),
-                    efectivo,
-                    countEfectivo: Number(dbStats.countEfectivo || 0),
-                    pctEfectivo: Number(dbStats.pctEfectivo || 0),
-                    transferencia: Number(dbStats.transferencia || 0),
-                    countTransferencia: Number(dbStats.countTransferencia || 0),
-                    pctTransferencia: Number(dbStats.pctTransferencia || 0),
-                    tarjeta: Number(dbStats.tarjeta || 0),
-                    countTarjeta: Number(dbStats.countTarjeta || 0),
-                    pctTarjeta: Number(dbStats.pctTarjeta || 0)
+                    turnoActivo: false,
+                    cajaNombre: 'Ninguna',
+                    cajeroNombre: '',
+                    fechaApertura: null,
+                    montoApertura: 0,
+                    efectivoEsperado: 0,
+                    total: 0,
+                    totalTickets: 0,
+                    efectivo: 0,
+                    countEfectivo: 0,
+                    pctEfectivo: 0,
+                    transferencia: 0,
+                    countTransferencia: 0,
+                    pctTransferencia: 0,
+                    tarjeta: 0,
+                    countTarjeta: 0,
+                    pctTarjeta: 0
                 };
             }
 
@@ -230,13 +220,15 @@ function dashboardModule() {
             const pctTransferencia = total > 0 ? Math.round((transferencia / safeTotal) * 100) : 0;
             const pctTarjeta = total > 0 ? Math.round((tarjeta / safeTotal) * 100) : 0;
 
+            const efectivoEsperado = montoApertura + efectivo + ingresosExtra - egresosGastos;
+
             return {
-                turnoActivo: Boolean(turno),
-                cajaNombre: turno?.caja?.nombre_caja || (turno ? `Caja #${turno.id_caja}` : 'Caja Principal'),
-                cajeroNombre: turno?.usuario?.nombre_apellido || '',
-                fechaApertura: turno?.fecha_hora_apertura || null,
+                turnoActivo: true,
+                cajaNombre: turno.caja?.descripcion_caja || turno.caja?.nombre_caja || `Caja #${turno.id_caja}`,
+                cajeroNombre: turno.usuario?.nombre_apellido || (this.currentUser ? this.currentUser.nombre_apellido : ''),
+                fechaApertura: turno.fecha_hora_apertura || null,
                 montoApertura,
-                efectivoEsperado: montoApertura + efectivo,
+                efectivoEsperado,
                 total,
                 totalTickets: list.length,
                 efectivo,
@@ -753,6 +745,11 @@ function authModule() {
 
                 this.notify(`¡Bienvenido, ${data.usuario.nombre_apellido}!`, 'Has iniciado sesión correctamente.', 'success', 2000);
 
+                // Validar y activar la pestaña correspondiente según permisos del usuario
+                if (typeof this.canAccessTab === 'function' && !this.canAccessTab(this.currentTab)) {
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                }
+
                 // Cargar pestaña inicial y datos de la empresa
                 await this.loadTab(this.currentTab, true);
                 await this.fetchEmpresa();
@@ -810,21 +807,77 @@ function authModule() {
 // 5. Módulo de Utilidades
 function utilsModule() {
     return {
-        notify(title, text = '', icon = 'success', timer = 2500) {
-            if (window.Swal) {
-                const isDark = (this.darkMode !== undefined) ? this.darkMode : document.documentElement.classList.contains('dark');
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: icon,
-                    title: title,
-                    text: text || undefined,
-                    timer: timer,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    background: isDark ? '#1e293b' : '#ffffff',
-                    color: isDark ? '#fff' : '#0f172a'
-                });
+        notify(title, text = '', icon = 'success', timer = 2800) {
+            let container = document.getElementById('fs-toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'fs-toast-container';
+                container.className = 'fixed top-4 right-4 z-[999999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-3 sm:px-0';
+                document.body.appendChild(container);
+            }
+
+            const isDark = (this.darkMode !== undefined) ? this.darkMode : document.documentElement.classList.contains('dark');
+
+            const iconConfig = {
+                success: {
+                    bg: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+                    svg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>'
+                },
+                error: {
+                    bg: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
+                    svg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>'
+                },
+                warning: {
+                    bg: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+                    svg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'
+                },
+                info: {
+                    bg: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+                    svg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+                }
+            }[icon] || {
+                bg: 'bg-brand-500/15 text-brand-600 dark:text-brand-400 border-brand-500/30',
+                svg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto flex items-start gap-3 p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 transform translate-x-8 opacity-0 ${
+                isDark
+                    ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-slate-950/50'
+                    : 'bg-white/95 border-slate-200 text-slate-900 shadow-slate-200/80'
+            }`;
+
+            toast.innerHTML = `
+                <div class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 border ${iconConfig.bg}">
+                    ${iconConfig.svg}
+                </div>
+                <div class="flex-1 min-w-0 pr-1">
+                    <h5 class="text-xs font-bold leading-snug truncate">${title}</h5>
+                    ${text ? `<p class="text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5 leading-relaxed break-words">${text}</p>` : ''}
+                </div>
+                <button type="button" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-0.5 -mr-1 -mt-1 flex-shrink-0 cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            `;
+
+            const closeBtn = toast.querySelector('button');
+            const removeToast = () => {
+                toast.classList.add('translate-x-8', 'opacity-0');
+                setTimeout(() => {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 300);
+            };
+
+            closeBtn.addEventListener('click', removeToast);
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-8', 'opacity-0');
+                toast.classList.add('translate-x-0', 'opacity-100');
+            });
+
+            if (timer > 0) {
+                setTimeout(removeToast, timer);
             }
         },
 
@@ -844,26 +897,39 @@ function utilsModule() {
                 normalized = normalized.replace(' ', 'T') + 'Z';
             }
             const d = new Date(normalized);
-            if (isNaN(d.getTime())) {
-                const fallback = new Date(dateStr);
-                if (isNaN(fallback.getTime())) return dateStr;
-                return fallback.toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
+            const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
+            if (isNaN(target.getTime())) return dateStr;
+
+            const pad = n => String(n).padStart(2, '0');
+            const day = pad(target.getDate());
+            const month = pad(target.getMonth() + 1);
+            const year = target.getFullYear();
+
+            let hours = target.getHours();
+            const minutes = pad(target.getMinutes());
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? pad(hours) : '12';
+
+            return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+        },
+
+        formatDateOnly(dateStr) {
+            if (!dateStr) return '';
+            let normalized = String(dateStr).trim();
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
             }
-            return d.toLocaleDateString('es-ES', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            });
+            const d = new Date(normalized);
+            const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
+            if (isNaN(target.getTime())) return dateStr;
+
+            const pad = n => String(n).padStart(2, '0');
+            const day = pad(target.getDate());
+            const month = pad(target.getMonth() + 1);
+            const year = target.getFullYear();
+
+            return `${day}/${month}/${year}`;
         },
 
         formatTime(dateStr) {
@@ -1962,7 +2028,9 @@ function posModule() {
         async fetchVentasEspera() {
             try {
                 this.loadingVentasEspera = true;
-                const res = await this.apiFetch('/api/ventas-espera');
+                const cajaId = this.turnoActivo?.id_caja || '';
+                const url = cajaId ? `/api/ventas-espera?id_caja=${cajaId}` : '/api/ventas-espera';
+                const res = await this.apiFetch(url);
                 if (res.ok) {
                     const json = await res.json();
                     this.ventasEspera = Array.isArray(json.data) ? json.data : [];
@@ -1986,12 +2054,17 @@ function posModule() {
         },
 
         async parkCurrentSale() {
+            if (!this.turnoActivo) {
+                this.notify('Caja Cerrada', 'Debes tener un turno de caja abierto para poner ventas en espera.', 'warning');
+                return;
+            }
             if (this.cart.length === 0) return;
 
             const clienteId = this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null);
 
             const payload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_caja: this.turnoActivo?.id_caja || null,
                 id_cliente: clienteId,
                 descuento: this.posSale.descuento_venta || 0,
                 detalles: this.cart.map(i => ({
@@ -2165,6 +2238,9 @@ function app() {
         cajaMovimientos: [],
         cajaSearch: '',
         cajaMovimientoFiltro: 'todos',
+        cajaHistorialAlcance: 'todas',
+        cajaMetodoPagoFiltro: '',
+        cajaUsuarioFiltro: '',
         showCajaMovimientoModal: false,
         isSavingCajaMovimiento: false,
         cajaMovimientoForm: {
@@ -2248,6 +2324,47 @@ function app() {
             const rol = String(this.currentUser.rol || '').toLowerCase();
             const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
             return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
+        },
+
+        hasPermission(permiso) {
+            if (!this.currentUser) return false;
+            if (this.isAdmin) return true;
+            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
+            if (permisos.includes('*')) return true;
+            return permisos.includes(permiso);
+        },
+
+        canAccessTab(tabId) {
+            if (!this.currentUser) return false;
+            if (this.isAdmin) return true;
+            switch (tabId) {
+                case 'dashboard':
+                    return this.hasPermission('dashboard.ver') || this.hasPermission('usuarios.gestionar');
+                case 'pos':
+                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
+                case 'productos':
+                    return this.hasPermission('productos.ver') || this.hasPermission('productos.gestionar') || this.hasPermission('inventario.gestionar');
+                case 'categorias':
+                    return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
+                case 'ventas':
+                    return this.hasPermission('ventas.ver');
+                case 'clientes':
+                    return this.hasPermission('clientes.gestionar') || this.hasPermission('pos.acceso');
+                case 'caja':
+                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso');
+                case 'inventario':
+                    return this.hasPermission('inventario.gestionar') || this.hasPermission('productos.gestionar');
+                case 'usuarios':
+                    return this.hasPermission('usuarios.gestionar');
+                case 'bitacora':
+                    return this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver');
+                default:
+                    return true;
+            }
+        },
+
+        get visibleNavItems() {
+            return this.navItems.filter(item => this.canAccessTab(item.id));
         },
 
         get lowStockProducts() {
@@ -2460,6 +2577,13 @@ function app() {
 
         async loadTab(tab, force = false) {
             if (!this.isAuthenticated) return;
+            if (!this.canAccessTab(tab)) {
+                const firstAllowed = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                if (tab !== firstAllowed) {
+                    this.currentTab = firstAllowed;
+                    return;
+                }
+            }
             if (!force && this.loadedTabs.includes(tab)) {
                 return;
             }
@@ -2548,6 +2672,9 @@ function app() {
             this.initAuth();
 
             if (this.isAuthenticated) {
+                if (!this.canAccessTab(this.currentTab)) {
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                }
                 this.loadTab(this.currentTab);
                 this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
@@ -2661,7 +2788,7 @@ function app() {
                 }
                 if (cajRes && cajRes.ok) {
                     const cajData = await cajRes.json();
-                    this.cajas = Array.isArray(cajData) ? cajData : [];
+                    this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
                 }
                 if (movCajRes && movCajRes.ok) {
                     const movData = await movCajRes.json();
@@ -2798,27 +2925,69 @@ function app() {
             }
         },
 
-        // Getters de Movimientos de Caja (RF-25)
+        // Getters de Movimientos de Caja (RF-25 / RF-28)
         get filteredCajaMovimientos() {
-            const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
+            let list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
             const term = (this.cajaSearch || '').trim().toLowerCase();
-            const filtro = this.cajaMovimientoFiltro || 'todos';
+            const filtroTipo = this.cajaMovimientoFiltro || 'todos';
+            const filtroMetodo = (this.cajaMetodoPagoFiltro || '').toLowerCase();
+            const filtroUsuario = this.cajaUsuarioFiltro;
 
+            // 1. Filtrado de alcance por rol (Cajeros solo ven su turno activo)
+            if (!this.isAdmin) {
+                if (!this.turnoActivo) {
+                    return [];
+                }
+                const turnoId = Number(this.turnoActivo.caja_operacion_id);
+                list = list.filter(m => Number(m.id_caja_operacion) === turnoId);
+            } else {
+                // Administrador: puede filtrar por su turno activo o ver historial general
+                if (this.cajaHistorialAlcance === 'mi_turno' && this.turnoActivo) {
+                    const turnoId = Number(this.turnoActivo.caja_operacion_id);
+                    list = list.filter(m => Number(m.id_caja_operacion) === turnoId);
+                }
+            }
+
+            // 2. Filtro por Usuario / Cajero (Solo admin)
+            if (this.isAdmin && filtroUsuario) {
+                list = list.filter(m => {
+                    const idUserVenta = m.venta?.id_usuario;
+                    const idUserTurno = m.turno?.id_usuario;
+                    return Number(idUserVenta) === Number(filtroUsuario) || Number(idUserTurno) === Number(filtroUsuario);
+                });
+            }
+
+            // 3. Filtro por Método de Pago
+            if (filtroMetodo) {
+                list = list.filter(m => {
+                    const metodo = (this.getMovimientoMetodoPago(m) || 'efectivo').toLowerCase();
+                    if (filtroMetodo === 'efectivo') return metodo === 'efectivo';
+                    if (filtroMetodo === 'transferencia') return metodo === 'transferencia';
+                    if (filtroMetodo === 'tarjeta') return ['tarjeta', 'debito', 'credito'].includes(metodo);
+                    return metodo.includes(filtroMetodo);
+                });
+            }
+
+            // 4. Filtro por tipo de movimiento y buscador
             return list.filter(m => {
-                if (filtro === 'ingreso') {
+                if (filtroTipo === 'ingreso') {
                     if (m.id_venta !== null || Number(m.monto_movimiento) <= 0) return false;
-                } else if (filtro === 'egreso') {
+                } else if (filtroTipo === 'egreso') {
                     if (m.id_venta !== null || Number(m.monto_movimiento) >= 0) return false;
-                } else if (filtro === 'venta') {
+                } else if (filtroTipo === 'venta') {
                     if (m.id_venta === null) return false;
                 }
 
                 if (term) {
                     const idStr = String(m.caja_movimiento_venta_id || '');
+                    const codigoMov = this.getMovimientoCodigo(m).toLowerCase();
+                    const codigoClean = codigoMov.replace(/-/g, '');
                     const cajaDesc = m.caja && m.caja.descripcion_caja ? m.caja.descripcion_caja.toLowerCase() : '';
                     const ventaCod = m.venta && m.venta.codigo_venta ? m.venta.codigo_venta.toLowerCase() : '';
                     const concepto = this.getMovimientoConcepto(m).toLowerCase();
-                    return idStr.includes(term) || cajaDesc.includes(term) || ventaCod.includes(term) || concepto.includes(term);
+                    const usuarioNom = this.getMovimientoUsuario(m).toLowerCase();
+                    const metodoNom = this.getMovimientoMetodoPago(m).toLowerCase();
+                    return idStr.includes(term) || codigoMov.includes(term) || codigoClean.includes(term) || cajaDesc.includes(term) || ventaCod.includes(term) || concepto.includes(term) || usuarioNom.includes(term) || metodoNom.includes(term);
                 }
 
                 return true;
@@ -2826,15 +2995,26 @@ function app() {
         },
 
         get resumenCajaMovimientos() {
+            const turno = this.turnoActivo;
             const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
             let ingresosExtra = 0;
             let egresosGastos = 0;
             let countIngresos = 0;
             let countEgresos = 0;
 
+            if (!turno) {
+                return {
+                    ingresosExtra: 0,
+                    egresosGastos: 0,
+                    countIngresos: 0,
+                    countEgresos: 0
+                };
+            }
+
             list.forEach(m => {
-                const monto = Number(m.monto_movimiento || 0);
-                if (m.id_venta === null) {
+                // Sumar estrictamente los movimientos extraordinarios del turno activo actual
+                if (Number(m.id_caja_operacion) === Number(turno.caja_operacion_id) && m.id_venta === null) {
+                    const monto = Number(m.monto_movimiento || 0);
                     if (monto > 0) {
                         ingresosExtra += monto;
                         countIngresos++;
@@ -2877,19 +3057,58 @@ function app() {
             return Number(mov.monto_movimiento) >= 0 ? 'Ingreso de Efectivo / Sencillo' : 'Egreso / Gasto Menor';
         },
 
-        openCajaMovimientoModal(tipo = 'Egreso', cajaId = null) {
+        getMovimientoCodigo(mov) {
+            if (!mov) return '';
+            if (mov.codigo_movimiento) return mov.codigo_movimiento;
+            let normalized = String(mov.fecha_hora_movimiento || '').trim();
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            const target = isNaN(d.getTime()) ? new Date() : d;
+            const pad = (n, len = 2) => String(n).padStart(len, '0');
+            const day = pad(target.getDate(), 2);
+            const month = pad(target.getMonth() + 1, 2);
+            const year = String(target.getFullYear()).slice(-2);
+            const caja = pad(mov.id_caja || 1, 3);
+            const id = pad(mov.caja_movimiento_venta_id || 0, 5);
+
+            return `${day}${month}${year}-${caja}-${id}`;
+        },
+
+        getMovimientoMetodoPago(mov) {
+            if (!mov) return 'Efectivo';
+            if (mov.venta && mov.venta.metodo_pago) {
+                return mov.venta.metodo_pago;
+            }
+            return 'Efectivo';
+        },
+
+        getMovimientoUsuario(mov) {
+            if (!mov) return 'N/A';
+            if (mov.venta && mov.venta.usuario && mov.venta.usuario.nombre_apellido) {
+                return mov.venta.usuario.nombre_apellido;
+            }
+            if (mov.turno && mov.turno.usuario && mov.turno.usuario.nombre_apellido) {
+                return mov.turno.usuario.nombre_apellido;
+            }
+            if (mov.turno && mov.turno.id_usuario) {
+                const u = Array.isArray(this.usuarios) ? this.usuarios.find(user => Number(user.usuario_id) === Number(mov.turno.id_usuario)) : null;
+                if (u && u.nombre_apellido) return u.nombre_apellido;
+            }
+            return 'Usuario #' + (mov.venta?.id_usuario || mov.turno?.id_usuario || '1');
+        },
+
+        openCajaMovimientoModal(tipo = 'Egreso') {
             const turno = this.turnoActivo;
-            let selectedCaja = cajaId;
-            if (!selectedCaja && turno) {
-                selectedCaja = turno.id_caja;
-            } else if (!selectedCaja && this.cajas && this.cajas.length > 0) {
-                const abierta = this.cajas.find(c => c.estado_caja === 'Abierta');
-                selectedCaja = abierta ? abierta.caja_id : this.cajas[0].caja_id;
+            if (!turno) {
+                this.notify('Sin Turno Activo', 'Debes tener un turno abierto para registrar movimientos de caja.', 'warning');
+                return;
             }
 
             this.cajaMovimientoForm = {
-                id_caja: selectedCaja || '',
-                id_caja_operacion: (turno && (!selectedCaja || turno.id_caja == selectedCaja)) ? turno.caja_operacion_id : '',
+                id_caja: turno.id_caja,
+                id_caja_operacion: turno.caja_operacion_id,
                 tipo_movimiento: tipo,
                 monto: '',
                 justificacion: ''
@@ -3127,6 +3346,43 @@ function app() {
                 return;
             }
 
+            // Validar si existen ventas en espera pendientes asociadas a la caja del turno a cerrar
+            const targetCajaId = this.cajaCierreData?.id_caja;
+            let ventasPendientes = [];
+            try {
+                const resEspera = await this.apiFetch(targetCajaId ? `/api/ventas-espera?id_caja=${targetCajaId}` : '/api/ventas-espera');
+                if (resEspera.ok) {
+                    const dataEspera = await resEspera.json();
+                    ventasPendientes = Array.isArray(dataEspera.data) ? dataEspera.data : [];
+                }
+            } catch (e) {
+                console.error('Error verificando ventas en espera:', e);
+            }
+
+            let descartarVentasEspera = false;
+            if (ventasPendientes.length > 0) {
+                if (this.isAdmin) {
+                    const nombres = ventasPendientes.map(v => v.identificador_cuenta || `Venta #${v.venta_espera_id}`).slice(0, 3).join(', ') + (ventasPendientes.length > 3 ? '...' : '');
+                    const adminConfirm = await Swal.fire({
+                        icon: 'warning',
+                        title: '¿Descartar ventas en espera?',
+                        html: `Esta caja tiene <b>${ventasPendientes.length} venta(s) en espera</b> activa(s) (${nombres}).<br><br>Como Administrador, ¿deseas <b>descartarlas automáticamente</b> para continuar con la liquidación del turno?`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, Descartar y Continuar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#f59e0b',
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    if (!adminConfirm.isConfirmed) return;
+                    descartarVentasEspera = true;
+                    this.notify('Ventas en Espera Descartadas', `Se descartaron ${ventasPendientes.length} venta(s) en espera de esta caja.`, 'info', 3000);
+                } else {
+                    this.notify('Ventas en Espera Pendientes', `No puedes cerrar el turno porque tienes ${ventasPendientes.length} venta(s) en espera activas. Debes reanudarlas o descartarlas en el POS antes de liquidar.`, 'warning', 5000);
+                    return;
+                }
+            }
+
             const confirmResult = await Swal.fire({
                 icon: 'question',
                 title: '¿Confirmar Cierre de Turno?',
@@ -3146,7 +3402,8 @@ function app() {
                 const turnoId = this.cajaCierreData.caja_operacion_id;
                 const payload = {
                     monto_cierre: Number(contado.toFixed(2)),
-                    observacion_cierre: this.cajaCierreForm.observacion_cierre ? this.cajaCierreForm.observacion_cierre.trim() : null
+                    observacion_cierre: this.cajaCierreForm.observacion_cierre ? this.cajaCierreForm.observacion_cierre.trim() : null,
+                    descartar_ventas_espera: descartarVentasEspera
                 };
 
                 const res = await this.apiFetch(`/api/caja-operaciones/${turnoId}`, {
@@ -3161,13 +3418,16 @@ function app() {
                 }
 
                 this.showCajaCierreModal = false;
+                if (typeof this.fetchVentasEspera === 'function') {
+                    this.fetchVentasEspera().catch(() => {});
+                }
                 await Promise.all([
                     this.fetchVentas(),
                     this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre han quedado registrados.', 'success');
+                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre del turno han quedado registrados.', 'success', 2800);
 
             } catch (err) {
                 console.error('Error cerrando turno:', err);

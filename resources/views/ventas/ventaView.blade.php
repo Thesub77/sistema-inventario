@@ -42,35 +42,39 @@
                     : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 animate-pulse'"
                 :title="turnoActivo ? 'Caja abierta con turno activo. Clic para arqueo y cierre.' : 'Caja cerrada. Clic para aperturar turno.'">
                 <span class="w-2 h-2 rounded-full" :class="turnoActivo ? 'bg-emerald-500' : 'bg-rose-500'"></span>
-                <span class="hidden md:inline" x-text="turnoActivo ? ('Caja Abierta #' + turnoActivo.caja_operacion_id) : 'Caja Cerrada'"></span>
+                <span class="hidden md:inline" x-text="turnoActivo ? ((turnoActivo.caja?.descripcion_caja || ('Caja #' + turnoActivo.id_caja)) + ' • Turno #' + turnoActivo.caja_operacion_id + (turnoActivo.fecha_hora_apertura ? ' (Jornada ' + formatDateOnly(turnoActivo.fecha_hora_apertura) + ')' : '')) : 'Caja Cerrada'"></span>
                 <span class="md:hidden" x-text="turnoActivo ? 'Abierta' : 'Cerrada'"></span>
             </button>
 
-            <!-- Botón de Movimiento de Caja (RF-25) -->
-            <button type="button" @click="openCajaMovimientoModal()"
-                title="Registrar Ingreso o Egreso Extraordinario de Caja (RF-25)"
-                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs cursor-pointer border bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-500"></i>
-                <span class="hidden xl:inline text-xs">Mov. Caja</span>
-            </button>
+            <!-- Botón de Movimiento de Caja (RF-25: Solo visible cuando hay un turno activo) -->
+            <template x-if="turnoActivo">
+                <button type="button" @click="openCajaMovimientoModal()"
+                    title="Registrar Ingreso o Egreso Extraordinario de Caja (RF-25)"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs cursor-pointer border bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-500"></i>
+                    <span class="hidden xl:inline text-xs">Mov. Caja</span>
+                </button>
+            </template>
 
-            <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders - RF-16) -->
-            <button type="button" @click="openVentasEsperaModal()"
-                class="relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer border"
-                :class="ventasEspera.length > 0 
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 ring-2 ring-amber-500/20' 
-                    : 'bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'">
-                <div class="relative">
-                    <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
-                    <span x-show="ventasEspera.length > 0"
-                        class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs"
+            <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders - RF-16: Solo visible cuando hay un turno activo) -->
+            <template x-if="turnoActivo">
+                <button type="button" @click="openVentasEsperaModal()"
+                    class="relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer border"
+                    :class="ventasEspera.length > 0 
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 ring-2 ring-amber-500/20' 
+                        : 'bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'">
+                    <div class="relative">
+                        <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
+                        <span x-show="ventasEspera.length > 0"
+                            class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs"
+                            x-text="ventasEspera.length"></span>
+                    </div>
+                    <span class="hidden sm:inline">En Espera</span>
+                    <span class="font-mono text-xs px-1.5 py-0.5 rounded-lg font-bold"
+                        :class="ventasEspera.length > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
                         x-text="ventasEspera.length"></span>
-                </div>
-                <span class="hidden sm:inline">En Espera</span>
-                <span class="font-mono text-xs px-1.5 py-0.5 rounded-lg font-bold"
-                    :class="ventasEspera.length > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
-                    x-text="ventasEspera.length"></span>
-            </button>
+                </button>
+            </template>
 
             <!-- Botón sutil y elegante de Carrito / Factura -->
             <button type="button" @click="showCartDrawer = true; $nextTick(() => typeof lucide !== 'undefined' && lucide.createIcons())"
@@ -472,7 +476,7 @@
 
                     <!-- Botón Pausar Venta (Poner en Espera - RF-16) -->
                     <button type="button" @click="parkCurrentSale()"
-                        :disabled="cart.length === 0 || loading"
+                        :disabled="!turnoActivo || cart.length === 0 || loading"
                         class="w-full py-2 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs">
                         <i data-lucide="pause-circle" class="w-4 h-4 text-amber-500"></i>
                         <span x-text="resumedVentaEsperaId ? 'Guardar Cambios en Espera' : 'Pausar Venta (Poner en Espera)'"></span>

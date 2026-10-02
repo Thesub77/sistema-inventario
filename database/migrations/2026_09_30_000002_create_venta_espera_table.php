@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('venta_espera', function (Blueprint $table) {
             $table->id('venta_espera_id');
             $table->unsignedBigInteger('id_usuario');
+            $table->unsignedBigInteger('id_caja')->nullable();
             $table->unsignedBigInteger('id_cliente')->nullable();
             $table->string('identificador_cuenta', 64);
             $table->string('observaciones', 255)->nullable();
@@ -24,6 +25,7 @@ return new class extends Migration
             $table->tinyInteger('estado')->default(1);
 
             $table->foreign('id_usuario')->references('usuario_id')->on('usuario');
+            $table->foreign('id_caja')->references('caja_id')->on('caja')->nullOnDelete();
             $table->foreign('id_cliente')->references('cliente_id')->on('cliente')->nullOnDelete();
         });
     }

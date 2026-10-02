@@ -39,6 +39,9 @@ export function app() {
         cajaMovimientos: [],
         cajaSearch: '',
         cajaMovimientoFiltro: 'todos',
+        cajaHistorialAlcance: 'todas',
+        cajaMetodoPagoFiltro: '',
+        cajaUsuarioFiltro: '',
         showCajaMovimientoModal: false,
         isSavingCajaMovimiento: false,
         cajaMovimientoForm: {
@@ -164,6 +167,47 @@ export function app() {
             const rol = String(this.currentUser.rol || '').toLowerCase();
             const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
             return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
+        },
+
+        hasPermission(permiso) {
+            if (!this.currentUser) return false;
+            if (this.isAdmin) return true;
+            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
+            if (permisos.includes('*')) return true;
+            return permisos.includes(permiso);
+        },
+
+        canAccessTab(tabId) {
+            if (!this.currentUser) return false;
+            if (this.isAdmin) return true;
+            switch (tabId) {
+                case 'dashboard':
+                    return this.hasPermission('dashboard.ver') || this.hasPermission('usuarios.gestionar');
+                case 'pos':
+                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
+                case 'productos':
+                    return this.hasPermission('productos.ver') || this.hasPermission('productos.gestionar') || this.hasPermission('inventario.gestionar');
+                case 'categorias':
+                    return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
+                case 'ventas':
+                    return this.hasPermission('ventas.ver');
+                case 'clientes':
+                    return this.hasPermission('clientes.gestionar') || this.hasPermission('pos.acceso');
+                case 'caja':
+                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso');
+                case 'inventario':
+                    return this.hasPermission('inventario.gestionar') || this.hasPermission('productos.gestionar');
+                case 'usuarios':
+                    return this.hasPermission('usuarios.gestionar');
+                case 'bitacora':
+                    return this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver');
+                default:
+                    return true;
+            }
+        },
+
+        get visibleNavItems() {
+            return this.navItems.filter(item => this.canAccessTab(item.id));
         },
 
         get lowStockProducts() {
@@ -375,6 +419,14 @@ export function app() {
         loadedTabs: [],
 
         async loadTab(tab, force = false) {
+            if (!this.canAccessTab(tab)) {
+                const firstAllowed = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                if (tab !== firstAllowed) {
+                    this.currentTab = firstAllowed;
+                    return;
+                }
+            }
+
             if (!force && this.loadedTabs.includes(tab)) {
                 return;
             }
@@ -465,8 +517,11 @@ export function app() {
             // Inicializar autenticación y verificar sesión
             this.initAuth();
 
-            // Si está autenticado, cargar pestaña activa inicial
+            // Si está autenticado, validar que currentTab sea accesible y cargar datos
             if (this.isAuthenticated) {
+                if (!this.canAccessTab(this.currentTab)) {
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                }
                 this.loadTab(this.currentTab);
                 this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
@@ -581,7 +636,7 @@ export function app() {
                 }
                 if (cajRes && cajRes.ok) {
                     const cajData = await cajRes.json();
-                    this.cajas = Array.isArray(cajData) ? cajData : [];
+                    this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
                 }
                 if (movCajRes && movCajRes.ok) {
                     const movData = await movCajRes.json();
@@ -718,27 +773,69 @@ export function app() {
             }
         },
 
-        // Getters de Movimientos de Caja (RF-25)
+        // Getters de Movimientos de Caja (RF-25 / RF-28)
         get filteredCajaMovimientos() {
-            const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
+            let list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
             const term = (this.cajaSearch || '').trim().toLowerCase();
-            const filtro = this.cajaMovimientoFiltro || 'todos';
+            const filtroTipo = this.cajaMovimientoFiltro || 'todos';
+            const filtroMetodo = (this.cajaMetodoPagoFiltro || '').toLowerCase();
+            const filtroUsuario = this.cajaUsuarioFiltro || '';
 
+            // 1. Filtrado de alcance por rol (Cajeros solo ven su turno activo)
+            if (!this.isAdmin) {
+                if (!this.turnoActivo) {
+                    return [];
+                }
+                const turnoId = Number(this.turnoActivo.caja_operacion_id);
+                list = list.filter(m => Number(m.id_caja_operacion) === turnoId);
+            } else {
+                // Administrador: puede filtrar por su turno activo o ver historial general
+                if (this.cajaHistorialAlcance === 'mi_turno' && this.turnoActivo) {
+                    const turnoId = Number(this.turnoActivo.caja_operacion_id);
+                    list = list.filter(m => Number(m.id_caja_operacion) === turnoId);
+                }
+            }
+
+            // 2. Filtro por Cajero / Usuario (Solo Administrador)
+            if (this.isAdmin && filtroUsuario) {
+                list = list.filter(m => {
+                    const idUserVenta = m.venta?.id_usuario;
+                    const idUserTurno = m.turno?.id_usuario;
+                    return Number(idUserVenta) === Number(filtroUsuario) || Number(idUserTurno) === Number(filtroUsuario);
+                });
+            }
+
+            // 3. Filtro por Método de Pago
+            if (filtroMetodo) {
+                list = list.filter(m => {
+                    const metodo = (this.getMovimientoMetodoPago(m) || 'efectivo').toLowerCase();
+                    if (filtroMetodo === 'efectivo') return metodo === 'efectivo';
+                    if (filtroMetodo === 'transferencia') return metodo === 'transferencia';
+                    if (filtroMetodo === 'tarjeta') return ['tarjeta', 'debito', 'credito'].includes(metodo);
+                    return metodo.includes(filtroMetodo);
+                });
+            }
+
+            // 4. Filtro por tipo de movimiento y buscador
             return list.filter(m => {
-                if (filtro === 'ingreso') {
+                if (filtroTipo === 'ingreso') {
                     if (m.id_venta !== null || Number(m.monto_movimiento) <= 0) return false;
-                } else if (filtro === 'egreso') {
+                } else if (filtroTipo === 'egreso') {
                     if (m.id_venta !== null || Number(m.monto_movimiento) >= 0) return false;
-                } else if (filtro === 'venta') {
+                } else if (filtroTipo === 'venta') {
                     if (m.id_venta === null) return false;
                 }
 
                 if (term) {
                     const idStr = String(m.caja_movimiento_venta_id || '');
+                    const codigoMov = this.getMovimientoCodigo(m).toLowerCase();
+                    const codigoClean = codigoMov.replace(/-/g, '');
                     const cajaDesc = m.caja && m.caja.descripcion_caja ? m.caja.descripcion_caja.toLowerCase() : '';
                     const ventaCod = m.venta && m.venta.codigo_venta ? m.venta.codigo_venta.toLowerCase() : '';
                     const concepto = this.getMovimientoConcepto(m).toLowerCase();
-                    return idStr.includes(term) || cajaDesc.includes(term) || ventaCod.includes(term) || concepto.includes(term);
+                    const usuarioNom = this.getMovimientoUsuario(m).toLowerCase();
+                    const metodoNom = this.getMovimientoMetodoPago(m).toLowerCase();
+                    return idStr.includes(term) || codigoMov.includes(term) || codigoClean.includes(term) || cajaDesc.includes(term) || ventaCod.includes(term) || concepto.includes(term) || usuarioNom.includes(term) || metodoNom.includes(term);
                 }
 
                 return true;
@@ -746,15 +843,26 @@ export function app() {
         },
 
         get resumenCajaMovimientos() {
+            const turno = this.turnoActivo;
             const list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
             let ingresosExtra = 0;
             let egresosGastos = 0;
             let countIngresos = 0;
             let countEgresos = 0;
 
+            if (!turno) {
+                return {
+                    ingresosExtra: 0,
+                    egresosGastos: 0,
+                    countIngresos: 0,
+                    countEgresos: 0
+                };
+            }
+
             list.forEach(m => {
-                const monto = Number(m.monto_movimiento || 0);
-                if (m.id_venta === null) {
+                // Sumar estrictamente los movimientos extraordinarios del turno activo actual
+                if (Number(m.id_caja_operacion) === Number(turno.caja_operacion_id) && m.id_venta === null) {
+                    const monto = Number(m.monto_movimiento || 0);
                     if (monto > 0) {
                         ingresosExtra += monto;
                         countIngresos++;
@@ -797,19 +905,61 @@ export function app() {
             return Number(mov.monto_movimiento) >= 0 ? 'Ingreso de Efectivo / Sencillo' : 'Egreso / Gasto Menor';
         },
 
-        openCajaMovimientoModal(tipo = 'Egreso', cajaId = null) {
+        getMovimientoCodigo(mov) {
+            if (!mov) return '';
+            if (mov.codigo_movimiento) return mov.codigo_movimiento;
+            let normalized = String(mov.fecha_hora_movimiento || '').trim();
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(normalized);
+            const target = isNaN(d.getTime()) ? new Date() : d;
+            const pad = (n, len = 2) => String(n).padStart(len, '0');
+            const day = pad(target.getDate(), 2);
+            const month = pad(target.getMonth() + 1, 2);
+            const year = String(target.getFullYear()).slice(-2);
+            const caja = pad(mov.id_caja || 1, 3);
+            const id = pad(mov.caja_movimiento_venta_id || 0, 5);
+
+            return `${day}${month}${year}-${caja}-${id}`;
+        },
+
+        getMovimientoMetodoPago(mov) {
+            if (!mov) return 'Efectivo';
+            if (mov.venta && mov.venta.metodo_pago) {
+                return mov.venta.metodo_pago;
+            }
+            return 'Efectivo';
+        },
+
+        getMovimientoUsuario(mov) {
+            if (!mov) return 'N/A';
+            if (mov.venta && mov.venta.usuario && mov.venta.usuario.nombre_apellido) {
+                return mov.venta.usuario.nombre_apellido;
+            }
+            if (mov.turno && mov.turno.usuario && mov.turno.usuario.nombre_apellido) {
+                return mov.turno.usuario.nombre_apellido;
+            }
+            if (Array.isArray(this.usuarios) && this.usuarios.length > 0) {
+                const uid = mov.venta?.id_usuario || mov.turno?.id_usuario;
+                if (uid) {
+                    const found = this.usuarios.find(u => Number(u.usuario_id) === Number(uid));
+                    if (found) return found.nombre_apellido;
+                }
+            }
+            return (this.currentUser && this.currentUser.nombre_apellido) ? this.currentUser.nombre_apellido : 'Usuario';
+        },
+
+        openCajaMovimientoModal(tipo = 'Egreso') {
             const turno = this.turnoActivo;
-            let selectedCaja = cajaId;
-            if (!selectedCaja && turno) {
-                selectedCaja = turno.id_caja;
-            } else if (!selectedCaja && this.cajas && this.cajas.length > 0) {
-                const abierta = this.cajas.find(c => c.estado_caja === 'Abierta');
-                selectedCaja = abierta ? abierta.caja_id : this.cajas[0].caja_id;
+            if (!turno) {
+                this.notify('Sin Turno Activo', 'Debes tener un turno abierto para registrar movimientos de caja.', 'warning');
+                return;
             }
 
             this.cajaMovimientoForm = {
-                id_caja: selectedCaja || '',
-                id_caja_operacion: (turno && (!selectedCaja || turno.id_caja == selectedCaja)) ? turno.caja_operacion_id : '',
+                id_caja: turno.id_caja,
+                id_caja_operacion: turno.caja_operacion_id,
                 tipo_movimiento: tipo,
                 monto: '',
                 justificacion: ''
@@ -1047,6 +1197,43 @@ export function app() {
                 return;
             }
 
+            // Validar si existen ventas en espera pendientes asociadas a la caja del turno a cerrar
+            const targetCajaId = this.cajaCierreData?.id_caja;
+            let ventasPendientes = [];
+            try {
+                const resEspera = await this.apiFetch(targetCajaId ? `/api/ventas-espera?id_caja=${targetCajaId}` : '/api/ventas-espera');
+                if (resEspera.ok) {
+                    const dataEspera = await resEspera.json();
+                    ventasPendientes = Array.isArray(dataEspera.data) ? dataEspera.data : [];
+                }
+            } catch (e) {
+                console.error('Error verificando ventas en espera:', e);
+            }
+
+            let descartarVentasEspera = false;
+            if (ventasPendientes.length > 0) {
+                if (this.isAdmin) {
+                    const nombres = ventasPendientes.map(v => v.identificador_cuenta || `Venta #${v.venta_espera_id}`).slice(0, 3).join(', ') + (ventasPendientes.length > 3 ? '...' : '');
+                    const adminConfirm = await Swal.fire({
+                        icon: 'warning',
+                        title: '¿Descartar ventas en espera?',
+                        html: `Esta caja tiene <b>${ventasPendientes.length} venta(s) en espera</b> activa(s) (${nombres}).<br><br>Como Administrador, ¿deseas <b>descartarlas automáticamente</b> para continuar con la liquidación del turno?`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, Descartar y Continuar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#f59e0b',
+                        background: this.darkMode ? '#1e293b' : '#ffffff',
+                        color: this.darkMode ? '#fff' : '#0f172a'
+                    });
+                    if (!adminConfirm.isConfirmed) return;
+                    descartarVentasEspera = true;
+                    this.notify('Ventas en Espera Descartadas', `Se descartaron ${ventasPendientes.length} venta(s) en espera de esta caja.`, 'info', 3000);
+                } else {
+                    this.notify('Ventas en Espera Pendientes', `No puedes cerrar el turno porque tienes ${ventasPendientes.length} venta(s) en espera activas. Debes reanudarlas o descartarlas en el POS antes de liquidar.`, 'warning', 5000);
+                    return;
+                }
+            }
+
             const confirmResult = await Swal.fire({
                 icon: 'question',
                 title: '¿Confirmar Cierre de Turno?',
@@ -1066,7 +1253,8 @@ export function app() {
                 const turnoId = this.cajaCierreData.caja_operacion_id;
                 const payload = {
                     monto_cierre: Number(contado.toFixed(2)),
-                    observacion_cierre: this.cajaCierreForm.observacion_cierre ? this.cajaCierreForm.observacion_cierre.trim() : null
+                    observacion_cierre: this.cajaCierreForm.observacion_cierre ? this.cajaCierreForm.observacion_cierre.trim() : null,
+                    descartar_ventas_espera: descartarVentasEspera
                 };
 
                 const res = await this.apiFetch(`/api/caja-operaciones/${turnoId}`, {
@@ -1081,13 +1269,16 @@ export function app() {
                 }
 
                 this.showCajaCierreModal = false;
+                if (typeof this.fetchVentasEspera === 'function') {
+                    this.fetchVentasEspera().catch(() => {});
+                }
                 await Promise.all([
                     this.fetchVentas(),
                     this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre del turno han quedado registrados.', 'success', 2500);
+                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre del turno han quedado registrados.', 'success', 2800);
 
             } catch (err) {
                 console.error('Error cerrando turno:', err);

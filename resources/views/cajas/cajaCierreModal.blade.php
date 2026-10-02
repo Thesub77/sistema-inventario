@@ -57,18 +57,18 @@
         <form x-show="!loadingArqueo" @submit.prevent="saveCajaCierre()" class="overflow-y-auto p-5 sm:p-6 space-y-4">
 
             <!-- Ficha Resumen del Turno Activo -->
-            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800 space-y-2.5 text-xs">
                 <div>
                     <span class="text-slate-400 uppercase font-semibold text-[10px]">Turno a Liquidar:</span>
                     <div class="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-1.5 mt-0.5">
-                        <span x-text="'Turno #' + (cajaCierreData?.caja_operacion_id || '')"></span>
+                        <span x-text="'Turno #' + (cajaCierreData?.caja_operacion_id || '') + (cajaCierreData?.fecha_hora_apertura ? ' (Jornada ' + formatDateOnly(cajaCierreData.fecha_hora_apertura) + ')' : '')"></span>
                         <span class="text-slate-400">•</span>
                         <span class="text-brand-500" x-text="cajaCierreData?.caja?.descripcion_caja || ('Caja #' + (cajaCierreData?.id_caja || ''))"></span>
                     </div>
                 </div>
-                <div class="text-right">
+                <div>
                     <span class="text-slate-400 uppercase font-semibold text-[10px]">Cajero Responsable:</span>
-                    <div class="font-bold text-slate-700 dark:text-slate-300 mt-0.5"
+                    <div class="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-1.5 mt-0.5"
                         x-text="cajaCierreData?.usuario?.nombre_apellido || currentUser?.nombre_apellido || 'Usuario'"></div>
                 </div>
             </div>

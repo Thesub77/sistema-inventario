@@ -151,33 +151,33 @@
     <!-- Tabla de Ventas -->
     <div class="glass-panel rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="text-xs uppercase bg-slate-50 dark:bg-dark-900/80 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                        <th class="py-3 px-4">Factura / Ticket</th>
-                        <th class="py-3 px-4">Cliente</th>
-                        <th class="py-3 px-4">Cajero / Vendedor</th>
-                        <th class="py-3 px-4">Método de Pago</th>
-                        <th class="py-3 px-4">Fecha y Hora</th>
-                        <th class="py-3 px-4 text-right">Subtotal</th>
-                        <th class="py-3 px-4 text-right">Total</th>
-                        <th class="py-3 px-4 text-center">Acciones</th>
+                        <th class="py-2.5 px-3">Factura / Ticket</th>
+                        <th class="py-2.5 px-3">Cliente</th>
+                        <th class="py-2.5 px-3">Cajero / Vendedor</th>
+                        <th class="py-2.5 px-3">Método de Pago</th>
+                        <th class="py-2.5 px-3">Fecha y Hora</th>
+                        <th class="py-2.5 px-3 text-right">Subtotal</th>
+                        <th class="py-2.5 px-3 text-right">Total</th>
+                        <th class="py-2.5 px-3 text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800/60">
                     <template x-for="v in filteredVentas" :key="v.venta_id">
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                             :class="{'opacity-60 bg-rose-50/30 dark:bg-rose-950/10': Number(v.estado) === 0}">
-                            <td class="py-3.5 px-4 font-mono font-bold text-brand-600 dark:text-indigo-400">
+                            <td class="py-2.5 px-3 font-mono font-bold text-brand-600 dark:text-indigo-400">
                                 <div class="flex items-center gap-1.5">
                                     <span x-text="v.codigo_venta"></span>
                                     <span x-show="Number(v.estado) === 0"
                                         class="text-[9px] font-sans font-bold px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">Anulada</span>
                                 </div>
                             </td>
-                            <td class="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200"
+                            <td class="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200"
                                 x-text="v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final'"></td>
-                            <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400">
+                            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-400">
                                 <span class="inline-flex items-center gap-1">
                                     <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -186,18 +186,18 @@
                                     <span x-text="v.usuario ? v.usuario.nombre_apellido : 'N/A'"></span>
                                 </span>
                             </td>
-                            <td class="py-3.5 px-4">
+                            <td class="py-2.5 px-3">
                                 <span class="px-2 py-0.5 text-xs rounded-md font-medium"
                                     :class="v.metodo_pago === 'Efectivo' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-brand-500/10 text-brand-600 dark:text-brand-400'"
                                     x-text="v.metodo_pago"></span>
                                 <span x-show="v.referencia_transferencia" class="block font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[130px]" :title="v.referencia_transferencia" x-text="v.referencia_transferencia"></span>
                             </td>
-                            <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400 font-mono" x-text="formatDate(v.fecha_hora_venta)"></td>
-                            <td class="py-3.5 px-4 text-right text-slate-600 dark:text-slate-400 font-mono" x-text="formatCurrency(v.subtotal_venta)"></td>
-                            <td class="py-3.5 px-4 text-right font-bold font-mono text-emerald-600 dark:text-emerald-400"
+                            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-400 font-mono" x-text="formatDate(v.fecha_hora_venta)"></td>
+                            <td class="py-2.5 px-3 text-right text-slate-600 dark:text-slate-400 font-mono" x-text="formatCurrency(v.subtotal_venta)"></td>
+                            <td class="py-2.5 px-3 text-right font-bold font-mono text-emerald-600 dark:text-emerald-400"
                                 :class="{'line-through text-rose-500': Number(v.estado) === 0}"
                                 x-text="formatCurrency(v.total_venta)"></td>
-                            <td class="py-3.5 px-4 text-center">
+                            <td class="py-2.5 px-3 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <button @click="openReceiptModal(v.venta_id, v)" class="p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Imprimir Comprobante (Ticket)">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
