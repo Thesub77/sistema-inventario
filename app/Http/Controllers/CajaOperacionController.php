@@ -78,7 +78,22 @@ class CajaOperacionController extends Controller
             $caja = Caja::lockForUpdate()->findOrFail($datos['id_caja']);
             // Una caja heredada abierta sin turno también permite registrar su monto real explícito.
             CajaException::exigir((int) $caja->estado === 1 && in_array($caja->estado_caja, ['Cerrada', 'Abierta'], true), 409, 'La caja debe estar activa y en un estado válido para registrar la apertura.');
-            CajaException::rechazarSi(Caja_operacion::where('id_caja', $caja->caja_id)->whereNull('fecha_hora_cierre')->exists(), 409, 'Ya existe una apertura sin cerrar.');
+
+            // 1. El usuario no puede tener más de un turno abierto simultáneamente
+            $turnoExistente = Caja_operacion::with('caja')
+                ->where('id_usuario', $usuario->usuario_id)
+                ->whereNull('fecha_hora_cierre')
+                ->where('estado', 1)
+                ->first();
+            CajaException::rechazarSi($turnoExistente !== null, 409, "Ya tienes el Turno #{$turnoExistente?->caja_operacion_id} abierto en '{$turnoExistente?->caja?->descripcion_caja}'. Debes cerrarlo antes de aperturar otra caja.");
+
+            // 2. La caja física no puede tener un turno abierto por otro cajero
+            CajaException::rechazarSi(
+                Caja_operacion::where('id_caja', $caja->caja_id)->whereNull('fecha_hora_cierre')->where('estado', 1)->exists(),
+                409,
+                "La caja '{$caja->descripcion_caja}' ya se encuentra abierta y en uso por otro cajero."
+            );
+
             $turno = Caja_operacion::create([
                 'id_caja' => $caja->caja_id,
                 'id_usuario' => $usuario->usuario_id,
@@ -150,7 +165,11 @@ class CajaOperacionController extends Controller
             $referencia = Caja_operacion::findOrFail($id);
             $caja = Caja::lockForUpdate()->findOrFail($referencia->id_caja);
             $turno = $this->cajas->turno($caja, $request->user());
-            CajaException::exigir((int) $turno->caja_operacion_id === (int) $id, 409, 'El turno ya está cerrado.');
+            // Verificar si es cierre propio o cierre supervisado por Administrador
+            $esAdminCierre = (int) $turno->id_usuario !== (int) $request->user()->usuario_id;
+            if ($esAdminCierre) {
+                CajaException::exigir($request->user()->esAdmin(), 403, 'No tienes permiso para cerrar el turno de otro cajero.');
+            }
 
             // El historial sin turno se consulta por separado. Su existencia no bloquea
             // el cierre ni autoriza a sumarlo al efectivo del turno actual.
@@ -168,7 +187,9 @@ class CajaOperacionController extends Controller
                 'estado' => 0,
             ]);
             $caja->update(['estado_caja' => 'Cerrada']);
-            $this->cajas->bitacora($request->user(), 'CIERRE_CAJA', $turno);
+
+            $accion = $esAdminCierre ? 'CIERRE_SUPERVISADO_CAJA' : 'CIERRE_CAJA';
+            $this->cajas->bitacora($request->user(), $accion, $turno);
 
             return response()->json($turno);
         }, 3);

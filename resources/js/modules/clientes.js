@@ -46,21 +46,10 @@ export function clientesModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el cliente');
                 this.showCustomerModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Cliente guardado',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Cliente guardado', `"${this.customerForm.nombre_apellido_cliente}" se guardó correctamente.`, 'success');
                 await this.fetchClientes();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Error al guardar cliente', error.message, 'error');
             }
         },
 
@@ -71,14 +60,17 @@ export function clientesModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
-                background: '#1e293b',
-                color: '#fff'
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
             });
 
             if (result.isConfirmed) {
                 await this.apiFetch(`/api/clientes/${c.cliente_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Cliente Eliminado', `"${c.nombre_apellido_cliente}" fue eliminado.`, 'success');
                 await this.fetchClientes();
             }
         }

@@ -68,15 +68,7 @@ export function authModule() {
                 this.loginForm.contrasenia_usuario = '';
                 this.loginError = '';
 
-                Swal.fire({
-                    icon: 'success',
-                    title: `¡Bienvenido, ${data.usuario.nombre_apellido}!`,
-                    text: 'Has iniciado sesión correctamente.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify(`¡Bienvenido, ${data.usuario.nombre_apellido}!`, 'Has iniciado sesión correctamente.', 'success', 2000);
 
                 // Cargar datos del dashboard y de la empresa al iniciar sesión
                 await this.loadTab(this.currentTab, true);
@@ -85,13 +77,7 @@ export function authModule() {
                 }
             } catch (error) {
                 this.loginError = error.message;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Autenticación',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error de Autenticación', error.message, 'error', 3000);
             } finally {
                 this.isLoggingIn = false;
                 this.$nextTick(() => {
@@ -122,20 +108,7 @@ export function authModule() {
             });
 
             // 3. Notificación sutil no bloqueante (Toast en esquina superior)
-            if (window.Swal) {
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: 'Sesión Finalizada',
-                    text: 'Has salido correctamente.',
-                    timer: 2000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
-            }
+            this.notify('Sesión Finalizada', 'Has salido correctamente.', 'info', 2000);
 
             // 4. Invalidar token en el backend en segundo plano (sin congelar la interfaz)
             if (token) {

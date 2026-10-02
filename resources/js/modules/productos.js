@@ -68,21 +68,10 @@ export function productosModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el producto');
                 this.showProductModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Producto Guardado!',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('¡Producto Guardado!', `El producto "${this.productForm.nombre_producto}" se guardó correctamente.`, 'success');
                 await this.fetchProductos();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Error al guardar producto', error.message, 'error');
             }
         },
 
@@ -95,20 +84,15 @@ export function productosModule() {
                 confirmButtonColor: '#e11d48',
                 confirmButtonText: 'Sí, eliminar',
                 cancelButtonText: 'Cancelar',
-                background: '#1e293b',
-                color: '#fff'
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
             });
 
             if (result.isConfirmed) {
                 await this.apiFetch(`/api/productos/${product.producto_id}`, {
                     method: 'DELETE'
                 });
-                Swal.fire({
-                    title: 'Eliminado',
-                    icon: 'success',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
                 await this.fetchProductos();
             }
         },
@@ -134,25 +118,13 @@ export function productosModule() {
 
             // Validación previa en cliente de justificación requerida para salidas y ajustes
             if ((isAjuste || isSalida) && (!this.stockForm.justificacion || !this.stockForm.justificacion.trim())) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Justificación Requerida',
-                    text: 'Debe ingresar una justificación breve para registrar la salida o ajuste (máximo 90 caracteres).',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Justificación Requerida', 'Debe ingresar una justificación breve para registrar la salida o ajuste.', 'warning');
                 return;
             }
 
             // Validación previa para evitar salidas que excedan las existencias actuales
             if (isSalida && Number(this.stockForm.cantidad) > this.stockForm.stock_anterior) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Existencia Insuficiente',
-                    text: `No se puede dar salida a ${this.stockForm.cantidad} unidades porque solo hay ${this.stockForm.stock_anterior} en bodega.`,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Existencia Insuficiente', `No se puede dar salida a ${this.stockForm.cantidad} unidades porque solo hay ${this.stockForm.stock_anterior} en bodega.`, 'warning');
                 return;
             }
 
@@ -215,26 +187,9 @@ export function productosModule() {
                 ]);
 
                 // Notificación no intrusiva con temporizador automático
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'Stock Actualizado',
-                    text: `Existencias actualizadas a ${newStock} unidades.`,
-                    timer: 2500,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Stock Actualizado', `Existencias actualizadas a ${newStock} unidades.`, 'success');
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Inventario',
-                    text: error.message,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Error de Inventario', error.message, 'error');
             }
         }
     };

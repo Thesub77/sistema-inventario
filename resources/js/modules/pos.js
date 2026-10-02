@@ -38,26 +38,14 @@ export function posModule() {
         // POS Cart Operations
         addToCart(product) {
             if (product.existencia_bodega <= 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Sin Stock',
-                    text: 'El producto no cuenta con existencias disponibles en bodega.',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Sin Stock', 'El producto no cuenta con existencias disponibles en bodega.', 'warning');
                 return;
             }
 
             const existing = this.cart.find(i => i.id_producto === product.producto_id);
             if (existing) {
                 if (existing.cantidad + 1 > product.existencia_bodega) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Límite de Stock',
-                        text: `Solo hay ${product.existencia_bodega} unidades disponibles.`,
-                        background: '#1e293b',
-                        color: '#fff'
-                    });
+                    this.notify('Límite de Stock', `Solo hay ${product.existencia_bodega} unidades disponibles.`, 'warning');
                     return;
                 }
                 existing.cantidad++;
@@ -86,13 +74,7 @@ export function posModule() {
             const item = this.cart[index];
             const product = this.productos.find(p => p.producto_id === item.id_producto);
             if (product && item.cantidad + 1 > product.existencia_bodega) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Límite de Stock',
-                    text: `Solo hay ${product.existencia_bodega} unidades disponibles.`,
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('Límite de Stock', `Solo hay ${product.existencia_bodega} unidades disponibles.`, 'warning');
                 return;
             }
             item.cantidad++;
@@ -151,21 +133,7 @@ export function posModule() {
 
             // Bloqueo estricto del POS: No se puede facturar sin turno activo
             if (!this.turnoActivo) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Caja Cerrada',
-                    text: 'No se puede generar la factura porque la caja no está abierta. Debe abrir un turno operativo primero.',
-                    showCancelButton: true,
-                    confirmButtonText: 'Abrir Caja Ahora',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#10b981',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        this.openCajaAperturaModal();
-                    }
-                });
+                this.notify('Caja Cerrada', 'No se puede facturar sin turno activo. Abre una caja primero.', 'warning', 3000);
                 return;
             }
 
@@ -177,24 +145,12 @@ export function posModule() {
                 const minLength = 4;
 
                 if (!ref) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: isTarjeta ? 'Voucher Requerido' : 'Referencia Requerida',
-                        text: `Debes ingresar el ${nombreCampo} para procesar el pago con ${this.posSale.metodo_pago.toLowerCase()}.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify(isTarjeta ? 'Voucher Requerido' : 'Referencia Requerida', `Debes ingresar el ${nombreCampo} para procesar el pago con ${this.posSale.metodo_pago.toLowerCase()}.`, 'warning');
                     return;
                 }
 
                 if (ref.length < minLength) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Mínimo Requerido No Alcanzado',
-                        text: `El ${nombreCampo} debe contener al menos ${minLength} caracteres.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Mínimo Requerido No Alcanzado', `El ${nombreCampo} debe contener al menos ${minLength} caracteres.`, 'warning');
                     return;
                 }
             }
@@ -203,25 +159,13 @@ export function posModule() {
             if (this.posSale.metodo_pago === 'Efectivo') {
                 const montoRecibidoNum = Number(this.posSale.monto_recibido);
                 if (!this.posSale.monto_recibido || isNaN(montoRecibidoNum) || montoRecibidoNum <= 0) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Efectivo Recibido Requerido',
-                        text: 'Debes ingresar el monto de efectivo entregado por el cliente (o pulsar "Paga Exacto") para calcular el cambio.',
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Efectivo Requerido', 'Debes ingresar el monto entregado por el cliente (o pulsar "Paga Exacto").', 'warning');
                     return;
                 }
 
                 if (montoRecibidoNum < this.cartTotal) {
                     const faltante = this.cartTotal - montoRecibidoNum;
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Efectivo Insuficiente',
-                        text: `El cliente entregó ${this.formatCurrency(montoRecibidoNum)}, pero el total es ${this.formatCurrency(this.cartTotal)}. Faltan ${this.formatCurrency(faltante)}.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Efectivo Insuficiente', `El cliente entregó ${this.formatCurrency(montoRecibidoNum)}, pero el total es ${this.formatCurrency(this.cartTotal)}. Faltan ${this.formatCurrency(faltante)}.`, 'warning');
                     return;
                 }
             }
@@ -253,6 +197,7 @@ export function posModule() {
 
             const salePayload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_caja: this.turnoActivo ? this.turnoActivo.id_caja : null,
                 id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
                 codigo_venta: candidateCode,
                 metodo_pago: this.posSale.metodo_pago,
@@ -417,39 +362,14 @@ export function posModule() {
                     this.fetchBitacoras();
                 }, 100);
 
-                // Notificación clara y prominente para el cajero
-                let alertHtml = `<p class="text-sm">Factura <strong>${newSale.codigo_venta}</strong> emitida por <strong>C$ ${newSale.total_venta}</strong></p>`;
-                if (salePayload.metodo_pago === 'Efectivo' && efectivoRecibido) {
-                    alertHtml += `<div class="mt-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-left space-y-1.5 font-mono">
-                        <div class="flex justify-between text-slate-300"><span>Monto Recibido:</span> <span>${this.formatCurrency(efectivoRecibido)}</span></div>
-                        <div class="flex justify-between font-bold text-emerald-400 text-sm border-t border-slate-700/80 pt-1"><span>Cambio a Entregar:</span> <span>${this.formatCurrency(cambioCalculado)}</span></div>
-                    </div>`;
-                }
+                // Notificación sutil tipo tarjeta en esquina superior derecha
+                const cambioInfo = (salePayload.metodo_pago === 'Efectivo' && cambioCalculado > 0)
+                    ? ` | Cambio: ${this.formatCurrency(cambioCalculado)}`
+                    : '';
+                this.notify('¡Venta Registrada!', `Factura ${newSale.codigo_venta} por ${this.formatCurrency(newSale.total_venta)}${cambioInfo}`, 'success', 3500);
 
-                const alertResult = await Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta Registrada!',
-                    html: alertHtml,
-                    showCancelButton: true,
-                    confirmButtonText: 'Imprimir Comprobante',
-                    cancelButtonText: 'Continuar Vendiendo',
-                    confirmButtonColor: '#10b981',
-                    cancelButtonColor: '#4f46e5',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
-
-                if (alertResult.isConfirmed) {
-                    await this.openReceiptModal(newSale.venta_id, newSale);
-                }
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al procesar venta', error.message, 'error', 4000);
             } finally {
                 this.loading = false;
             }
@@ -522,13 +442,7 @@ export function posModule() {
                 });
             } catch (error) {
                 this.showReceiptModal = false;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Comprobante',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error de Comprobante', error.message, 'error');
             } finally {
                 this.loadingReceipt = false;
             }
@@ -562,11 +476,7 @@ export function posModule() {
         async deleteSale(sale) {
             const usuariosActivos = (this.usuarios || []).filter(usuario => Number(usuario.estado) === 1);
             if (usuariosActivos.length === 0) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'No se puede anular',
-                    text: 'No hay usuarios activos disponibles para registrar al responsable.'
-                });
+                this.notify('No se puede anular', 'No hay usuarios activos disponibles para registrar al responsable.', 'error');
                 return;
             }
 
@@ -586,8 +496,8 @@ export function posModule() {
                 cancelButtonColor: '#334155',
                 confirmButtonText: 'Sí, anular',
                 cancelButtonText: 'Cancelar',
-                background: '#1e293b',
-                color: '#fff'
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
             });
 
             if (!result.isConfirmed) return;
@@ -607,13 +517,7 @@ export function posModule() {
                     throw new Error(data.message || 'No se pudo anular la venta.');
                 }
             } catch (error) {
-                await Swal.fire({
-                    title: 'No se pudo anular la venta',
-                    text: error.message,
-                    icon: 'error',
-                    background: '#1e293b',
-                    color: '#fff'
-                });
+                this.notify('No se pudo anular la venta', error.message, 'error');
                 return;
             }
 
@@ -625,20 +529,11 @@ export function posModule() {
                     this.fetchBitacoras()
                 ]);
             } catch {
-                await Swal.fire({
-                    title: 'Venta anulada',
-                    text: 'La anulación se guardó, pero no se pudo actualizar la pantalla. Recargá la página.',
-                    icon: 'warning'
-                });
+                this.notify('Venta Anulada', 'La anulación se guardó, pero no se pudo actualizar la pantalla.', 'warning');
                 return;
             }
 
-            await Swal.fire({
-                title: 'Venta anulada',
-                icon: 'success',
-                background: '#1e293b',
-                color: '#fff'
-            });
+            this.notify('Venta Anulada', `La factura ${sale.codigo_venta} fue anulada correctamente.`, 'success');
         },
 
         // Métodos de control y filtrado del Historial de Ventas (RF-21)
@@ -784,23 +679,9 @@ export function posModule() {
                 this.showCartDrawer = false;
                 await this.fetchVentasEspera();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta en Espera!',
-                    text: `La venta fue guardada exitosamente como "${nombreAsignado}".`,
-                    timer: 2500,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Venta en Espera!', `Guardada exitosamente como "${nombreAsignado}".`, 'success', 2500);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al pausar venta',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al pausar venta', error.message, 'error');
             } finally {
                 this.loading = false;
             }
@@ -858,24 +739,9 @@ export function posModule() {
                     if (window.lucide) window.lucide.createIcons();
                 });
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: `Venta "${v.identificador_cuenta}" cargada al carrito`,
-                    showConfirmButton: false,
-                    timer: 2000,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Venta Cargada', `"${v.identificador_cuenta}" cargada al carrito`, 'success', 2000);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cargar orden', error.message, 'error');
             } finally {
                 this.loading = false;
             }
@@ -911,24 +777,9 @@ export function posModule() {
 
                 await this.fetchVentasEspera();
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: `Venta "${venta.identificador_cuenta}" descartada`,
-                    showConfirmButton: false,
-                    timer: 2000,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Venta Descartada', `"${venta.identificador_cuenta}" fue descartada.`, 'info', 2000);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al descartar', error.message, 'error');
             } finally {
                 this.loading = false;
             }

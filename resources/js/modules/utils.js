@@ -1,5 +1,23 @@
 export function utilsModule() {
     return {
+        notify(title, text = '', icon = 'success', timer = 2500) {
+            if (window.Swal) {
+                const isDark = (this.darkMode !== undefined) ? this.darkMode : document.documentElement.classList.contains('dark');
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: icon,
+                    title: title,
+                    text: text || undefined,
+                    timer: timer,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#fff' : '#0f172a'
+                });
+            }
+        },
+
         formatCurrency(amount) {
             const sym = (this.empresa && this.empresa.moneda_simbolo) ? this.empresa.moneda_simbolo : 'C$';
             return sym + ' ' + Number(amount || 0).toLocaleString('es-NI', {

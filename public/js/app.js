@@ -140,11 +140,15 @@ function dashboardModule() {
             return 'Buenas noches';
         },
 
-        // Turno Activo detectado desde /api/caja-operaciones
+        // Turno Activo detectado desde /api/caja-operaciones (asociado al usuario en sesión)
         get turnoActivo() {
             if (!Array.isArray(this.turnos)) return null;
-            return this.turnos.find(t => !t.fecha_hora_cierre && (t.estado === undefined || Number(t.estado) === 1)) ||
-                   this.turnos.find(t => !t.fecha_hora_cierre) || null;
+            const currentUserId = this.currentUser?.usuario_id;
+            if (currentUserId) {
+                const myShift = this.turnos.find(t => Number(t.id_usuario) === Number(currentUserId) && !t.fecha_hora_cierre && (t.estado === undefined || Number(t.estado) === 1));
+                if (myShift) return myShift;
+            }
+            return null;
         },
 
         // RF-26: Consulta y métricas de ventas del turno en tiempo real
@@ -747,28 +751,14 @@ function authModule() {
                 this.loginForm.contrasenia_usuario = '';
                 this.loginError = '';
 
-                Swal.fire({
-                    icon: 'success',
-                    title: `¡Bienvenido, ${data.usuario.nombre_apellido}!`,
-                    text: 'Has iniciado sesión correctamente.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify(`¡Bienvenido, ${data.usuario.nombre_apellido}!`, 'Has iniciado sesión correctamente.', 'success', 2000);
 
                 // Cargar pestaña inicial y datos de la empresa
                 await this.loadTab(this.currentTab, true);
                 await this.fetchEmpresa();
             } catch (error) {
                 this.loginError = error.message;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Autenticación',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error de Autenticación', error.message, 'error', 3000);
             } finally {
                 this.isLoggingIn = false;
                 this.$nextTick(() => {
@@ -799,20 +789,7 @@ function authModule() {
             });
 
             // 3. Notificación sutil no bloqueante (Toast en esquina superior)
-            if (window.Swal) {
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: 'Sesión Finalizada',
-                    text: 'Has salido correctamente.',
-                    timer: 2000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
-            }
+            this.notify('Sesión Finalizada', 'Has salido correctamente.', 'info', 2000);
 
             // 4. Invalidar token en el backend en segundo plano (sin congelar la interfaz)
             if (token) {
@@ -833,6 +810,24 @@ function authModule() {
 // 5. Módulo de Utilidades
 function utilsModule() {
     return {
+        notify(title, text = '', icon = 'success', timer = 2500) {
+            if (window.Swal) {
+                const isDark = (this.darkMode !== undefined) ? this.darkMode : document.documentElement.classList.contains('dark');
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: icon,
+                    title: title,
+                    text: text || undefined,
+                    timer: timer,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#fff' : '#0f172a'
+                });
+            }
+        },
+
         formatCurrency(amount) {
             const sym = (this.empresa && this.empresa.moneda_simbolo) ? this.empresa.moneda_simbolo : 'C$';
             return sym + ' ' + Number(amount || 0).toLocaleString('es-NI', {
@@ -966,21 +961,10 @@ function categoriasModule() {
                 }
 
                 this.showCategoryModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Categoría guardada!',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Categoría guardada!', `La categoría "${this.categoryForm.nombre_categoria}" fue guardada.`, 'success');
                 await this.fetchCategorias();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al guardar',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al guardar categoría', error.message, 'error');
             } finally {
                 this.isSavingCategory = false;
             }
@@ -993,6 +977,8 @@ function categoriasModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
             });
@@ -1001,6 +987,7 @@ function categoriasModule() {
                 await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
                 await this.fetchCategorias();
             }
         }
@@ -1073,21 +1060,10 @@ function productosModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el producto');
                 this.showProductModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Producto Guardado!',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Producto Guardado!', `El producto "${this.productForm.nombre_producto}" se guardó correctamente.`, 'success');
                 await this.fetchProductos();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al guardar producto', error.message, 'error');
             }
         },
 
@@ -1108,12 +1084,7 @@ function productosModule() {
                 await this.apiFetch(`/api/productos/${product.producto_id}`, {
                     method: 'DELETE'
                 });
-                Swal.fire({
-                    title: 'Eliminado',
-                    icon: 'success',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
                 await this.fetchProductos();
             }
         },
@@ -1139,25 +1110,13 @@ function productosModule() {
 
             // Validación previa en cliente de justificación requerida para salidas y ajustes
             if ((isAjuste || isSalida) && (!this.stockForm.justificacion || !this.stockForm.justificacion.trim())) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Justificación Requerida',
-                    text: 'Debe ingresar una justificación breve para registrar la salida o ajuste (máximo 90 caracteres).',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Justificación Requerida', 'Debe ingresar una justificación breve para registrar la salida o ajuste.', 'warning');
                 return;
             }
 
             // Validación previa para evitar salidas que excedan las existencias actuales
             if (isSalida && Number(this.stockForm.cantidad) > this.stockForm.stock_anterior) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Existencia Insuficiente',
-                    text: `No se puede dar salida a ${this.stockForm.cantidad} unidades porque solo hay ${this.stockForm.stock_anterior} en bodega.`,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Existencia Insuficiente', `No se puede dar salida a ${this.stockForm.cantidad} unidades porque solo hay ${this.stockForm.stock_anterior} en bodega.`, 'warning');
                 return;
             }
 
@@ -1220,26 +1179,9 @@ function productosModule() {
                 ]);
 
                 // Notificación no intrusiva con temporizador automático
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'Stock Actualizado',
-                    text: `Existencias actualizadas a ${newStock} unidades.`,
-                    timer: 2500,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Stock Actualizado', `Existencias actualizadas a ${newStock} unidades.`, 'success');
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Inventario',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error de Inventario', error.message, 'error');
             }
         }
     };
@@ -1290,21 +1232,10 @@ function clientesModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el cliente');
                 this.showCustomerModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Cliente guardado',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Cliente guardado', `"${this.customerForm.nombre_apellido_cliente}" se guardó correctamente.`, 'success');
                 await this.fetchClientes();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al guardar cliente', error.message, 'error');
             }
         },
 
@@ -1315,6 +1246,8 @@ function clientesModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
             });
@@ -1323,6 +1256,7 @@ function clientesModule() {
                 await this.apiFetch(`/api/clientes/${c.cliente_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Cliente Eliminado', `"${c.nombre_apellido_cliente}" fue eliminado.`, 'success');
                 await this.fetchClientes();
             }
         }
@@ -1384,21 +1318,10 @@ function usuariosModule() {
 
                 if (!res.ok) throw new Error('Error al guardar el usuario');
                 this.showUserModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Usuario guardado',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Usuario guardado', `"${this.userForm.nombre_usuario}" se guardó correctamente.`, 'success');
                 await this.fetchUsuarios();
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al guardar usuario', error.message, 'error');
             }
         },
 
@@ -1409,6 +1332,8 @@ function usuariosModule() {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
             });
@@ -1417,6 +1342,7 @@ function usuariosModule() {
                 await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'DELETE'
                 });
+                this.notify('Usuario Eliminado', `"${u.nombre_usuario}" fue eliminado.`, 'success');
                 await this.fetchUsuarios();
             }
         }
@@ -1462,26 +1388,14 @@ function posModule() {
 
         addToCart(product) {
             if (product.existencia_bodega <= 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Sin Stock',
-                    text: 'El producto no cuenta con existencias disponibles en bodega.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Sin Stock', 'El producto no cuenta con existencias disponibles en bodega.', 'warning');
                 return;
             }
 
             const existing = this.cart.find(i => i.id_producto === product.producto_id);
             if (existing) {
                 if (existing.cantidad + 1 > product.existencia_bodega) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Límite de Stock',
-                        text: `Solo hay ${product.existencia_bodega} unidades disponibles.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Límite de Stock', `Solo hay ${product.existencia_bodega} unidades disponibles.`, 'warning');
                     return;
                 }
                 existing.cantidad++;
@@ -1510,13 +1424,7 @@ function posModule() {
             const item = this.cart[index];
             const product = this.productos.find(p => p.producto_id === item.id_producto);
             if (product && item.cantidad + 1 > product.existencia_bodega) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Límite de Stock',
-                    text: `Solo hay ${product.existencia_bodega} unidades disponibles.`,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Límite de Stock', `Solo hay ${product.existencia_bodega} unidades disponibles.`, 'warning');
                 return;
             }
             item.cantidad++;
@@ -1575,21 +1483,7 @@ function posModule() {
 
             // Bloqueo estricto del POS: No se puede facturar sin turno activo
             if (!this.turnoActivo) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Caja Cerrada',
-                    text: 'No se puede generar la factura porque la caja no está abierta. Debe abrir un turno operativo primero.',
-                    showCancelButton: true,
-                    confirmButtonText: 'Abrir Caja Ahora',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#10b981',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        this.openCajaAperturaModal();
-                    }
-                });
+                this.notify('Caja Cerrada', 'No se puede facturar sin turno activo. Abre una caja primero.', 'warning', 3000);
                 return;
             }
 
@@ -1601,24 +1495,12 @@ function posModule() {
                 const minLength = 4;
 
                 if (!ref) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: isTarjeta ? 'Voucher Requerido' : 'Referencia Requerida',
-                        text: `Debes ingresar el ${nombreCampo} para procesar el pago con ${this.posSale.metodo_pago.toLowerCase()}.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify(isTarjeta ? 'Voucher Requerido' : 'Referencia Requerida', `Debes ingresar el ${nombreCampo} para procesar el pago con ${this.posSale.metodo_pago.toLowerCase()}.`, 'warning');
                     return;
                 }
 
                 if (ref.length < minLength) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Mínimo Requerido No Alcanzado',
-                        text: `El ${nombreCampo} debe contener al menos ${minLength} caracteres.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Mínimo Requerido No Alcanzado', `El ${nombreCampo} debe contener al menos ${minLength} caracteres.`, 'warning');
                     return;
                 }
             }
@@ -1627,25 +1509,13 @@ function posModule() {
             if (this.posSale.metodo_pago === 'Efectivo') {
                 const montoRecibidoNum = Number(this.posSale.monto_recibido);
                 if (!this.posSale.monto_recibido || isNaN(montoRecibidoNum) || montoRecibidoNum <= 0) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Efectivo Recibido Requerido',
-                        text: 'Debes ingresar el monto de efectivo entregado por el cliente (o pulsar "Paga Exacto") para calcular el cambio.',
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Efectivo Requerido', 'Debes ingresar el monto entregado por el cliente (o pulsar "Paga Exacto").', 'warning');
                     return;
                 }
 
                 if (montoRecibidoNum < this.cartTotal) {
                     const faltante = this.cartTotal - montoRecibidoNum;
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Efectivo Insuficiente',
-                        text: `El cliente entregó ${this.formatCurrency(montoRecibidoNum)}, pero el total es ${this.formatCurrency(this.cartTotal)}. Faltan ${this.formatCurrency(faltante)}.`,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('Efectivo Insuficiente', `El cliente entregó ${this.formatCurrency(montoRecibidoNum)}, pero el total es ${this.formatCurrency(this.cartTotal)}. Faltan ${this.formatCurrency(faltante)}.`, 'warning');
                     return;
                 }
             }
@@ -1677,6 +1547,7 @@ function posModule() {
 
             const salePayload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
+                id_caja: this.turnoActivo ? this.turnoActivo.id_caja : null,
                 id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
                 codigo_venta: candidateCode,
                 metodo_pago: this.posSale.metodo_pago,
@@ -1796,7 +1667,7 @@ function posModule() {
                 if (statusText) statusText.textContent = '¡Factura emitida exitosamente!';
                 await new Promise(r => setTimeout(r, 260));
 
-                // Descontar existencias y limpiar carrito de forma reactiva instantánea
+                // Descontar existencias localmente para respuesta visual instantánea (0ms)
                 salePayload.detalles.forEach(d => {
                     const p = this.productos.find(prod => prod.producto_id === d.id_producto);
                     if (p) p.existencia_bodega = Math.max(0, p.existencia_bodega - d.cantidad);
@@ -1824,7 +1695,6 @@ function posModule() {
                 newSale.cambio = cambioCalculado;
                 this.receiptData = newSale;
                 this.receiptAnulada = Boolean(newSale.estado === 0);
-                this.showCartDrawer = false;
 
                 // Guardar en caché de sesión para recordar el monto entregado en el voucher
                 if (salePayload.metodo_pago === 'Efectivo' && efectivoRecibido) {
@@ -1842,39 +1712,14 @@ function posModule() {
                     this.fetchBitacoras();
                 }, 100);
 
-                // Notificación clara y prominente para el cajero
-                let alertHtml = `<p class="text-sm">Factura <strong>${newSale.codigo_venta}</strong> emitida por <strong>C$ ${newSale.total_venta}</strong></p>`;
-                if (salePayload.metodo_pago === 'Efectivo' && efectivoRecibido) {
-                    alertHtml += `<div class="mt-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-left space-y-1.5 font-mono">
-                        <div class="flex justify-between text-slate-300"><span>Monto Recibido:</span> <span>${this.formatCurrency(efectivoRecibido)}</span></div>
-                        <div class="flex justify-between font-bold text-emerald-400 text-sm border-t border-slate-700/80 pt-1"><span>Cambio a Entregar:</span> <span>${this.formatCurrency(cambioCalculado)}</span></div>
-                    </div>`;
-                }
+                // Notificación sutil tipo tarjeta en esquina superior derecha
+                const cambioInfo = (salePayload.metodo_pago === 'Efectivo' && cambioCalculado > 0)
+                    ? ` | Cambio: ${this.formatCurrency(cambioCalculado)}`
+                    : '';
+                this.notify('¡Venta Registrada!', `Factura ${newSale.codigo_venta} por ${this.formatCurrency(newSale.total_venta)}${cambioInfo}`, 'success', 3500);
 
-                const alertResult = await Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta Registrada!',
-                    html: alertHtml,
-                    showCancelButton: true,
-                    confirmButtonText: 'Imprimir Comprobante',
-                    cancelButtonText: 'Continuar Vendiendo',
-                    confirmButtonColor: '#10b981',
-                    cancelButtonColor: '#4f46e5',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
-
-                if (alertResult.isConfirmed) {
-                    await this.openReceiptModal(newSale.venta_id, newSale);
-                }
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al procesar venta', error.message, 'error', 4000);
             } finally {
                 this.loading = false;
             }
@@ -1947,13 +1792,7 @@ function posModule() {
                 });
             } catch (error) {
                 this.showReceiptModal = false;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Comprobante',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error de Comprobante', error.message, 'error');
             } finally {
                 this.loadingReceipt = false;
             }
@@ -1987,13 +1826,7 @@ function posModule() {
         async deleteSale(sale) {
             const usuariosActivos = (this.usuarios || []).filter(usuario => Number(usuario.estado) === 1);
             if (usuariosActivos.length === 0) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'No se puede anular',
-                    text: 'No hay usuarios activos disponibles para registrar al responsable.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se puede anular', 'No hay usuarios activos disponibles para registrar al responsable.', 'error');
                 return;
             }
 
@@ -2034,13 +1867,7 @@ function posModule() {
                     throw new Error(data.message || 'No se pudo anular la venta.');
                 }
             } catch (error) {
-                await Swal.fire({
-                    title: 'No se pudo anular la venta',
-                    text: error.message,
-                    icon: 'error',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo anular la venta', error.message, 'error');
                 return;
             }
 
@@ -2052,22 +1879,11 @@ function posModule() {
                     this.fetchBitacoras()
                 ]);
             } catch {
-                await Swal.fire({
-                    title: 'Venta anulada',
-                    text: 'La anulación se guardó, pero no se pudo actualizar la pantalla. Recargá la página.',
-                    icon: 'warning',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Venta Anulada', 'La anulación se guardó, pero no se pudo actualizar la pantalla.', 'warning');
                 return;
             }
 
-            await Swal.fire({
-                title: 'Venta anulada',
-                icon: 'success',
-                background: this.darkMode ? '#1e293b' : '#ffffff',
-                color: this.darkMode ? '#fff' : '#0f172a'
-            });
+            this.notify('Venta Anulada', `La factura ${sale.codigo_venta} fue anulada correctamente.`, 'success');
         },
 
         // Métodos de control y filtrado del Historial de Ventas (RF-21)
@@ -2213,23 +2029,9 @@ function posModule() {
                 this.showCartDrawer = false;
                 await this.fetchVentasEspera();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Venta en Espera!',
-                    text: `La venta fue guardada exitosamente como "${nombreAsignado}".`,
-                    timer: 2500,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Venta en Espera!', `Guardada exitosamente como "${nombreAsignado}".`, 'success', 2500);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al pausar venta',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al pausar venta', error.message, 'error');
             } finally {
                 this.loading = false;
             }
@@ -2287,24 +2089,9 @@ function posModule() {
                     if (window.lucide) window.lucide.createIcons();
                 });
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: `Venta "${v.identificador_cuenta}" cargada al carrito`,
-                    showConfirmButton: false,
-                    timer: 2000,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Venta Cargada', `"${v.identificador_cuenta}" cargada al carrito`, 'success', 2000);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cargar orden', error.message, 'error');
             } finally {
                 this.loading = false;
             }
@@ -2340,24 +2127,9 @@ function posModule() {
 
                 await this.fetchVentasEspera();
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: `Venta "${venta.identificador_cuenta}" descartada`,
-                    showConfirmButton: false,
-                    timer: 2000,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Venta Descartada', `"${venta.identificador_cuenta}" fue descartada.`, 'info', 2000);
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al descartar', error.message, 'error');
             } finally {
                 this.loading = false;
             }
@@ -2949,33 +2721,15 @@ function app() {
 
         async saveEmpresa() {
             if (!this.empresaForm.nombre_comercial?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'El nombre comercial de la empresa es obligatorio.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'El nombre comercial de la empresa es obligatorio.', 'warning');
                 return;
             }
             if (!this.empresaForm.telefono_contacto?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'El teléfono de contacto es obligatorio.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'El teléfono de contacto es obligatorio.', 'warning');
                 return;
             }
             if (!this.empresaForm.direccion_fisica?.trim()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Requerido',
-                    text: 'La dirección física del establecimiento es obligatoria.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Requerido', 'La dirección física del establecimiento es obligatoria.', 'warning');
                 return;
             }
             if (!this.empresaForm.moneda_simbolo?.trim()) {
@@ -3011,21 +2765,9 @@ function app() {
                 this.receiptEmpresa = this.empresa;
                 this.showEmpresaModal = false;
 
-                await Swal.fire({
-                    icon: 'success',
-                    title: '¡Datos Guardados!',
-                    text: data.message || 'Los datos del negocio han sido actualizados con éxito.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al Guardar',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al Guardar', error.message, 'error');
             } finally {
                 this.isSavingEmpresa = false;
             }
@@ -3170,25 +2912,13 @@ function app() {
             const montoNum = Number(form.monto);
 
             if (isNaN(montoNum) || montoNum <= 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Monto requerido',
-                    text: 'El monto del movimiento debe ser un importe mayor a cero.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Monto Requerido', 'El monto del movimiento debe ser un importe mayor a cero.', 'warning');
                 return;
             }
 
             const just = (form.justificacion || '').trim();
             if (just.length < 3) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Motivo obligatorio',
-                    text: 'Debe ingresar una justificación o motivo de al menos 3 caracteres (RF-25).',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Motivo Obligatorio', 'Debe ingresar una justificación o motivo de al menos 3 caracteres (RF-25).', 'warning');
                 return;
             }
 
@@ -3219,15 +2949,7 @@ function app() {
                     throw new Error(data.message || 'Error al registrar el movimiento en caja.');
                 }
 
-                await Swal.fire({
-                    icon: 'success',
-                    title: '¡Movimiento Registrado!',
-                    text: `${form.tipo_movimiento === 'Ingreso' ? 'Ingreso' : 'Egreso'} de C$ ${montoNum.toFixed(2)} registrado exitosamente en caja.`,
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Movimiento Registrado!', `${form.tipo_movimiento === 'Ingreso' ? 'Ingreso' : 'Egreso'} de C$ ${montoNum.toFixed(2)} registrado exitosamente en caja.`, 'success', 2500);
 
                 this.showCajaMovimientoModal = false;
 
@@ -3239,22 +2961,36 @@ function app() {
 
             } catch (error) {
                 console.error('Error registrando movimiento de caja:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo registrar',
-                    text: error.message || 'Ocurrió un error al procesar la operación.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo registrar', error.message || 'Ocurrió un error al procesar la operación.', 'error');
             } finally {
                 this.isSavingCajaMovimiento = false;
             }
         },
 
         getTurnoIdForCaja(cajaId) {
-            if (!Array.isArray(this.turnos)) return null;
-            const t = this.turnos.find(turno => Number(turno.id_caja) === Number(cajaId) && !turno.fecha_hora_cierre && (turno.estado === undefined || Number(turno.estado) === 1));
+            const t = this.getTurnoForCaja(cajaId);
             return t ? t.caja_operacion_id : null;
+        },
+
+        getTurnoForCaja(cajaId) {
+            if (!Array.isArray(this.turnos)) return null;
+            return this.turnos.find(turno => Number(turno.id_caja) === Number(cajaId) && !turno.fecha_hora_cierre && (turno.estado === undefined || Number(turno.estado) === 1)) || null;
+        },
+
+        isCajaMine(cajaId) {
+            const t = this.getTurnoForCaja(cajaId);
+            if (!t) return false;
+            const currentUserId = this.currentUser?.usuario_id;
+            return Number(t.id_usuario) === Number(currentUserId);
+        },
+
+        getCajaCashierName(cajaId) {
+            const t = this.getTurnoForCaja(cajaId);
+            if (!t) return null;
+            if (t.usuario?.nombre_usuario) return t.usuario.nombre_usuario;
+            if (t.usuario?.nombre_apellido) return t.usuario.nombre_apellido;
+            const u = (this.usuarios || []).find(usr => Number(usr.usuario_id) === Number(t.id_usuario));
+            return u ? (u.nombre_usuario || u.nombre_apellido) : `Usuario #${t.id_usuario}`;
         },
 
         get cajaCierreDiferencia() {
@@ -3268,6 +3004,11 @@ function app() {
         },
 
         openCajaAperturaModal(cajaId = null) {
+            if (this.turnoActivo) {
+                this.notify('Turno ya Activo', `Ya tienes un turno activo en la caja #${this.turnoActivo.id_caja}. Debes cerrarlo antes de abrir uno nuevo.`, 'warning');
+                return;
+            }
+
             let targetCaja = cajaId;
             if (!targetCaja) {
                 const cerrada = (this.cajas || []).find(c => c.estado_caja !== 'Abierta' && Number(c.estado) === 1);
@@ -3287,25 +3028,13 @@ function app() {
         async saveCajaApertura() {
             if (this.isSavingCajaApertura) return;
             if (!this.cajaAperturaForm.id_caja) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Seleccione una Caja',
-                    text: 'Debe seleccionar una caja física para aperturar el turno.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Seleccione una Caja', 'Debe seleccionar una caja física para aperturar el turno.', 'warning');
                 return;
             }
 
             const monto = Number(this.cajaAperturaForm.monto_apertura);
             if (isNaN(monto) || monto < 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Monto Inválido',
-                    text: 'El fondo inicial de apertura debe ser un número mayor o igual a 0.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Monto Inválido', 'El fondo inicial de apertura debe ser un número mayor o igual a 0.', 'warning');
                 return;
             }
 
@@ -3332,25 +3061,11 @@ function app() {
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Turno Aperturado!',
-                    text: 'La caja ha sido abierta exitosamente. El POS ya está listo para facturar.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                this.notify('¡Turno Aperturado!', 'La caja ha sido abierta exitosamente. El POS ya está listo para facturar.', 'success');
 
             } catch (err) {
                 console.error('Error al aperturar turno:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo abrir el turno',
-                    text: err.message || 'Ocurrió un error inesperado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo abrir el turno', err.message || 'Ocurrió un error inesperado.', 'error');
             } finally {
                 this.isSavingCajaApertura = false;
             }
@@ -3363,13 +3078,7 @@ function app() {
             }
 
             if (!targetTurnoId) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Sin Turno Abierto',
-                    text: 'No se encontró ningún turno activo para cerrar.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Sin Turno Abierto', 'No se encontró ningún turno activo para cerrar.', 'info');
                 return;
             }
 
@@ -3393,13 +3102,7 @@ function app() {
                 this.cajaCierreData = data;
             } catch (err) {
                 console.error('Error cargando arqueo:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al consultar arqueo',
-                    text: err.message || 'No se pudieron calcular los datos del arqueo.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al consultar arqueo', err.message || 'No se pudieron calcular los datos del arqueo.', 'error');
                 this.showCajaCierreModal = false;
             } finally {
                 this.loadingArqueo = false;
@@ -3414,25 +3117,13 @@ function app() {
 
             const contado = Number(this.cajaCierreForm.monto_cierre);
             if (this.cajaCierreForm.monto_cierre === '' || isNaN(contado) || contado < 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Efectivo Contado Requerido',
-                    text: 'Debe ingresar el monto total de efectivo físico contado en caja.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Efectivo Requerido', 'Debe ingresar el monto total de efectivo físico contado en caja.', 'warning');
                 return;
             }
 
             const diff = this.cajaCierreDiferencia;
             if (diff !== null && diff !== 0 && (!this.cajaCierreForm.observacion_cierre || !this.cajaCierreForm.observacion_cierre.trim())) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Justificación Obligatoria',
-                    text: 'Existe un descuadre en el arqueo (diferencia de ' + (diff > 0 ? '+' : '') + this.formatCurrency(diff) + '). Debe ingresar una justificación u observación obligatoria.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Justificación Obligatoria', 'Existe un descuadre en el arqueo (' + (diff > 0 ? '+' : '') + this.formatCurrency(diff) + '). Ingrese una justificación.', 'warning');
                 return;
             }
 
@@ -3476,23 +3167,11 @@ function app() {
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Turno Cerrado Exitosamente!',
-                    text: 'El arqueo y cierre del turno han quedado registrados y auditados en el sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('¡Turno Cerrado Exitosamente!', 'El arqueo y cierre han quedado registrados.', 'success');
 
             } catch (err) {
                 console.error('Error cerrando turno:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al cerrar turno',
-                    text: err.message || 'Ocurrió un error inesperado al procesar el cierre.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cerrar turno', err.message || 'Ocurrió un error inesperado al procesar el cierre.', 'error');
             } finally {
                 this.isSavingCajaCierre = false;
             }
@@ -3525,13 +3204,7 @@ function app() {
 
             const desc = (this.cajaForm.descripcion_caja || '').trim();
             if (!desc) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo Obligatorio',
-                    text: 'Debe ingresar el nombre o descripción de la caja.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Campo Obligatorio', 'Debe ingresar el nombre o descripción de la caja.', 'warning');
                 return;
             }
 
@@ -3562,25 +3235,11 @@ function app() {
                 this.showCajaFormModal = false;
                 await this.fetchVentas();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: isEdit ? '¡Caja Actualizada!' : '¡Caja Creada!',
-                    text: data.message || 'La caja física ha sido guardada exitosamente.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a',
-                    timer: 1800,
-                    showConfirmButton: false
-                });
+                this.notify(isEdit ? '¡Caja Actualizada!' : '¡Caja Creada!', data.message || 'La caja física ha sido guardada exitosamente.', 'success');
 
             } catch (err) {
                 console.error('Error guardando caja:', err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo guardar la caja',
-                    html: err.message || 'Ocurrió un error inesperado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo guardar la caja', err.message || 'Ocurrió un error inesperado.', 'error');
             } finally {
                 this.isSavingCaja = false;
             }
