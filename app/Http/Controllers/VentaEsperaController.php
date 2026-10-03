@@ -36,14 +36,28 @@ class VentaEsperaController extends Controller
         ])->where('estado', 1);
 
         if ($idCaja) {
-            $query->where('id_caja', $idCaja);
+            $query->where(function ($q) use ($idCaja, $user) {
+                $q->where('id_caja', $idCaja);
+                if ($user) {
+                    $q->orWhere(function ($sub) use ($user) {
+                        $sub->whereNull('id_caja')
+                            ->where('id_usuario', $user->usuario_id);
+                    });
+                }
+            });
         } elseif ($user) {
             $turnoActivo = Caja_operacion::where('id_usuario', $user->usuario_id)
                 ->where('estado', 1)
                 ->whereNull('fecha_hora_cierre')
                 ->first();
             if ($turnoActivo) {
-                $query->where('id_caja', $turnoActivo->id_caja);
+                $query->where(function ($q) use ($turnoActivo, $user) {
+                    $q->where('id_caja', $turnoActivo->id_caja)
+                        ->orWhere(function ($sub) use ($user) {
+                            $sub->whereNull('id_caja')
+                                ->where('id_usuario', $user->usuario_id);
+                        });
+                });
             } elseif (! $user->esAdmin()) {
                 $query->where('id_usuario', $user->usuario_id);
             }
