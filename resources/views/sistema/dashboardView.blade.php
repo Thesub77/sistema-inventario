@@ -419,7 +419,7 @@
 
                         <!-- Sugerencia comercial o acción -->
                         <div class="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-                            <button type="button" @click="currentTab = 'pos'"
+                            <button x-show="canAccessPOS" x-cloak type="button" @click="currentTab = 'pos'"
                                 class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer">
                                 <i data-lucide="tag" class="w-3.5 h-3.5 text-amber-400"></i>
                                 <span>Promocionar</span>

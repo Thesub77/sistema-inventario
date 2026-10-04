@@ -169,6 +169,15 @@ export function app() {
             return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
         },
 
+        get canAccessBusinessInfo() {
+            if (!this.currentUser) return false;
+            return this.isAdmin || this.hasPermission('empresa.gestionar');
+        },
+
+        get canAccessPOS() {
+            return this.canAccessTab('pos');
+        },
+
         hasPermission(permiso) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
@@ -180,21 +189,22 @@ export function app() {
         canAccessTab(tabId) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
+            const rol = String(this.currentUser.rol || '').toLowerCase();
             switch (tabId) {
                 case 'dashboard':
                     return this.hasPermission('dashboard.ver') || this.hasPermission('usuarios.gestionar');
                 case 'pos':
-                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
+                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear') || rol.includes('cajer') || rol.includes('ventas');
                 case 'productos':
                     return this.hasPermission('productos.ver') || this.hasPermission('productos.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
-                    return this.hasPermission('ventas.ver');
+                    return this.hasPermission('ventas.ver') || this.hasPermission('ventas.crear');
                 case 'clientes':
                     return this.hasPermission('clientes.gestionar') || this.hasPermission('pos.acceso');
                 case 'caja':
-                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso');
+                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso') || rol.includes('cajer');
                 case 'inventario':
                     return this.hasPermission('inventario.gestionar') || this.hasPermission('productos.gestionar');
                 case 'usuarios':
@@ -520,7 +530,7 @@ export function app() {
             // Si está autenticado, validar que currentTab sea accesible y cargar datos
             if (this.isAuthenticated) {
                 if (!this.canAccessTab(this.currentTab)) {
-                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                 }
                 this.loadTab(this.currentTab);
                 this.fetchEmpresa();
@@ -551,15 +561,21 @@ export function app() {
 
             // Observar cambios de pestaña para cargar datos bajo demanda
             this.$watch('currentTab', (newTab) => {
-                this.loadTab(newTab);
-                if (newTab === 'dashboard') {
-                    this.initDashboardCharts();
-                }
-                this.$nextTick(() => {
-                    if (window.lucide) {
-                        window.lucide.createIcons();
+                if (this.isAuthenticated) {
+                    if (!this.canAccessTab(newTab)) {
+                        this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
+                        return;
                     }
-                });
+                    this.loadTab(newTab);
+                    if (newTab === 'dashboard') {
+                        this.initDashboardCharts();
+                    }
+                    this.$nextTick(() => {
+                        if (window.lucide) {
+                            window.lucide.createIcons();
+                        }
+                    });
+                }
             });
         },
 
