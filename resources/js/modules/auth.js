@@ -72,7 +72,7 @@ export function authModule() {
 
                 // Validar y activar la pestaña correspondiente según permisos del usuario
                 if (typeof this.canAccessTab === 'function' && !this.canAccessTab(this.currentTab)) {
-                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'pos';
+                    this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                 }
 
                 // Cargar datos de la pestaña activa y de la empresa al iniciar sesión

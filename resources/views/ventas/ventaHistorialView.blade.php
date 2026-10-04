@@ -33,7 +33,7 @@
             </div>
 
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button type="button" @click="currentTab = 'pos'"
+                <button x-show="canAccessPOS" x-cloak type="button" @click="currentTab = 'pos'"
                     class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     <span>Nueva Venta</span>
