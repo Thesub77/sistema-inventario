@@ -432,6 +432,17 @@ export function usuariosModule() {
 
         // --- MÉTODOS DE ROLES & PERMISOS DINÁMICOS (JSON) ---
         openRolModal(rol = null) {
+            if (rol && (rol.nombre_rol === 'Administrador' || (Array.isArray(rol.permisos) && rol.permisos.includes('*')))) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Rol Protegido',
+                    text: 'El rol Administrador es fundamental para el sistema y no puede ser modificado.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
             if (rol) {
                 this.isEditingRol = true;
                 this.rolForm = {
@@ -504,6 +515,17 @@ export function usuariosModule() {
 
         async saveRol() {
             if (this.isSavingRol) return;
+
+            if (this.isEditingRol && (this.rolForm.nombre_rol === 'Administrador' || (this.roles.find(r => r.rol_id === this.rolForm.rol_id)?.nombre_rol === 'Administrador'))) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Operación Denegada',
+                    text: 'El rol Administrador es inmutable y no puede ser modificado.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
 
             const nombre = (this.rolForm.nombre_rol || '').trim();
             if (!nombre) {

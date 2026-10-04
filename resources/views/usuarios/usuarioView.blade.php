@@ -344,11 +344,19 @@
                                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5" x-text="r.descripcion_rol || 'Sin descripción'"></p>
                             </div>
 
-                            <button type="button" @click="openRolModal(r)"
-                                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                title="Editar rol y privilegios">
-                                <i data-lucide="edit-3" class="w-4 h-4"></i>
-                            </button>
+                            <template x-if="r.nombre_rol !== 'Administrador'">
+                                <button type="button" @click="openRolModal(r)"
+                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    title="Editar rol y privilegios">
+                                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                </button>
+                            </template>
+                            <template x-if="r.nombre_rol === 'Administrador'">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Rol maestro del sistema, no modificable">
+                                    <i data-lucide="shield-check" class="w-3 h-3"></i>
+                                    <span>Protegido</span>
+                                </span>
+                            </template>
                         </div>
 
                         <!-- Resumen de permisos asignados -->
@@ -381,16 +389,24 @@
                     <div class="pt-3 mt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                         <span x-text="(r.usuarios_count !== undefined ? r.usuarios_count : countUsersInRole(r.rol_id)) + ' usuarios asignados'"></span>
                         <div class="flex items-center gap-1">
-                            <button type="button" @click="openRolModal(r)"
-                                class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
-                                Configurar
-                            </button>
                             <template x-if="r.nombre_rol !== 'Administrador'">
-                                <button type="button" @click="deleteRol(r)"
-                                    class="p-1 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
-                                    title="Eliminar rol">
-                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                </button>
+                                <div class="flex items-center gap-1">
+                                    <button type="button" @click="openRolModal(r)"
+                                        class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
+                                        Configurar
+                                    </button>
+                                    <button type="button" @click="deleteRol(r)"
+                                        class="p-1 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                                        title="Eliminar rol">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            </template>
+                            <template x-if="r.nombre_rol === 'Administrador'">
+                                <span class="text-[11px] font-medium text-slate-400 italic flex items-center gap-1">
+                                    <i data-lucide="lock" class="w-3 h-3"></i>
+                                    <span>Inmutable</span>
+                                </span>
                             </template>
                         </div>
                     </div>
