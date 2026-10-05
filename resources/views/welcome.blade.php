@@ -225,6 +225,9 @@
                 <!-- MODAL: DETALLE DE FACTURA / VENTA -->
                 @include('ventas.ventaForm')
 
+                <!-- MODAL: ANIMACIÓN DE EMISIÓN DE FACTURA -->
+                @include('ventas.facturandoModal')
+
                 <!-- MODAL: COMPROBANTE DE VENTA IMPRIMIBLE -->
                 @include('ventas.comprobanteModal')
 

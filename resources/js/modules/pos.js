@@ -22,6 +22,12 @@ export function posModule() {
         selectedSale: null,
         showCartDrawer: false,
 
+        // Estado del modal de animación de facturación en curso
+        isProcessingBilling: false,
+        billingProgress: 15,
+        billingStatusText: 'Procesando transacción...',
+        billingCandidateCode: '',
+
         // Estado del comprobante imprimible
         showReceiptModal: false,
         receiptData: null,
@@ -217,68 +223,29 @@ export function posModule() {
                 }))
             };
 
+            this.billingCandidateCode = candidateCode;
+            this.billingProgress = 15;
+            this.billingStatusText = 'Procesando transacción...';
+            this.isProcessingBilling = true;
             this.loading = true;
 
-            // Animación centrada en pantalla con barra de progreso mientras el backend emite la factura
-            let progressInterval = null;
-            Swal.fire({
-                title: 'Emitiendo Factura',
-                html: `
-                    <div class="py-3 px-1 space-y-4">
-                        <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full bg-brand-500/20 animate-ping"></div>
-                            <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/25">
-                                <svg class="w-7 h-7 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="space-y-1">
-                            <p id="pos-billing-status" class="text-sm font-semibold ${this.darkMode ? 'text-slate-200' : 'text-slate-700'} transition-all">
-                                Procesando transacción...
-                            </p>
-                            <p class="text-xs ${this.darkMode ? 'text-slate-400' : 'text-slate-500'} font-mono">
-                                Código: ${salePayload.codigo_venta}
-                            </p>
-                        </div>
-
-                        <div class="w-full ${this.darkMode ? 'bg-slate-700/60 border-slate-600/50' : 'bg-slate-200 border-slate-300'} rounded-full h-3 overflow-hidden p-0.5 border shadow-inner">
-                            <div id="pos-billing-bar" class="bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-300 ease-out" style="width: 15%"></div>
-                        </div>
-
-                        <p class="text-[11px] ${this.darkMode ? 'text-slate-400' : 'text-slate-500'}">
-                            Generando comprobante fiscal y deduciendo inventario...
-                        </p>
-                    </div>
-                `,
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                background: this.darkMode ? '#1e293b' : '#ffffff',
-                color: this.darkMode ? '#fff' : '#0f172a',
-                didOpen: () => {
-                    const bar = document.getElementById('pos-billing-bar');
-                    const statusText = document.getElementById('pos-billing-status');
-                    const steps = [
-                        { pct: 35, text: 'Verificando existencias...' },
-                        { pct: 60, text: 'Registrando pago...' },
-                        { pct: 80, text: 'Generando comprobante...' },
-                        { pct: 92, text: 'Finalizando emisión...' }
-                    ];
-                    let stepIdx = 0;
-                    progressInterval = setInterval(() => {
-                        if (stepIdx < steps.length) {
-                            if (bar) bar.style.width = steps[stepIdx].pct + '%';
-                            if (statusText) statusText.textContent = steps[stepIdx].text;
-                            stepIdx++;
-                        }
-                    }, 220);
-                },
-                willClose: () => {
-                    if (progressInterval) clearInterval(progressInterval);
-                }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
             });
+
+            // Progreso dinámico y reactivo en pantalla mientras el backend emite la factura
+            let progressInterval = setInterval(() => {
+                if (this.billingProgress < 90) {
+                    this.billingProgress += 15;
+                    if (this.billingProgress >= 30 && this.billingProgress < 55) {
+                        this.billingStatusText = 'Verificando existencias...';
+                    } else if (this.billingProgress >= 55 && this.billingProgress < 75) {
+                        this.billingStatusText = 'Registrando pago...';
+                    } else if (this.billingProgress >= 75) {
+                        this.billingStatusText = 'Generando comprobante fiscal...';
+                    }
+                }
+            }, 200);
 
             try {
                 let res = await this.apiFetch('/api/ventas', {
@@ -310,11 +277,9 @@ export function posModule() {
                 const newSale = responseData.venta;
 
                 // Completar la barra de progreso al 100% con feedback positivo
-                if (progressInterval) clearInterval(progressInterval);
-                const bar = document.getElementById('pos-billing-bar');
-                const statusText = document.getElementById('pos-billing-status');
-                if (bar) bar.style.width = '100%';
-                if (statusText) statusText.textContent = '¡Factura emitida exitosamente!';
+                clearInterval(progressInterval);
+                this.billingProgress = 100;
+                this.billingStatusText = '¡Factura emitida exitosamente!';
                 await new Promise(r => setTimeout(r, 260));
 
                 // Descontar existencias localmente para respuesta visual instantánea (0ms)
@@ -369,15 +334,16 @@ export function posModule() {
                 this.notify('¡Venta Registrada!', `Factura ${newSale.codigo_venta} por ${this.formatCurrency(newSale.total_venta)}${cambioInfo}`, 'success', 3500);
 
                 // Cerrar modal de animación de emisión y abrir automáticamente la ventana del comprobante/factura
-                Swal.close();
+                this.isProcessingBilling = false;
                 await this.openReceiptModal(newSale.venta_id, newSale);
 
             } catch (error) {
-                if (progressInterval) clearInterval(progressInterval);
-                Swal.close();
+                clearInterval(progressInterval);
+                this.isProcessingBilling = false;
                 this.notify('Error al procesar venta', error.message, 'error', 4000);
             } finally {
-                if (progressInterval) clearInterval(progressInterval);
+                clearInterval(progressInterval);
+                this.isProcessingBilling = false;
                 this.loading = false;
             }
         },
