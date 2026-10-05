@@ -46,17 +46,17 @@
                 <span class="md:hidden" x-text="turnoActivo ? 'Abierta' : 'Cerrada'"></span>
             </button>
 
-            <!-- Botón de Movimiento de Caja (RF-25: Solo visible cuando hay un turno activo) -->
+            <!-- Botón de Movimiento de Caja (Solo visible cuando hay un turno activo) -->
             <template x-if="turnoActivo">
                 <button type="button" @click="openCajaMovimientoModal()"
-                    title="Registrar Ingreso o Egreso Extraordinario de Caja (RF-25)"
+                    title="Registrar Ingreso o Egreso Extraordinario de Caja"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs cursor-pointer border bg-white dark:bg-dark-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
                     <i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-500"></i>
                     <span class="hidden xl:inline text-xs">Mov. Caja</span>
                 </button>
             </template>
 
-            <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders - RF-16: Solo visible cuando hay un turno activo) -->
+            <!-- Botón sutil y elegante de Ventas en Espera (Parked Orders: Solo visible cuando hay un turno activo) -->
             <template x-if="turnoActivo">
                 <button type="button" @click="openVentasEsperaModal()"
                     class="relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer border"
@@ -474,7 +474,7 @@
                         </div>
                     </template>
 
-                    <!-- Botón Pausar Venta (Poner en Espera - RF-16) -->
+                    <!-- Botón Pausar Venta (Poner en Espera) -->
                     <button type="button" @click="parkCurrentSale()"
                         :disabled="!turnoActivo || cart.length === 0 || loading"
                         class="w-full py-2 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs">
@@ -499,7 +499,7 @@
         </div>
     </div>
 
-    <!-- Modal: Listado de Ventas en Espera / Cuentas Pendientes (RF-16) -->
+    <!-- Modal: Listado de Ventas en Espera / Cuentas Pendientes -->
     <div x-show="showVentasEsperaModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
         <!-- Backdrop -->
         <div x-show="showVentasEsperaModal"

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bitacora;
 use App\Models\Rol;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -45,6 +46,14 @@ class RolController extends Controller
     {
         $rol = Rol::findOrFail($id);
 
+        // Blindaje: El rol Administrador es inmutable y no puede ser modificado ni desactivado
+        if ($rol->nombre_rol === 'Administrador' || in_array('*', $rol->permisos ?? [], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El rol Administrador es inmutable y no puede ser modificado ni desactivado.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'nombre_rol' => [
                 'sometimes',
@@ -59,12 +68,21 @@ class RolController extends Controller
             'estado' => 'sometimes|integer|in:0,1',
         ]);
 
-        // Evitar desactivar el rol Administrador
-        if ($rol->nombre_rol === 'Administrador' && isset($validated['estado']) && (int) $validated['estado'] === 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'El rol Administrador no puede ser desactivado.',
-            ], 403);
+        // Si se desactiva el rol (estado = 0), bloquear automáticamente a todos los usuarios asignados y revocar sus sesiones
+        if (isset($validated['estado']) && (int) $validated['estado'] === 0 && (int) $rol->estado === 1) {
+            $usuariosAfectados = $rol->usuarios()->where('estado', 1)->get();
+            foreach ($usuariosAfectados as $u) {
+                $u->update(['estado' => 0]);
+                $u->tokens()->delete();
+
+                Bitacora::create([
+                    'id_usuario' => $u->usuario_id,
+                    'accion_bitacora' => 'USUARIO_BLOQUEADO',
+                    'descripcion_bitacora' => "Usuario {$u->nombre_usuario} bloqueado automáticamente por desactivación del rol {$rol->nombre_rol}.",
+                    'fecha_hora_bitacora' => now(),
+                    'estado' => 1,
+                ]);
+            }
         }
 
         $rol->update($validated);
@@ -76,7 +94,7 @@ class RolController extends Controller
     {
         $rol = Rol::findOrFail($id);
 
-        if ($rol->nombre_rol === 'Administrador') {
+        if ($rol->nombre_rol === 'Administrador' || in_array('*', $rol->permisos ?? [], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'El rol Administrador no puede ser eliminado.',

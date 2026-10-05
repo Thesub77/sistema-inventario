@@ -40,35 +40,60 @@
 
         <!-- Formulario -->
         <form @submit.prevent="saveUser()" class="p-5 sm:p-6 space-y-4">
-            <!-- Selección de Rol y Botón para Administrar Roles -->
-            <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        Rol & Perfil de Acceso <span class="text-rose-500">*</span>
-                    </label>
-                    <button type="button" @click="openRolModal()"
-                        class="text-xs text-brand-500 hover:text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer">
-                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                        <span>Crear Nuevo Rol</span>
-                    </button>
-                </div>
-                <select x-model.number="userForm.id_rol" required
-                    class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer">
-                    <option value="" disabled>Selecciona un rol</option>
-                    <template x-for="r in roles" :key="r.rol_id">
-                        <option :value="r.rol_id"
-                            :disabled="Number(r.estado) === 0"
-                            x-text="r.nombre_rol + (Number(r.estado) === 0 ? ' (Inactivo)' : '')"></option>
-                    </template>
-                </select>
-                <!-- Resumen de permisos del rol seleccionado -->
-                <template x-if="selectedUserRoleDescription">
-                    <div class="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs flex items-start gap-2">
-                        <i data-lucide="info" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
-                        <span x-text="selectedUserRoleDescription"></span>
+            <!-- Selección de Rol y Botón para Administrar Roles (Oculto para Administrador / Cuenta Propia) -->
+            <template x-if="!isEditingAdminUser">
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                            Rol & Perfil de Acceso <span class="text-rose-500">*</span>
+                        </label>
+                        <button type="button" @click="openRolModal()"
+                            class="text-xs text-brand-500 hover:text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Crear Nuevo Rol</span>
+                        </button>
                     </div>
-                </template>
-            </div>
+                    <select x-model.number="userForm.id_rol" required
+                        class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer">
+                        <option value="" disabled>Selecciona un rol</option>
+                        <template x-for="r in roles" :key="r.rol_id">
+                            <option :value="r.rol_id"
+                                :disabled="Number(r.estado) === 0"
+                                x-text="r.nombre_rol + (Number(r.estado) === 0 ? ' (Inactivo)' : '')"></option>
+                        </template>
+                    </select>
+                    <!-- Resumen de permisos del rol seleccionado -->
+                    <template x-if="selectedUserRoleDescription">
+                        <div class="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs flex items-start gap-2">
+                            <i data-lucide="info" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span x-text="selectedUserRoleDescription"></span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Banner Informativo de Rol Protegido para Administrador -->
+            <template x-if="isEditingAdminUser">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Rol & Perfil de Acceso
+                    </label>
+                    <div class="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-900 dark:text-white">Administrador del Sistema</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Privilegios totales y acceso global a todos los módulos</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                            Rol Protegido
+                        </span>
+                    </div>
+                </div>
+            </template>
 
             <!-- Nombre Completo -->
             <div class="space-y-1.5">
@@ -120,20 +145,21 @@
                 </div>
             </div>
 
-            <!-- Estado de la Cuenta (Activo / Inactivo) -->
-            <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
-                <div>
-                    <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Si está inactivo, el usuario no podrá iniciar sesión en ningún módulo</p>
+            <!-- Estado de la Cuenta (Activo / Inactivo) - Oculto para Administrador / Cuenta Propia -->
+            <template x-if="!isEditingAdminUser">
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
+                    <div>
+                        <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Si está inactivo, el usuario no podrá iniciar sesión en ningún módulo</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" :checked="Number(userForm.estado) === 1"
+                            @change="userForm.estado = $event.target.checked ? 1 : 0"
+                            class="sr-only peer">
+                        <div class="w-10 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
                 </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" :checked="Number(userForm.estado) === 1"
-                        :disabled="isEditingUser && currentUser && currentUser.usuario_id === userForm.usuario_id"
-                        @change="userForm.estado = $event.target.checked ? 1 : 0"
-                        class="sr-only peer">
-                    <div class="w-10 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
-            </div>
+            </template>
 
             <!-- Botones de Acción -->
             <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">

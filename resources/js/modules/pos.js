@@ -29,7 +29,7 @@ export function posModule() {
         receiptAnulada: false,
         loadingReceipt: false,
 
-        // Estado y control de ventas en espera (Parked Orders / RF-16)
+        // Estado y control de ventas en espera (Parked Orders)
         ventasEspera: [],
         showVentasEsperaModal: false,
         loadingVentasEspera: false,
@@ -368,9 +368,16 @@ export function posModule() {
                     : '';
                 this.notify('¡Venta Registrada!', `Factura ${newSale.codigo_venta} por ${this.formatCurrency(newSale.total_venta)}${cambioInfo}`, 'success', 3500);
 
+                // Cerrar modal de animación de emisión y abrir automáticamente la ventana del comprobante/factura
+                Swal.close();
+                await this.openReceiptModal(newSale.venta_id, newSale);
+
             } catch (error) {
+                if (progressInterval) clearInterval(progressInterval);
+                Swal.close();
                 this.notify('Error al procesar venta', error.message, 'error', 4000);
             } finally {
+                if (progressInterval) clearInterval(progressInterval);
                 this.loading = false;
             }
         },
@@ -536,7 +543,7 @@ export function posModule() {
             this.notify('Venta Anulada', `La factura ${sale.codigo_venta} fue anulada correctamente.`, 'success');
         },
 
-        // Métodos de control y filtrado del Historial de Ventas (RF-21)
+        // Métodos de control y filtrado del Historial de Ventas
         clearVentaFilters() {
             this.searchVenta = '';
             this.ventaFechaDesde = '';
@@ -608,7 +615,7 @@ export function posModule() {
             }
         },
 
-        // Métodos de Ventas en Espera / Cuentas Pendientes (Parked Orders - RF-16)
+        // Métodos de Ventas en Espera / Cuentas Pendientes (Parked Orders)
         async fetchVentasEspera() {
             try {
                 this.loadingVentasEspera = true;

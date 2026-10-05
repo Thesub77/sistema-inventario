@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Modal de Apertura de Turno de Caja (RF-28)
+    DOCUMENTACIÓN DE VISTA: Modal de Apertura de Turno de Caja
     Archivo: resources/views/cajas/cajaAperturaModal.blade.php
     Propósito: Permite iniciar formalmente un turno de caja indicando el fondo
                inicial de sencillo, activando la caja para facturar en el POS.
@@ -31,9 +31,6 @@
                 <div>
                     <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white flex items-center gap-2">
                         <span>Apertura de Turno</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
-                            RF-28
-                        </span>
                     </h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Inicio de operaciones de caja y facturación</p>
                 </div>

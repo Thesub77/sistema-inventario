@@ -1,10 +1,10 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Modal de Registro de Movimientos de Caja (RF-25)
+    DOCUMENTACIÓN DE VISTA: Modal de Registro de Movimientos de Caja
     Archivo: resources/views/cajas/cajaMovimientoModal.blade.php
     Propósito: Permite a los usuarios a cargo del turno registrar ingresos y egresos
                extraordinarios de efectivo (gastos menores y sencillo) con motivo
-               obligatorio para cuadre de arqueo y cierre (RF-25 y RF-28).
+               obligatorio para cuadre de arqueo y cierre.
     Controlador asociado: App\Http\Controllers\CajaMovimientoVentaController
     Endpoint: POST /api/caja-movimientos-venta
     Integración: Incluido en welcome.blade.php mediante @include('cajas.cajaMovimientoModal')
@@ -36,12 +36,6 @@
                 <div>
                     <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white flex items-center gap-2">
                         <span>Movimiento de Efectivo</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
-                            :class="cajaMovimientoForm.tipo_movimiento === 'Ingreso'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'">
-                            RF-25
-                        </span>
                     </h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Registro auditado de entradas y salidas durante el turno</p>
                 </div>
@@ -159,7 +153,7 @@
                 </div>
             </div>
 
-            <!-- Motivo / Justificación Obligatoria (RF-25) -->
+            <!-- Motivo / Justificación Obligatoria -->
             <div class="space-y-1.5">
                 <div class="flex items-center justify-between">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -207,11 +201,11 @@
                 </div>
             </div>
 
-            <!-- Alerta Informativa de Impacto en Arqueo (RF-28) -->
+            <!-- Alerta Informativa de Impacto en Arqueo -->
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-dark-950/80 border border-slate-200 dark:border-slate-800 flex items-start gap-2.5 text-xs text-slate-500 dark:text-slate-400">
                 <i data-lucide="info" class="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5"></i>
                 <p>
-                    Este movimiento se aplicará al arqueo del turno en tiempo real y quedará auditado con tu usuario en la bitácora del sistema (RF-25 / RF-28).
+                    Este movimiento se aplicará al arqueo del turno en tiempo real y quedará auditado con tu usuario en la bitácora del sistema.
                 </p>
             </div>
 

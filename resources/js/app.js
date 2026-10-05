@@ -52,7 +52,7 @@ export function app() {
             justificacion: ''
         },
 
-        // Estado de Apertura de Turno (RF-28)
+        // Estado de Apertura de Turno
         showCajaAperturaModal: false,
         isSavingCajaApertura: false,
         cajaAperturaForm: {
@@ -60,7 +60,7 @@ export function app() {
             monto_apertura: '0.00'
         },
 
-        // Estado de Arqueo y Cierre de Turno (RF-28)
+        // Estado de Arqueo y Cierre de Turno
         showCajaCierreModal: false,
         isSavingCajaCierre: false,
         loadingArqueo: false,
@@ -271,7 +271,7 @@ export function app() {
 
         get filteredVentas() {
             return this.ventas.filter(v => {
-                // 1. Filtro por número de comprobante, cliente o referencia (RF-21)
+                // 1. Filtro por número de comprobante, cliente o referencia
                 if (this.searchVenta) {
                     const term = this.searchVenta.toLowerCase().trim();
                     const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
@@ -282,14 +282,14 @@ export function app() {
                     }
                 }
 
-                // 2. Filtro por Usuario / Cajero (RF-21)
+                // 2. Filtro por Usuario / Cajero
                 if (this.ventaUsuarioFilter) {
                     if (Number(v.id_usuario) !== Number(this.ventaUsuarioFilter)) {
                         return false;
                     }
                 }
 
-                // 3. Filtro por Rango de Fechas (Desde y Hasta) ajustado a fecha local del comprobante (RF-21)
+                // 3. Filtro por Rango de Fechas (Desde y Hasta) ajustado a fecha local del comprobante
                 if (this.ventaFechaDesde || this.ventaFechaHasta) {
                     const dateOnly = this.getVentaLocalDate ? this.getVentaLocalDate(v.fecha_hora_venta) : (v.fecha_hora_venta ? String(v.fecha_hora_venta).slice(0, 10) : '');
 
@@ -789,7 +789,7 @@ export function app() {
             }
         },
 
-        // Getters de Movimientos de Caja (RF-25 / RF-28)
+        // Getters de Movimientos de Caja
         get filteredCajaMovimientos() {
             let list = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
             const term = (this.cajaSearch || '').trim().toLowerCase();

@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Modal de Arqueo y Cierre de Turno de Caja (RF-28)
+    DOCUMENTACIÓN DE VISTA: Modal de Arqueo y Cierre de Turno de Caja
     Archivo: resources/views/cajas/cajaCierreModal.blade.php
     Propósito: Permite realizar el arqueo en vivo comparando el efectivo esperado
                contra el efectivo contado, exigiendo justificación si existe descuadre
@@ -33,9 +33,6 @@
                 <div>
                     <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white flex items-center gap-2">
                         <span>Arqueo & Cierre de Caja</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
-                            RF-28
-                        </span>
                     </h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Verificación de efectivo físico y liquidación del turno</p>
                 </div>

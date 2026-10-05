@@ -220,6 +220,32 @@ class IntegridadSeguridadTest extends TestCase
         $resPut->assertStatus(403);
     }
 
+    public function test_usuario_no_puede_cambiar_su_propio_rol(): void
+    {
+        // El adminPrincipal intenta cambiarse a sí mismo el rol a Cajero
+        $res = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'id_rol' => $this->rolCajero->rol_id,
+        ]);
+        $res->assertStatus(403);
+        $res->assertJsonPath('message', 'No puedes modificar tu propio rol de usuario.');
+    }
+
+    public function test_admin_puede_editar_su_nombre_y_usuario_sin_alterar_rol(): void
+    {
+        $res = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'nombre_apellido' => 'Admin Renombrado',
+            'nombre_usuario' => 'admin_nuevo',
+        ]);
+        $res->assertStatus(200);
+        $this->assertDatabaseHas('usuario', [
+            'usuario_id' => $this->adminPrincipal->usuario_id,
+            'nombre_apellido' => 'Admin Renombrado',
+            'nombre_usuario' => 'admin_nuevo',
+            'id_rol' => $this->rolAdmin->rol_id,
+            'estado' => 1,
+        ]);
+    }
+
     public function test_no_se_puede_desactivar_al_unico_administrador_activo(): void
     {
         // Desactivamos al adminSecundario
@@ -264,6 +290,75 @@ class IntegridadSeguridadTest extends TestCase
         $resUnico = $this->deleteJson("/api/usuarios/{$tercerUsuario->usuario_id}");
         $resUnico->assertStatus(403);
         $resUnico->assertJsonPath('message', 'No se puede desactivar al único Administrador activo del sistema.');
+    }
+
+    public function test_bloqueo_automatico_tras_3_intentos_fallidos_y_desbloqueo_por_admin(): void
+    {
+        $this->app['auth']->forgetGuards();
+
+        $cajeroTest = Usuario::create([
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Cajero Bloqueo',
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => bcrypt('claveCorrecta123'),
+            'fecha_registro' => now(),
+            'estado' => 1,
+        ]);
+
+        // Intento 1: Fallido (Quedan 2)
+        $res1 = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => 'claveErronea1',
+        ]);
+        $res1->assertStatus(401);
+        $res1->assertJsonPath('intentos_restantes', 2);
+
+        // Intento 2: Fallido (Queda 1)
+        $res2 = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => 'claveErronea2',
+        ]);
+        $res2->assertStatus(401);
+        $res2->assertJsonPath('intentos_restantes', 1);
+
+        // Intento 3: Fallido -> Bloqueo automático (403)
+        $res3 = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => 'claveErronea3',
+        ]);
+        $res3->assertStatus(403);
+        $res3->assertJsonPath('success', false);
+        $this->assertStringContainsString('bloqueada por exceder el límite de 3 intentos', $res3->json('message'));
+
+        // Verificar que en base de datos el usuario quedó en estado 0 (Inactivo / Bloqueado)
+        $cajeroTest->refresh();
+        $this->assertEquals(0, (int) $cajeroTest->estado);
+
+        // Intento 4: Intentar con clave correcta mientras está bloqueado debe dar 403
+        $res4 = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => 'claveCorrecta123',
+        ]);
+        $res4->assertStatus(403);
+        $this->assertStringContainsString('inactiva o bloqueada', $res4->json('message'));
+
+        // Administrador reactiva la cuenta del usuario
+        Sanctum::actingAs($this->adminPrincipal);
+        $resUpdate = $this->putJson("/api/usuarios/{$cajeroTest->usuario_id}", [
+            'estado' => 1,
+        ]);
+        $resUpdate->assertStatus(200);
+        $cajeroTest->refresh();
+        $this->assertEquals(1, (int) $cajeroTest->estado);
+
+        // Intento 5: Ahora el usuario puede iniciar sesión correctamente
+        $this->app['auth']->forgetGuards();
+        $resLogin = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_bloqueo',
+            'contrasenia_usuario' => 'claveCorrecta123',
+        ]);
+        $resLogin->assertStatus(200);
+        $resLogin->assertJsonPath('success', true);
     }
 
     public function test_bitacora_es_inmutable_y_rechaza_creacion_modificacion_o_eliminacion_directa(): void

@@ -133,6 +133,21 @@ export function usuariosModule() {
             return 'Este rol actualmente no tiene permisos configurados en la base de datos.';
         },
 
+        // Indica si el usuario que se está editando es el usuario en sesión o posee rol Administrador
+        get isEditingAdminUser() {
+            if (!this.isEditingUser) return false;
+            // 1. Si es el usuario en sesión actual (ej. admin editando su propio perfil)
+            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(this.userForm.usuario_id)) {
+                return true;
+            }
+            // 2. Si el usuario seleccionado tiene asignado el rol de Administrador
+            const userObj = (this.usuarios || []).find(u => Number(u.usuario_id) === Number(this.userForm.usuario_id));
+            if (userObj && userObj.rol && (userObj.rol.nombre_rol === 'Administrador' || (Array.isArray(userObj.rol.permisos) && userObj.rol.permisos.includes('*')))) {
+                return true;
+            }
+            return false;
+        },
+
         // Contador auxiliar de usuarios por rol
         countUsersInRole(rolId) {
             if (!Array.isArray(this.usuarios)) return 0;
@@ -190,11 +205,17 @@ export function usuariosModule() {
             const method = this.isEditingUser ? 'PUT' : 'POST';
 
             const payload = {
-                id_rol: Number(this.userForm.id_rol),
                 nombre_apellido: (this.userForm.nombre_apellido || '').trim(),
                 nombre_usuario: (this.userForm.nombre_usuario || '').trim(),
-                estado: Number(this.userForm.estado)
             };
+
+            // Si es edición de cuenta administrador / propia, blindar estado en 1 y no enviar cambio de rol
+            if (this.isEditingAdminUser) {
+                payload.estado = 1;
+            } else {
+                payload.id_rol = Number(this.userForm.id_rol);
+                payload.estado = Number(this.userForm.estado);
+            }
 
             if (this.userForm.fecha_registro) {
                 payload.fecha_registro = this.userForm.fecha_registro;
@@ -244,11 +265,23 @@ export function usuariosModule() {
 
         // Bloquear / Desbloquear usuario con confirmación rápida
         async toggleUserStatus(u) {
-            if (this.currentUser && this.currentUser.usuario_id === u.usuario_id) {
+            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) {
                 Swal.fire({
                     icon: 'info',
                     title: 'Acción No Permitida',
                     text: 'No puedes bloquear o desactivar tu propia cuenta en sesión.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin && Number(u.estado) === 1) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'No se puede bloquear o desactivar a una cuenta con rol Administrador.',
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });
@@ -384,11 +417,23 @@ export function usuariosModule() {
         },
 
         async deleteUser(u) {
-            if (this.currentUser && this.currentUser.usuario_id === u.usuario_id) {
+            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) {
                 Swal.fire({
                     icon: 'info',
                     title: 'Acción No Permitida',
                     text: 'No puedes eliminar tu propia cuenta en sesión.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'No se puede eliminar a una cuenta con rol Administrador.',
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });
