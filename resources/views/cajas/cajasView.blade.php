@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Gestión de Cajas, Turnos y Movimientos Monetarios (RF-25 / RF-28)
+    DOCUMENTACIÓN DE VISTA: Gestión de Cajas, Turnos y Movimientos Monetarios
     Archivo: resources/views/cajas/cajasView.blade.php
     Propósito: Permite la visualización de cajas físicas, control del turno operativo,
                arqueo de efectivo y registro de entradas / salidas extraordinarias (gastos menores y sencillo).
@@ -23,7 +23,7 @@
             <div class="space-y-1">
                 <div class="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Control Financiero & Arqueo (RF-25 / RF-28)</span>
+                    <span>Control Financiero & Arqueo</span>
                 </div>
                 <h2 class="text-2xl sm:text-3xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
                     Cajas & <span class="text-emerald-600 dark:text-emerald-400">Movimientos</span>
@@ -330,7 +330,7 @@
         </div>
     </template>
 
-    <!-- 4. Historial Detallado de Movimientos de Caja (RF-25) -->
+    <!-- 4. Historial Detallado de Movimientos de Caja -->
     <div class="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
         <!-- Encabezado de Sección: Título a la izquierda y Filtros de Tipo a la derecha -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -366,7 +366,7 @@
 
         <!-- Barra de Filtros Secundarios (Ubicada debajo del título con amplio espacio para más filtros) -->
         <div class="flex flex-wrap items-center gap-3 pt-1">
-            <!-- Selector de Alcance para Administrador (RF-25 / RF-28) -->
+            <!-- Selector de Alcance para Administrador -->
             <template x-if="isAdmin">
                 <div class="relative min-w-[200px]">
                     <select x-model="cajaHistorialAlcance"

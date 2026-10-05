@@ -231,13 +231,13 @@
                 <!-- MODAL: AJUSTES DE EMPRESA Y FACTURACIÓN -->
                 @include('sistema.empresaModal')
 
-                <!-- MODAL: REGISTRO DE MOVIMIENTO DE CAJA (RF-25) -->
+                <!-- MODAL: REGISTRO DE MOVIMIENTO DE CAJA -->
                 @include('cajas.cajaMovimientoModal')
 
-                <!-- MODAL: APERTURA DE TURNO DE CAJA (RF-28) -->
+                <!-- MODAL: APERTURA DE TURNO DE CAJA -->
                 @include('cajas.cajaAperturaModal')
 
-                <!-- MODAL: ARQUEO Y CIERRE DE TURNO DE CAJA (RF-28) -->
+                <!-- MODAL: ARQUEO Y CIERRE DE TURNO DE CAJA -->
                 @include('cajas.cajaCierreModal')
 
                 <!-- MODAL: CREAR / EDITAR CAJA FÍSICA -->

@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Listado e Historial de Ventas (RF-21)
+    DOCUMENTACIÓN DE VISTA: Listado e Historial de Ventas
     Archivo: resources/views/ventas/ventaHistorialView.blade.php
     Propósito: Permite la consulta y filtrado de ventas realizadas según criterios
                de fecha (rango Desde / Hasta), cajero/usuario y número de comprobante/cliente.
@@ -14,7 +14,7 @@
     x-init="$watch('currentTab', v => { if (v === 'ventas') $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); }); $watch('filteredVentas', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }))"
     class="space-y-4">
 
-    <!-- Panel Principal de Filtros de Consulta (RF-21) -->
+    <!-- Panel Principal de Filtros de Consulta -->
     <div class="glass-panel p-4 sm:p-5 rounded-2xl space-y-4 shadow-sm border border-slate-200 dark:border-slate-800">
         <!-- Fila Superior: Título y Botón Nueva Venta -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800/80">
@@ -28,7 +28,7 @@
                         <span class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                             x-text="filteredVentas.length + (filteredVentas.length === 1 ? ' venta' : ' ventas')"></span>
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Consulte comprobantes por fecha, cajero o número de factura (RF-21)</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Consulte comprobantes por fecha, cajero o número de factura</p>
                 </div>
             </div>
 

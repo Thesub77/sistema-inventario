@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    FACTURASTOCK PRO - DASHBOARD ANALÍTICO & OPERATIVO (RF-13, RF-26, RF-30, RF-31, RF-32, RF-33)
+    FACTURASTOCK PRO - DASHBOARD ANALÍTICO & OPERATIVO
     Archivo: resources/views/sistema/dashboardView.blade.php
     Propósito: Panel de control integral con métricas en tiempo real, alertas de stock bajo,
                cuadre de turno desglosado (efectivo/transferencia), gráficos de ventas interactivos,
@@ -10,7 +10,7 @@
 
 <div x-show="currentTab === 'dashboard'" x-cloak class="space-y-6">
 
-    <!-- 1. ENCABEZADO DE BIENVENIDA & ACCIONES RÁPIDAS (RF-30) -->
+    <!-- 1. ENCABEZADO DE BIENVENIDA & ACCIONES RÁPIDAS -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl relative overflow-hidden border border-slate-800">
         <div class="absolute -right-16 -top-16 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -31,7 +31,7 @@
         </div>
     </div>
 
-    <!-- 2. RF-26: CONSULTA DE VENTAS DEL TURNO / DEL DÍA (DESGLOSE EFECTIVO Y TRANSFERENCIA) -->
+    <!-- 2. CONSULTA DE VENTAS DEL TURNO / DEL DÍA (DESGLOSE EFECTIVO Y TRANSFERENCIA) -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 relative overflow-hidden">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-slate-800/80 pb-4">
             <div>
@@ -166,10 +166,10 @@
         </div>
     </div>
 
-    <!-- 4. SECCIÓN DE GRÁFICOS INTERACTIVOS (RF-31: INDICADOR DE VENTAS & RF-32: TOP 5 ROTACIÓN) -->
+    <!-- 4. SECCIÓN DE GRÁFICOS INTERACTIVOS (INDICADOR DE VENTAS & TOP 5 ROTACIÓN) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        <!-- GRÁFICO 1: RF-31 - Indicador de Ventas por Días / Semanas -->
+        <!-- GRÁFICO 1: Indicador de Ventas por Días / Semanas -->
         <div class="lg:col-span-8 glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 flex flex-col justify-between space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -222,7 +222,7 @@
             </div>
         </div>
 
-        <!-- GRÁFICO 2: RF-32 - Top 5 Productos de Mayor Rotación (Más Vendidos) -->
+        <!-- GRÁFICO 2: Top 5 Productos de Mayor Rotación (Más Vendidos) -->
         <div class="lg:col-span-4 glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 flex flex-col justify-between space-y-4">
             <div>
                 <div class="flex items-center justify-between mb-4">
@@ -277,10 +277,10 @@
         </div>
     </div>
 
-    <!-- 5. SECCIÓN INFERIOR: RF-13 (ALERTAS DE STOCK BAJO) Y RF-33 (BAJA ROTACIÓN) -->
+    <!-- 5. SECCIÓN INFERIOR: ALERTAS DE STOCK BAJO Y BAJA ROTACIÓN -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <!-- PANEL RF-13: ALERTAS DE STOCK BAJO Y CRÍTICO -->
+        <!-- PANEL: ALERTAS DE STOCK BAJO Y CRÍTICO -->
         <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                 <div class="flex items-center gap-2">
@@ -366,7 +366,7 @@
             </div>
         </div>
 
-        <!-- PANEL RF-33: PRODUCTOS CON BAJA O NULA ROTACIÓN -->
+        <!-- PANEL: PRODUCTOS CON BAJA O NULA ROTACIÓN -->
         <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                 <div class="flex items-center gap-2">
@@ -439,7 +439,7 @@
         </div>
     </div>
 
-    <!-- 6. ÚLTIMAS VENTAS EN TIEMPO REAL (RF-30) -->
+    <!-- 6. ÚLTIMAS VENTAS EN TIEMPO REAL -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
             <div class="flex items-center gap-2.5">

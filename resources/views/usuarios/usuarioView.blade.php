@@ -1,6 +1,6 @@
 {{--
     =============================================================================
-    DOCUMENTACIÓN DE VISTA: Gestión Integral de Usuarios y Roles (RF-Admin)
+    DOCUMENTACIÓN DE VISTA: Gestión Integral de Usuarios y Roles
     Archivo: resources/views/usuarios/usuarioView.blade.php
     Propósito: Permite al Administrador gestionar usuarios, bloquear/desbloquear,
                restablecer contraseñas de acceso y administrar roles dinámicos con permisos JSON.
@@ -264,24 +264,28 @@
                                         <!-- Botón: Bloquear / Desbloquear (Toggle) -->
                                         <button type="button"
                                             @click="toggleUserStatus(u)"
-                                            :disabled="currentUser && currentUser.usuario_id === u.usuario_id"
+                                            :disabled="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id)) || (u.rol && u.rol.nombre_rol === 'Administrador')"
                                             class="p-2 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                             :class="Number(u.estado) === 1
                                                 ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/10'
                                                 : 'text-rose-500 hover:text-emerald-500 hover:bg-emerald-500/10'"
-                                            :title="currentUser && currentUser.usuario_id === u.usuario_id
+                                            :title="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id))
                                                 ? 'No puedes bloquear tu propia cuenta'
-                                                : (Number(u.estado) === 1 ? 'Bloquear acceso al usuario' : 'Habilitar acceso al usuario')">
+                                                : ((u.rol && u.rol.nombre_rol === 'Administrador')
+                                                    ? 'No se puede bloquear a una cuenta Administrador'
+                                                    : (Number(u.estado) === 1 ? 'Bloquear acceso al usuario' : 'Habilitar acceso al usuario'))">
                                             <i :data-lucide="Number(u.estado) === 1 ? 'lock' : 'unlock'" class="w-4 h-4"></i>
                                         </button>
 
                                         <!-- Botón: Eliminar Usuario -->
                                         <button type="button" @click="deleteUser(u)"
-                                            :disabled="currentUser && currentUser.usuario_id === u.usuario_id"
+                                            :disabled="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id)) || (u.rol && u.rol.nombre_rol === 'Administrador')"
                                             class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                            :title="currentUser && currentUser.usuario_id === u.usuario_id
+                                            :title="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id))
                                                 ? 'No puedes eliminar tu propia cuenta'
-                                                : 'Eliminar o desactivar usuario'">
+                                                : ((u.rol && u.rol.nombre_rol === 'Administrador')
+                                                    ? 'No se puede eliminar a una cuenta Administrador'
+                                                    : 'Eliminar o desactivar usuario')">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>
@@ -344,13 +348,6 @@
                                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5" x-text="r.descripcion_rol || 'Sin descripción'"></p>
                             </div>
 
-                            <template x-if="r.nombre_rol !== 'Administrador'">
-                                <button type="button" @click="openRolModal(r)"
-                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                    title="Editar rol y privilegios">
-                                    <i data-lucide="edit-3" class="w-4 h-4"></i>
-                                </button>
-                            </template>
                             <template x-if="r.nombre_rol === 'Administrador'">
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Rol maestro del sistema, no modificable">
                                     <i data-lucide="shield-check" class="w-3 h-3"></i>

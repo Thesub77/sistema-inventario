@@ -229,4 +229,64 @@ class AuthAndRoleTest extends TestCase
         $res->assertStatus(403);
         $res->assertJsonPath('success', false);
     }
+
+    public function test_rol_administrador_no_puede_ser_modificado_ni_desactivado(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Intentar cambiar nombre o permisos al rol Administrador
+        $res = $this->putJson('/api/roles/'.$this->rolAdmin->rol_id, [
+            'nombre_rol' => 'Admin Modificado',
+        ]);
+        $res->assertStatus(403);
+        $res->assertJsonPath('success', false);
+
+        // Intentar desactivar al rol Administrador
+        $res2 = $this->putJson('/api/roles/'.$this->rolAdmin->rol_id, [
+            'estado' => 0,
+        ]);
+        $res2->assertStatus(403);
+        $res2->assertJsonPath('success', false);
+    }
+
+    public function test_desactivar_un_rol_bloquea_a_todos_los_usuarios_asignados_y_revoca_sesiones(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Cajero tiene token activo y estado 1
+        $tokenCajero = $this->cajero->createToken('cajero-token')->plainTextToken;
+        $this->assertEquals(1, (int) $this->cajero->estado);
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'tokenable_id' => $this->cajero->usuario_id,
+        ]);
+
+        // Desactivamos el rol Cajero
+        $res = $this->putJson('/api/roles/'.$this->rolCajero->rol_id, [
+            'estado' => 0,
+        ]);
+        $res->assertStatus(200);
+
+        // Verificar que el cajero quedó con estado 0 (Bloqueado)
+        $this->cajero->refresh();
+        $this->assertEquals(0, (int) $this->cajero->estado);
+
+        // Verificar que sus tokens fueron revocados
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $this->cajero->usuario_id,
+        ]);
+
+        // Intentar autenticarse con ese token debe ser 401
+        $this->app['auth']->forgetGuards();
+        $this->withHeader('Authorization', 'Bearer '.$tokenCajero)
+            ->getJson('/api/auth/me')
+            ->assertStatus(401);
+
+        // Intentar iniciar sesión debe devolver 403 por cuenta bloqueada
+        $resLogin = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'cajero_test',
+            'contrasenia_usuario' => 'cajero123',
+        ]);
+        $resLogin->assertStatus(403);
+        $this->assertStringContainsString('inactiva o bloqueada', $resLogin->json('message'));
+    }
 }

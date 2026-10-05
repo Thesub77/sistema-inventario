@@ -2,8 +2,8 @@
  * ==============================================================================
  * FACTURASTOCK PRO - MÓDULO DE DASHBOARD INTELIGENTE
  * Archivo: resources/js/modules/dashboard.js
- * Descripción: Métricas analíticas, alertas de stock, desglose de turno (RF-26),
- *              gráficos interactivos (RF-31, RF-32) y baja rotación (RF-33).
+ * Descripción: Métricas analíticas, alertas de stock, desglose de turno,
+ *              gráficos interactivos y baja rotación.
  *              Optimizado mediante agregaciones directas desde el Backend (Issue #19).
  * ==============================================================================
  */
@@ -77,7 +77,7 @@ export function dashboardModule() {
             return null;
         },
 
-        // RF-26: Consulta y métricas de ventas del turno en tiempo real (Aislamiento por turno actual)
+        // Consulta y métricas de ventas del turno en tiempo real (Aislamiento por turno actual)
         get ventasTurno() {
             const turno = this.turnoActivo;
             if (!turno) {
@@ -169,7 +169,7 @@ export function dashboardModule() {
             };
         },
 
-        // RF-13: Alertas de Stock Bajo detalladas
+        // Alertas de Stock Bajo detalladas
         get stockAlerts() {
             if (this.dashboardData?.stockAlerts) {
                 return this.dashboardData.stockAlerts;
@@ -218,7 +218,7 @@ export function dashboardModule() {
             return alerts.todos;
         },
 
-        // RF-32: Top 5 de productos con mayor rotación en tiempo real (más vendidos)
+        // Top 5 de productos con mayor rotación en tiempo real (más vendidos)
         get topProductosVendidos() {
             const backendTop = Array.isArray(this.dashboardData?.topProductosVendidos) ? this.dashboardData.topProductosVendidos : [];
 
@@ -286,7 +286,7 @@ export function dashboardModule() {
             return backendTop;
         },
 
-        // RF-33: Productos con baja o nula rotación
+        // Productos con baja o nula rotación
         get productosBajaRotacion() {
             const backendBaja = Array.isArray(this.dashboardData?.productosBajaRotacion) ? this.dashboardData.productosBajaRotacion : null;
 
@@ -362,7 +362,7 @@ export function dashboardModule() {
             return (this.productosBajaRotacion || []).reduce((sum, p) => sum + (p.capitalInmovilizado || 0), 0);
         },
 
-        // RF-30: Últimas 10 ventas emitidas en tiempo real
+        // Últimas 10 ventas emitidas en tiempo real
         get ultimasVentas() {
             const raw = (Array.isArray(this.ventas) && this.ventas.length > 0)
                 ? this.ventas
@@ -392,7 +392,7 @@ export function dashboardModule() {
             });
         },
 
-        // RF-31 & RF-32: Renderizado de gráficos con Chart.js en tiempo real
+        // Renderizado de gráficos con Chart.js en tiempo real
         renderDashboardCharts() {
             if (typeof window.Chart === 'undefined') return;
 
@@ -400,7 +400,7 @@ export function dashboardModule() {
             const textColor = isDark ? '#94a3b8' : '#64748b';
             const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
-            // 1. Gráfico de Ventas (RF-31: Indicador de ventas por días o semanas en tiempo real)
+            // 1. Gráfico de Ventas (Indicador de ventas por días o semanas en tiempo real)
             const canvasVentas = document.getElementById('chartVentas');
             if (canvasVentas) {
                 if (this.chartVentasInstance) {
@@ -537,7 +537,7 @@ export function dashboardModule() {
                 });
             }
 
-            // 2. Gráfico de Top Productos Rotación (RF-32)
+            // 2. Gráfico de Top Productos Rotación
             const canvasTop = document.getElementById('chartTopProductos');
             if (canvasTop) {
                 if (this.chartTopInstance) {

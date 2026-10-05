@@ -43,7 +43,8 @@ class AuthController extends Controller
         // Si el usuario no existe o la contraseña es incorrecta
         if (! $usuario || ! Hash::check($validated['contrasenia_usuario'], $usuario->contrasenia_usuario)) {
             if ($usuario) {
-                Bitacora::create([
+                // 1. Registrar el intento fallido actual
+                $bitacoraFallida = Bitacora::create([
                     'id_usuario' => $usuario->usuario_id,
                     'accion_bitacora' => 'LOGIN_FALLIDO',
                     'descripcion_bitacora' => "Intento fallido de inicio de sesión para el usuario: {$usuario->nombre_usuario}",
@@ -51,26 +52,34 @@ class AuthController extends Controller
                     'estado' => 1,
                 ]);
 
-                // Contar intentos fallidos consecutivos desde el último login exitoso o desbloqueo
-                $ultimoReset = Bitacora::where('id_usuario', $usuario->usuario_id)
-                    ->whereIn('accion_bitacora', ['LOGIN_EXITOSO', 'USUARIO_BLOQUEADO'])
-                    ->latest('fecha_hora_bitacora')
-                    ->value('fecha_hora_bitacora');
+                // 2. Buscar el último evento que haya reiniciado el contador de intentos (login exitoso, desbloqueo, cambio de clave o bloqueo previo)
+                $ultimoResetId = Bitacora::where('id_usuario', $usuario->usuario_id)
+                    ->whereIn('accion_bitacora', [
+                        'LOGIN_EXITOSO',
+                        'USUARIO_BLOQUEADO',
+                        'USUARIO_DESBLOQUEADO',
+                        'USUARIO_REACTIVADO',
+                        'RESTABLECER_CONTRASENIA',
+                    ])
+                    ->where('id_bitacora', '<', $bitacoraFallida->id_bitacora)
+                    ->max('id_bitacora');
 
+                // 3. Contar intentos fallidos posteriores al último reinicio
                 $intentosFallidosQuery = Bitacora::where('id_usuario', $usuario->usuario_id)
                     ->where('accion_bitacora', 'LOGIN_FALLIDO');
 
-                if ($ultimoReset) {
-                    $intentosFallidosQuery->where('fecha_hora_bitacora', '>', $ultimoReset);
+                if ($ultimoResetId) {
+                    $intentosFallidosQuery->where('id_bitacora', '>', $ultimoResetId);
                 }
 
                 $intentosFallidos = $intentosFallidosQuery->count();
 
                 $esAdmin = $usuario->rol && ($usuario->rol->nombre_rol === 'Administrador' || in_array('*', $usuario->rol->permisos ?? [], true));
 
-                // Bloqueo automático al tercer intento fallido consecutivo (para usuarios no administradores)
+                // 4. Bloqueo automático al tercer intento fallido consecutivo (para usuarios no administradores)
                 if (! $esAdmin && $intentosFallidos >= 3) {
                     $usuario->update(['estado' => 0]);
+                    $usuario->tokens()->delete();
 
                     Bitacora::create([
                         'id_usuario' => $usuario->usuario_id,

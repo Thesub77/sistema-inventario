@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bitacora;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,7 +66,7 @@ class UsuarioController extends Controller
 
     public function update(Request $request, $id)
     {
-        $usuario = Usuario::findOrFail($id);
+        $usuario = Usuario::with('rol')->findOrFail($id);
 
         $validated = $request->validate([
             'id_rol' => 'sometimes|required|integer|exists:rol,rol_id',
@@ -99,16 +100,18 @@ class UsuarioController extends Controller
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
         ]);
 
-        // Si se intenta desactivar el usuario (estado = 0)
-        if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0 && (int) $usuario->estado === 1) {
-            if (Auth::check() && (int) Auth::id() === (int) $usuario->usuario_id) {
+        $esMismoUsuario = Auth::check() && (int) Auth::id() === (int) $usuario->usuario_id;
+        $esAdmin = $usuario->rol && ($usuario->rol->nombre_rol === 'Administrador' || in_array('*', $usuario->rol->permisos ?? [], true));
+
+        // 1. Blindaje: Impedir cambio de rol propio o degradar al último administrador
+        if (array_key_exists('id_rol', $validated) && (int) $validated['id_rol'] !== (int) $usuario->id_rol) {
+            if ($esMismoUsuario) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No puedes desactivar tu propio usuario en sesión.',
+                    'message' => 'No puedes modificar tu propio rol de usuario.',
                 ], 403);
             }
 
-            $esAdmin = $usuario->rol && $usuario->rol->nombre_rol === 'Administrador';
             if ($esAdmin) {
                 $activeAdmins = Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'Administrador'))
                     ->where('estado', 1)
@@ -117,23 +120,67 @@ class UsuarioController extends Controller
                 if ($activeAdmins <= 1) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'No se puede desactivar al único Administrador activo del sistema.',
+                        'message' => 'No puedes cambiar el rol al único Administrador activo del sistema.',
                     ], 403);
                 }
             }
+        }
 
+        // 2. Blindaje: Impedir auto-bloqueo o auto-desactivación y proteger cuenta administrador
+        if (array_key_exists('estado', $validated) && (int) $validated['estado'] !== (int) $usuario->estado) {
+            if ($esMismoUsuario) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No puedes bloquear o cambiar el estado de tu propia cuenta en sesión.',
+                ], 403);
+            }
+
+            if ((int) $validated['estado'] === 0 && $esAdmin) {
+                $activeAdmins = Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'Administrador'))
+                    ->where('estado', 1)
+                    ->count();
+
+                if ($activeAdmins <= 1) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No se puede desactivar o bloquear al único Administrador activo del sistema.',
+                    ], 403);
+                }
+            }
+        }
+
+        // Si se desactiva el usuario, revocar sus tokens de sesión
+        if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0 && (int) $usuario->estado === 1) {
             $usuario->tokens()->delete();
+        }
+
+        // Si se reactiva / desbloquea el usuario (de 0 a 1), registrar en bitácora para resetear contador de intentos
+        if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 1 && (int) $usuario->estado === 0) {
+            Bitacora::create([
+                'id_usuario' => $usuario->usuario_id,
+                'accion_bitacora' => 'USUARIO_DESBLOQUEADO',
+                'descripcion_bitacora' => "Cuenta de {$usuario->nombre_usuario} reactivada/desbloqueada por el administrador.",
+                'fecha_hora_bitacora' => now(),
+                'estado' => 1,
+            ]);
         }
 
         if (! empty($validated['contrasenia_usuario'])) {
             $validated['contrasenia_usuario'] = Hash::make($validated['contrasenia_usuario']);
+            Bitacora::create([
+                'id_usuario' => $usuario->usuario_id,
+                'accion_bitacora' => 'RESTABLECER_CONTRASENIA',
+                'descripcion_bitacora' => "Contraseña del usuario {$usuario->nombre_usuario} actualizada por el administrador.",
+                'fecha_hora_bitacora' => now(),
+                'estado' => 1,
+            ]);
         } else {
             unset($validated['contrasenia_usuario']);
         }
 
         $usuario->update($validated);
 
-        return response()->json($usuario);
+        return response()->json($usuario->load('rol'));
     }
 
     public function destroy($id)
@@ -147,7 +194,7 @@ class UsuarioController extends Controller
             ], 403);
         }
 
-        $esAdmin = $usuario->rol && $usuario->rol->nombre_rol === 'Administrador';
+        $esAdmin = $usuario->rol && ($usuario->rol->nombre_rol === 'Administrador' || in_array('*', $usuario->rol->permisos ?? [], true));
         if ($esAdmin && (int) $usuario->estado === 1) {
             $activeAdmins = Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'Administrador'))
                 ->where('estado', 1)
