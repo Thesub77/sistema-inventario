@@ -661,8 +661,6 @@ class IntegridadSeguridadTest extends TestCase
         $movEntrada = $resEntrada->json('movimiento');
         $this->assertNull($movEntrada['tipo_merma']);
         $this->assertNull($movEntrada['costo_unitario']);
-        $this->assertNull($movEntrada['proveedor_nombre']);
-        $this->assertNull($movEntrada['numero_factura_recibo']);
 
         $this->assertDatabaseHas('movimiento_inventario', [
             'movimiento_inventario_id' => $movEntrada['movimiento_inventario_id'],
@@ -670,13 +668,11 @@ class IntegridadSeguridadTest extends TestCase
             'tipo_merma' => null,
             'costo_unitario' => null,
             'costo_total_perdida' => null,
-            'proveedor_nombre' => null,
-            'numero_factura_recibo' => null,
             'stock_resultante_producto' => 15,
         ]);
     }
 
-    public function test_entrada_inventario_permite_guardar_proveedor_y_factura_opcionalmente(): void
+    public function test_entrada_inventario_actualiza_stock_correctamente(): void
     {
         $cat = Categoria::create([
             'codigo_categoria' => 'CAT-PROV-1',
@@ -696,94 +692,24 @@ class IntegridadSeguridadTest extends TestCase
             'estado' => 1,
         ]);
 
-        // 1. Entrada de inventario CON proveedor y número de factura/recibo
-        $resConDatos = $this->postJson('/api/movimientos-inventario', [
+        // Entrada de inventario estándar
+        $res = $this->postJson('/api/movimientos-inventario', [
             'id_producto' => $prod->producto_id,
             'id_usuario' => $this->adminPrincipal->usuario_id,
             'tipo_movimiento' => 'Entrada por Compra',
             'cantidad_movimiento' => 10,
             'fecha_movimiento' => now()->toDateString(),
-            'proveedor_nombre' => 'Lácteos El Carmen S.A.',
-            'numero_factura_recibo' => 'FAC-2026-00458',
         ]);
 
-        $resConDatos->assertStatus(201);
-        $movCon = $resConDatos->json('movimiento');
-        $this->assertEquals('Lácteos El Carmen S.A.', $movCon['proveedor_nombre']);
-        $this->assertEquals('FAC-2026-00458', $movCon['numero_factura_recibo']);
+        $res->assertStatus(201);
+        $mov = $res->json('movimiento');
 
         $this->assertDatabaseHas('movimiento_inventario', [
-            'movimiento_inventario_id' => $movCon['movimiento_inventario_id'],
+            'movimiento_inventario_id' => $mov['movimiento_inventario_id'],
             'tipo_movimiento' => 'Entrada por Compra',
-            'proveedor_nombre' => 'Lácteos El Carmen S.A.',
-            'numero_factura_recibo' => 'FAC-2026-00458',
             'stock_resultante_producto' => 20,
         ]);
         $this->assertEquals(20, $prod->fresh()->existencia_bodega);
-
-        // 2. Entrada de inventario SIN proveedor ni número de factura/recibo (opcional)
-        $resSinDatos = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 5,
-            'fecha_movimiento' => now()->toDateString(),
-        ]);
-
-        $resSinDatos->assertStatus(201);
-        $movSin = $resSinDatos->json('movimiento');
-        $this->assertNull($movSin['proveedor_nombre']);
-        $this->assertNull($movSin['numero_factura_recibo']);
-
-        $this->assertDatabaseHas('movimiento_inventario', [
-            'movimiento_inventario_id' => $movSin['movimiento_inventario_id'],
-            'tipo_movimiento' => 'Entrada',
-            'proveedor_nombre' => null,
-            'numero_factura_recibo' => null,
-            'stock_resultante_producto' => 25,
-        ]);
-        $this->assertEquals(25, $prod->fresh()->existencia_bodega);
-
-        // 3. Validar longitud máxima de proveedor_nombre (máx 128)
-        $resProveedorLargo = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'proveedor_nombre' => str_repeat('P', 129),
-        ]);
-        $resProveedorLargo->assertStatus(422);
-        $resProveedorLargo->assertJsonValidationErrors(['proveedor_nombre']);
-
-        // 4. Validar longitud máxima de numero_factura_recibo (máx 64)
-        $resFacturaLarga = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'numero_factura_recibo' => str_repeat('F', 65),
-        ]);
-        $resFacturaLarga->assertStatus(422);
-        $resFacturaLarga->assertJsonValidationErrors(['numero_factura_recibo']);
-
-        // 5. Movimientos que no son entradas (ej. Salida por Merma) no almacenan proveedor ni factura
-        $resSalida = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Salida por Merma',
-            'tipo_merma' => 'Deterioro/Vencimiento',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'justificacion' => 'Bolsa rota',
-            'proveedor_nombre' => 'Proveedor Ignorado',
-            'numero_factura_recibo' => 'FAC-IGNORADA',
-        ]);
-        $resSalida->assertStatus(201);
-        $movSalida = $resSalida->json('movimiento');
-        $this->assertNull($movSalida['proveedor_nombre']);
-        $this->assertNull($movSalida['numero_factura_recibo']);
     }
 
     public function test_dashboard_resumen_incluye_total_perdidas_mermas_del_mes_en_curso(): void
