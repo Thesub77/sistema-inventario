@@ -18,8 +18,11 @@ class ProveedorAndCuentaPorPagarTest extends TestCase
     use RefreshDatabase;
 
     protected Usuario $adminUser;
+
     protected Usuario $cajeroUser;
+
     protected Caja $caja;
+
     protected Caja_operacion $turno;
 
     protected function setUp(): void

@@ -6,7 +6,6 @@ use App\Models\Bitacora;
 use App\Models\Proveedor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ProveedorController extends Controller
 {
@@ -53,6 +52,7 @@ class ProveedorController extends Controller
 
         if ($request->filled('por_pagina')) {
             $perPage = (int) $request->input('por_pagina', 10);
+
             return response()->json($query->paginate($perPage)->withQueryString());
         }
 

@@ -82,8 +82,9 @@ return new class extends Migration
 
         if (Schema::hasTable('cliente')) {
             try {
-                DB::statement("UPDATE venta SET cliente_nombre = (SELECT nombre_apellido_cliente FROM cliente WHERE cliente.cliente_id = venta.id_cliente) WHERE id_cliente IS NOT NULL AND EXISTS (SELECT 1 FROM cliente WHERE cliente.cliente_id = venta.id_cliente)");
-            } catch (\Throwable $e) {}
+                DB::statement('UPDATE venta SET cliente_nombre = (SELECT nombre_apellido_cliente FROM cliente WHERE cliente.cliente_id = venta.id_cliente) WHERE id_cliente IS NOT NULL AND EXISTS (SELECT 1 FROM cliente WHERE cliente.cliente_id = venta.id_cliente)');
+            } catch (Throwable $e) {
+            }
         }
 
         Schema::table('venta', function (Blueprint $table) {

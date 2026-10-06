@@ -7,7 +7,6 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
-use App\Models\Venta_espera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;

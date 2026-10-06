@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Exceptions\CajaException;
 use App\Models\Bitacora;
 use App\Models\Caja_movimiento_venta;
 use App\Models\Caja_operacion;
@@ -381,7 +380,7 @@ class CuentaPorPagarController extends Controller
             Bitacora::create([
                 'id_usuario' => $usuario->usuario_id,
                 'accion_bitacora' => 'ABONO_CUENTA_POR_PAGAR',
-                'descripcion_bitacora' => "Se registró un abono de C$ ".number_format($montoAbono, 2)." a la factura #{$cuenta->numero_factura} ({$cuenta->proveedor->nombre_comercial}). Saldo restante: C$ ".number_format($nuevoSaldo, 2),
+                'descripcion_bitacora' => 'Se registró un abono de C$ '.number_format($montoAbono, 2)." a la factura #{$cuenta->numero_factura} ({$cuenta->proveedor->nombre_comercial}). Saldo restante: C$ ".number_format($nuevoSaldo, 2),
                 'fecha_hora_bitacora' => now(),
                 'estado' => 1,
             ]);
