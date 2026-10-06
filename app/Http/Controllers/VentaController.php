@@ -50,7 +50,6 @@ class VentaController extends Controller
 
         $query = Venta::with([
             'usuario',
-            'cliente',
             'venta_detalles.producto',
         ]);
 
@@ -119,7 +118,7 @@ class VentaController extends Controller
         $validated = $request->validate([
             'id_usuario' => ['required', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
 
-            'id_cliente' => ['required', 'integer', Rule::exists('cliente', 'cliente_id')->where('estado', 1)],
+            'cliente_nombre' => 'nullable|string|max:128',
 
             'codigo_venta' => 'required|string|max:32|unique:venta,codigo_venta',
 
@@ -247,7 +246,7 @@ class VentaController extends Controller
             $venta = Venta::create([
                 'id_usuario' => $validated['id_usuario'],
 
-                'id_cliente' => $validated['id_cliente'],
+                'cliente_nombre' => ! empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : 'Consumidor Final',
 
                 'codigo_venta' => $validated['codigo_venta'],
 
@@ -354,7 +353,6 @@ class VentaController extends Controller
 
                 'venta' => $venta->load([
                     'usuario',
-                    'cliente',
                     'venta_detalles.producto',
                 ]),
             ], 201);
@@ -369,7 +367,6 @@ class VentaController extends Controller
     {
         $venta = Venta::with([
             'usuario',
-            'cliente',
             'venta_detalles.producto',
             'caja_movimiento_ventas',
         ])
@@ -559,7 +556,6 @@ class VentaController extends Controller
         // Los importes y precios son los guardados al confirmar, no los del catálogo actual.
         $venta = Venta::with([
             'usuario',
-            'cliente',
             'venta_detalles.producto',
             'caja_movimiento_ventas.caja.empresa',
         ])->findOrFail($id);

@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Caja;
-use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Rol;
 use App\Models\Usuario;
@@ -170,16 +169,9 @@ class EmpresaTest extends TestCase
     {
         Sanctum::actingAs($this->cajero);
 
-        $cliente = Cliente::create([
-            'nombre_apellido_cliente' => 'Cliente Test',
-            'codigo_cliente' => 'CLI-TEST-1',
-            'telefono_cliente' => '88889999',
-            'estado' => 1,
-        ]);
-
         $venta = Venta::create([
             'id_usuario' => $this->admin->usuario_id,
-            'id_cliente' => $cliente->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'codigo_venta' => 'V-TEST-001',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now(),

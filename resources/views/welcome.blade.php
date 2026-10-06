@@ -67,8 +67,8 @@
                             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
                             <i :data-lucide="item.icon" class="w-4 h-4"></i>
                             <span x-text="item.label"></span>
-                            <span x-show="item.badge && item.badge() > 0"
-                                x-text="item.badge ? item.badge() : ''"
+                            <span x-show="getNavBadge(item.id) > 0"
+                                x-text="getNavBadge(item.id)"
                                 class="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white"></span>
                         </button>
                     </template>
@@ -184,8 +184,8 @@
                 <!-- 5. TAB: CATEGORÍAS -->
                 @include('categorias.categoriaView')
 
-                <!-- 6. TAB: CLIENTES -->
-                @include('clientes.clienteView')
+                <!-- 6. TAB: PROVEEDORES Y CUENTAS POR PAGAR -->
+                @include('proveedores.proveedoresView')
 
                 <!-- 7. TAB: CAJA Y MOVIMIENTOS -->
                 @include('cajas.cajasView')
@@ -210,8 +210,11 @@
                 <!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
                 @include('categorias.categoriaForm')
 
-                <!-- MODAL: CLIENTE (CREAR / EDITAR) -->
-                @include('clientes.clienteForm')
+                <!-- MODALES: PROVEEDORES Y CUENTAS POR PAGAR -->
+                @include('proveedores.proveedorModal')
+                @include('proveedores.cuentaPorPagarModal')
+                @include('proveedores.abonoModal')
+                @include('proveedores.historialAbonosModal')
 
                 <!-- MODAL: USUARIO (CREAR / EDITAR) -->
                 @include('usuarios.usuarioForm')

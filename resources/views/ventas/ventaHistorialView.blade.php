@@ -176,7 +176,7 @@
                                 </div>
                             </td>
                             <td class="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200"
-                                x-text="v.cliente ? v.cliente.nombre_apellido_cliente : 'Consumidor Final'"></td>
+                                x-text="v.cliente_nombre || 'Consumidor Final'"></td>
                             <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-400">
                                 <span class="inline-flex items-center gap-1">
                                     <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">

@@ -25,7 +25,7 @@
             <div class="grid grid-cols-2 gap-2 text-xs bg-dark-950 p-3 rounded-xl border border-slate-800">
                 <div>
                     <span class="text-slate-400">Cliente:</span>
-                    <p class="font-bold text-slate-200" x-text="selectedSale?.cliente?.nombre_apellido_cliente || 'Consumidor Final'"></p>
+                    <p class="font-bold text-slate-200" x-text="selectedSale?.cliente_nombre || 'Consumidor Final'"></p>
                 </div>
                 <div>
                     <span class="text-slate-400">Método de Pago:</span>

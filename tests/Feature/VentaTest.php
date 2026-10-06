@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Caja;
 use App\Models\Categoria;
-use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
@@ -19,8 +18,6 @@ class VentaTest extends TestCase
     use RefreshDatabase;
 
     protected Usuario $usuario;
-
-    protected Cliente $cliente;
 
     protected Categoria $categoria;
 
@@ -45,14 +42,6 @@ class VentaTest extends TestCase
             'nombre_usuario' => 'vendedor',
             'contrasenia_usuario' => bcrypt('secret123'),
             'fecha_registro' => now(),
-            'estado' => 1,
-        ]);
-
-        $this->cliente = Cliente::create([
-            'nombre_apellido_cliente' => 'Cliente Fiel',
-            'codigo_cliente' => 'CLI-001',
-            'telefono_cliente' => '12345678',
-            'direccion_cliente' => 'Managua',
             'estado' => 1,
         ]);
 
@@ -91,7 +80,7 @@ class VentaTest extends TestCase
 
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-001',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -112,7 +101,7 @@ class VentaTest extends TestCase
     {
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-002',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -132,7 +121,7 @@ class VentaTest extends TestCase
     {
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-003',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -196,7 +185,7 @@ class VentaTest extends TestCase
         // Registrar venta
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-004',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -247,7 +236,7 @@ class VentaTest extends TestCase
     {
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-005',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -262,7 +251,7 @@ class VentaTest extends TestCase
     {
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-TRF-001',
             'metodo_pago' => 'Transferencia',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -283,7 +272,7 @@ class VentaTest extends TestCase
     {
         $payload = [
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Cliente Fiel',
             'codigo_venta' => 'FAC-TRF-002',
             'metodo_pago' => 'Transferencia',
             'referencia_transferencia' => 'TRF-BAC-987654321',

@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Caja;
 use App\Models\Categoria;
-use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Models\Venta_espera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -17,10 +17,6 @@ class VentaEsperaTest extends TestCase
     use RefreshDatabase;
 
     protected Usuario $usuario;
-
-    protected Cliente $clienteGenerico;
-
-    protected Cliente $clienteRegistrado;
 
     protected Categoria $categoria;
 
@@ -43,20 +39,6 @@ class VentaEsperaTest extends TestCase
             'nombre_usuario' => 'cajero1',
             'contrasenia_usuario' => bcrypt('secret123'),
             'fecha_registro' => now(),
-            'estado' => 1,
-        ]);
-
-        $this->clienteGenerico = Cliente::create([
-            'nombre_apellido_cliente' => 'Consumidor Final',
-            'codigo_cliente' => 'CON-0000',
-            'telefono_cliente' => '00000000',
-            'estado' => 1,
-        ]);
-
-        $this->clienteRegistrado = Cliente::create([
-            'nombre_apellido_cliente' => 'Carlos Mendoza',
-            'codigo_cliente' => 'CLI-0145',
-            'telefono_cliente' => '88889999',
             'estado' => 1,
         ]);
 
@@ -83,9 +65,9 @@ class VentaEsperaTest extends TestCase
 
     public function test_guarda_venta_en_espera_con_nomenclatura_automatica_consumidor_final(): void
     {
-        // 1ra venta en espera con cliente con código '0000'
+        // 1ra venta en espera con cliente Consumidor Final
         $response1 = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteGenerico->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -103,21 +85,14 @@ class VentaEsperaTest extends TestCase
 
         $this->assertDatabaseHas('venta_espera', [
             'identificador_cuenta' => 'Cliente1',
-            'id_cliente' => $this->clienteGenerico->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'total' => 50.00,
             'estado' => 1,
         ]);
 
-        // 2da venta en espera simultánea con otro cliente genérico que contiene '0000'
-        $otroGenerico = Cliente::create([
-            'nombre_apellido_cliente' => 'Cliente Ocasional',
-            'codigo_cliente' => 'CLI-0000',
-            'telefono_cliente' => '00000000',
-            'estado' => 1,
-        ]);
-
+        // 2da venta en espera simultánea con otro cliente genérico
         $response2 = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $otroGenerico->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -135,7 +110,7 @@ class VentaEsperaTest extends TestCase
     public function test_guarda_venta_en_espera_con_nombre_de_cliente_registrado(): void
     {
         $response = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -148,11 +123,11 @@ class VentaEsperaTest extends TestCase
         $response->assertStatus(201)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.identificador_cuenta', 'Carlos Mendoza')
-            ->assertJsonPath('data.id_cliente', $this->clienteRegistrado->cliente_id);
+            ->assertJsonPath('data.cliente_nombre', 'Carlos Mendoza');
 
         $this->assertDatabaseHas('venta_espera', [
             'identificador_cuenta' => 'Carlos Mendoza',
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'total' => 75.00,
         ]);
     }
@@ -162,7 +137,7 @@ class VentaEsperaTest extends TestCase
         $stockInicial = $this->producto->fresh()->existencia_bodega;
 
         $response = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -186,7 +161,7 @@ class VentaEsperaTest extends TestCase
     public function test_listar_y_obtener_venta_en_espera_con_detalles(): void
     {
         $postRes = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -216,7 +191,7 @@ class VentaEsperaTest extends TestCase
     public function test_eliminacion_logica_de_venta_en_espera_y_sus_detalles(): void
     {
         $postRes = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -257,7 +232,7 @@ class VentaEsperaTest extends TestCase
     public function test_validacion_de_descuento_mayor_al_subtotal(): void
     {
         $response = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteRegistrado->cliente_id,
+            'cliente_nombre' => 'Carlos Mendoza',
             'descuento' => 100, // Subtotal será 25, descuento 100 es inválido
             'detalles' => [
                 [
@@ -275,7 +250,7 @@ class VentaEsperaTest extends TestCase
     public function test_actualizar_venta_en_espera_existente(): void
     {
         $postRes = $this->postJson('/api/ventas-espera', [
-            'id_cliente' => $this->clienteGenerico->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,
@@ -290,7 +265,7 @@ class VentaEsperaTest extends TestCase
 
         // Modificar agregando más cantidad
         $updateRes = $this->putJson("/api/ventas-espera/{$id}", [
-            'id_cliente' => $this->clienteGenerico->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'detalles' => [
                 [
                     'id_producto' => $this->producto->producto_id,

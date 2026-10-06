@@ -369,17 +369,7 @@ export function dashboardModule() {
                 : (Array.isArray(this.dashboardData?.ultimasVentas) ? this.dashboardData.ultimasVentas : []);
 
             return raw.slice(0, 10).map(v => {
-                let cliente = 'Consumidor Final';
-                if (v.cliente_nombre) {
-                    cliente = v.cliente_nombre;
-                } else if (v.cliente && v.cliente.nombre_apellido_cliente) {
-                    cliente = v.cliente.nombre_apellido_cliente;
-                } else if (v.id_cliente && Array.isArray(this.clientes)) {
-                    const found = this.clientes.find(c => Number(c.cliente_id) === Number(v.id_cliente));
-                    if (found && found.nombre_apellido_cliente) {
-                        cliente = found.nombre_apellido_cliente;
-                    }
-                }
+                const cliente = v.cliente_nombre || 'Consumidor Final';
 
                 return {
                     venta_id: v.venta_id,

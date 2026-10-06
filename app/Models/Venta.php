@@ -15,7 +15,7 @@ class Venta extends Model
 
     protected $fillable = [
         'id_usuario',
-        'id_cliente',
+        'cliente_nombre',
         'codigo_venta',
         'metodo_pago',
         'referencia_transferencia',
@@ -29,11 +29,6 @@ class Venta extends Model
     public function usuario()
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'usuario_id');
-    }
-
-    public function cliente()
-    {
-        return $this->belongsTo(Cliente::class, 'id_cliente', 'cliente_id');
     }
 
     public function venta_detalles()
