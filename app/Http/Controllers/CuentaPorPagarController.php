@@ -40,7 +40,7 @@ class CuentaPorPagarController extends Controller
     {
         $this->authorizeAdmin($request);
 
-        $query = Cuenta_por_pagar::with(['proveedor'])
+        $query = Cuenta_por_pagar::with(['proveedor', 'pagos.usuario'])
             ->orderBy('fecha_vencimiento');
 
         if ($request->filled('id_proveedor')) {
@@ -243,7 +243,7 @@ class CuentaPorPagarController extends Controller
 
         Bitacora::create([
             'id_usuario' => $request->user()->usuario_id,
-            'accion_bitacora' => 'CUENTA_POR_PAGAR_ELIMINADA',
+            'accion_bitacora' => 'CUENTA_PAGAR_ELIMINADA',
             'descripcion_bitacora' => "Se eliminó la cuenta por pagar #{$cuenta->numero_factura}.",
             'fecha_hora_bitacora' => now(),
             'estado' => 1,
@@ -264,15 +264,32 @@ class CuentaPorPagarController extends Controller
 
         $validated = $request->validate([
             'monto_pago' => 'required|numeric|min:0.01|max:999999999.99',
-            'metodo_pago' => ['required', 'string', Rule::in(['Efectivo', 'Transferencia'])],
-            'debitar_de_caja' => 'required|boolean',
+            'metodo_pago' => ['required', 'string', Rule::in(['Efectivo', 'Transferencia', 'Cheque', 'Otro'])],
+            'debitar_de_caja' => 'sometimes|boolean',
+            'registrar_en_caja' => 'sometimes|boolean',
             'id_caja_operacion' => 'nullable|integer|exists:caja_operacion,caja_operacion_id',
             'notas' => 'nullable|string|max:255',
+            'nota' => 'nullable|string|max:255',
+            'referencia_pago' => 'nullable|string|max:255',
         ], [
             'monto_pago.required' => 'El monto del abono o pago es obligatorio.',
             'monto_pago.min' => 'El monto del abono debe ser mayor a 0.',
             'metodo_pago.required' => 'Debe indicar el método de pago.',
         ]);
+
+        $debitarDeCaja = $request->boolean('debitar_de_caja', $request->boolean('registrar_en_caja', false));
+        $validated['debitar_de_caja'] = $debitarDeCaja;
+
+        if (empty($validated['notas'])) {
+            $partesNota = [];
+            if (! empty($validated['referencia_pago'])) {
+                $partesNota[] = 'Ref: '.trim($validated['referencia_pago']);
+            }
+            if (! empty($validated['nota'])) {
+                $partesNota[] = trim($validated['nota']);
+            }
+            $validated['notas'] = ! empty($partesNota) ? implode(' - ', $partesNota) : null;
+        }
 
         return DB::transaction(function () use ($validated, $request, $id) {
             $cuenta = Cuenta_por_pagar::lockForUpdate()->with('proveedor')->findOrFail($id);
@@ -332,7 +349,7 @@ class CuentaPorPagarController extends Controller
 
                 Bitacora::create([
                     'id_usuario' => $usuario->usuario_id,
-                    'accion_bitacora' => 'CAJA_EGRESO_PAGO_PROVEEDOR',
+                    'accion_bitacora' => 'CAJA_PAGO_PROVEEDOR',
                     'descripcion_bitacora' => "Egreso de caja #{$movimiento->caja_movimiento_venta_id}: Pago a proveedor {$cuenta->proveedor->nombre_comercial} (Factura #{$cuenta->numero_factura}) por C$ ".number_format($montoAbono, 2),
                     'fecha_hora_bitacora' => now(),
                     'estado' => 1,

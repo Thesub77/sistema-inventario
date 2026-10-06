@@ -1310,7 +1310,8 @@ function proveedoresModule() {
             metodo_pago: 'Efectivo',
             referencia_pago: '',
             nota: '',
-            registrar_en_caja: true
+            registrar_en_caja: true,
+            debitar_de_caja: true
         },
 
         // Modal de Historial de Pagos / Abonos
@@ -1640,12 +1641,14 @@ function proveedoresModule() {
         // Control de Pagos y Abonos
         openAbonoModal(cuenta) {
             this.selectedCuentaParaAbono = cuenta;
+            const tieneTurno = Boolean(this.turnoActivo);
             this.abonoForm = {
                 monto_pago: Number(cuenta.saldo_pendiente || 0).toFixed(2),
                 metodo_pago: 'Efectivo',
                 referencia_pago: '',
                 nota: '',
-                registrar_en_caja: Boolean(this.turnoActivo)
+                registrar_en_caja: tieneTurno,
+                debitar_de_caja: tieneTurno
             };
             this.showAbonoModal = true;
             this.$nextTick(() => {
@@ -1674,16 +1677,31 @@ function proveedoresModule() {
                 return;
             }
 
-            if (this.abonoForm.metodo_pago === 'Efectivo' && this.abonoForm.registrar_en_caja && !this.turnoActivo) {
-                this.notify('Caja Cerrada', 'Para registrar la salida de efectivo de caja, debes tener un turno activo abierto.', 'warning');
+            const debeDebitar = this.abonoForm.metodo_pago === 'Efectivo' && Boolean(this.abonoForm.registrar_en_caja || this.abonoForm.debitar_de_caja);
+
+            if (debeDebitar && !this.turnoActivo) {
+                this.notify('Caja Cerrada', 'Para registrar la salida de efectivo de caja, debes tener un turno activo abierto o desmarcar la casilla de descontar de caja.', 'warning');
                 return;
             }
 
             this.isSavingAbono = true;
             try {
+                const payload = {
+                    monto_pago: montoNum,
+                    metodo_pago: this.abonoForm.metodo_pago,
+                    debitar_de_caja: debeDebitar,
+                    registrar_en_caja: debeDebitar,
+                    referencia_pago: this.abonoForm.referencia_pago ? this.abonoForm.referencia_pago.trim() : null,
+                    nota: this.abonoForm.nota ? this.abonoForm.nota.trim() : null,
+                    notas: [
+                        this.abonoForm.referencia_pago ? `Ref: ${this.abonoForm.referencia_pago.trim()}` : '',
+                        this.abonoForm.nota ? this.abonoForm.nota.trim() : ''
+                    ].filter(Boolean).join(' - ') || null
+                };
+
                 const res = await this.apiFetch(`/api/cuentas-por-pagar/${this.selectedCuentaParaAbono.cuenta_por_pagar_id}/pagos`, {
                     method: 'POST',
-                    body: JSON.stringify(this.abonoForm)
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await res.json();
@@ -1720,12 +1738,27 @@ function proveedoresModule() {
             }
         },
 
-        openHistorialAbonos(cuenta) {
-            this.selectedCuentaHistorial = cuenta;
+        async openHistorialAbonos(cuenta) {
+            this.selectedCuentaHistorial = { ...cuenta };
             this.showHistorialAbonosModal = true;
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
             });
+
+            try {
+                const res = await this.apiFetch(`/api/cuentas-por-pagar/${cuenta.cuenta_por_pagar_id}/pagos`);
+                if (res.ok) {
+                    const pagos = await res.json();
+                    if (this.selectedCuentaHistorial && this.selectedCuentaHistorial.cuenta_por_pagar_id === cuenta.cuenta_por_pagar_id) {
+                        this.selectedCuentaHistorial.pagos = pagos;
+                        this.$nextTick(() => {
+                            if (window.lucide) window.lucide.createIcons();
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Error al cargar historial de pagos:', e);
+            }
         },
 
         // Utilidades de Fechas y Estados

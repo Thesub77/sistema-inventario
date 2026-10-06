@@ -182,7 +182,7 @@
         <!-- Tabla de Cuentas por Pagar -->
         <div class="glass-panel rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs">
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs whitespace-nowrap">
+                <table class="w-full text-left text-xs whitespace-nowrap min-w-[950px]">
                     <thead class="text-[11px] uppercase bg-slate-50 dark:bg-dark-900 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold">
                         <tr>
                             <th class="py-3 px-4">Proveedor</th>
@@ -192,7 +192,7 @@
                             <th class="py-3 px-4 text-right">Pagado</th>
                             <th class="py-3 px-4 text-right">Saldo Pendiente</th>
                             <th class="py-3 px-4 text-center">Estado</th>
-                            <th class="py-3 px-4 text-center">Acciones</th>
+                            <th class="py-3 px-4 text-center min-w-[170px]">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
@@ -259,44 +259,61 @@
                                 </td>
 
                                 <!-- Acciones -->
-                                <td class="py-3 px-4 text-center">
-                                    <div class="flex items-center justify-center gap-1">
-                                        <!-- Botón Abonar / Liquidar -->
+                                <td class="py-3 px-4 text-center min-w-[170px]">
+                                    <div class="flex items-center justify-center gap-1.5 flex-nowrap">
+                                        <!-- Botón Abonar / Liquidada -->
                                         <button type="button"
                                             x-show="Number(cuenta.saldo_pendiente) > 0"
                                             @click="openAbonoModal(cuenta)"
-                                            class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                            class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer flex-shrink-0"
                                             title="Registrar Abono o Pago">
                                             <i data-lucide="hand-coins" class="w-3.5 h-3.5"></i>
                                             <span>Abonar</span>
                                         </button>
+                                        <span x-show="Number(cuenta.saldo_pendiente) <= 0"
+                                            class="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] inline-flex items-center gap-1 flex-shrink-0"
+                                            title="Factura pagada en su totalidad">
+                                            <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                                            <span>Liquidada</span>
+                                        </span>
 
                                         <!-- Botón Ver Historial de Pagos -->
                                         <button type="button"
-                                            x-show="(cuenta.pagos && cuenta.pagos.length > 0) || Number(cuenta.monto_pagado) > 0"
                                             @click="openHistorialAbonos(cuenta)"
-                                            class="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                            title="Ver historial de abonos">
+                                            class="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex-shrink-0 relative"
+                                            :title="Number(cuenta.monto_pagado) > 0 ? 'Ver historial de pagos (' + formatCurrency(cuenta.monto_pagado) + ' pagados)' : 'Ver historial de pagos'">
                                             <i data-lucide="history" class="w-4 h-4"></i>
+                                            <span x-show="Number(cuenta.monto_pagado) > 0"
+                                                class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-dark-900"></span>
                                         </button>
 
-                                        <!-- Botón Editar (solo si no tiene abonos) -->
+                                        <!-- Botón Editar (datos descriptivos de la factura) -->
                                         <button type="button"
                                             x-show="Number(cuenta.monto_pagado) === 0"
                                             @click="openCuentaPorPagarModal(cuenta)"
-                                            class="p-1.5 text-slate-400 hover:text-brand-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                            class="p-1.5 text-slate-400 hover:text-brand-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex-shrink-0"
                                             title="Editar factura">
                                             <i data-lucide="edit-3" class="w-4 h-4"></i>
                                         </button>
+                                        <span x-show="Number(cuenta.monto_pagado) > 0"
+                                            class="p-1.5 text-slate-300 dark:text-slate-600 rounded-lg cursor-not-allowed opacity-40 flex-shrink-0 inline-flex"
+                                            title="No se puede editar porque cuenta con pagos registrados">
+                                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                        </span>
 
-                                        <!-- Botón Eliminar (solo si no tiene abonos) -->
+                                        <!-- Botón Eliminar (solo si no tiene abonos registrados) -->
                                         <button type="button"
                                             x-show="Number(cuenta.monto_pagado) === 0"
                                             @click="deleteCuentaPorPagar(cuenta)"
-                                            class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                            class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex-shrink-0"
                                             title="Eliminar factura">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
+                                        <span x-show="Number(cuenta.monto_pagado) > 0"
+                                            class="p-1.5 text-slate-300 dark:text-slate-600 rounded-lg cursor-not-allowed opacity-40 flex-shrink-0 inline-flex"
+                                            title="No se puede eliminar porque cuenta con pagos registrados">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </span>
                                     </div>
                                 </td>
                             </tr>

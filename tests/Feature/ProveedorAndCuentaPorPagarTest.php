@@ -241,6 +241,72 @@ class ProveedorAndCuentaPorPagarTest extends TestCase
             ->assertJsonPath('cuenta.monto_pagado', 2000)
             ->assertJsonPath('cuenta.saldo_pendiente', 0)
             ->assertJsonPath('cuenta.estado', 'Pagada');
+
+        $this->assertDatabaseHas('bitacora', [
+            'accion_bitacora' => 'CAJA_PAGO_PROVEEDOR',
+        ]);
+    }
+
+    public function test_abono_acepta_alias_registrar_en_caja_o_campo_opcional(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        $prov = Proveedor::create(['nombre_comercial' => 'Distribuidora Central', 'estado' => 1]);
+
+        $cuenta = Cuenta_por_pagar::create([
+            'id_proveedor' => $prov->proveedor_id,
+            'numero_factura' => 'FAC-ALIAS-123',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(15)->toDateString(),
+            'monto_total' => 1000.00,
+            'monto_pagado' => 0.00,
+            'saldo_pendiente' => 1000.00,
+            'estado' => 'Pendiente',
+        ]);
+
+        // Registrar abono enviando registrar_en_caja (nombre de campo del formulario frontend)
+        $res = $this->postJson("/api/cuentas-por-pagar/{$cuenta->cuenta_por_pagar_id}/pagos", [
+            'monto_pago' => 300.00,
+            'metodo_pago' => 'Transferencia',
+            'registrar_en_caja' => false,
+            'referencia_pago' => 'TRF-09923',
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('cuenta.monto_pagado', 300)
+            ->assertJsonPath('cuenta.saldo_pendiente', 700);
+    }
+
+    public function test_eliminar_cuenta_por_pagar_registra_bitacora_valida(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        $prov = Proveedor::create(['nombre_comercial' => 'Proveedor Eliminable', 'estado' => 1]);
+
+        $cuenta = Cuenta_por_pagar::create([
+            'id_proveedor' => $prov->proveedor_id,
+            'numero_factura' => 'FAC-DEL-999',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(5)->toDateString(),
+            'monto_total' => 450.00,
+            'monto_pagado' => 0.00,
+            'saldo_pendiente' => 450.00,
+            'estado' => 'Pendiente',
+        ]);
+
+        $res = $this->deleteJson("/api/cuentas-por-pagar/{$cuenta->cuenta_por_pagar_id}");
+
+        $res->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('cuenta_por_pagar', [
+            'cuenta_por_pagar_id' => $cuenta->cuenta_por_pagar_id,
+        ]);
+
+        $this->assertDatabaseHas('bitacora', [
+            'accion_bitacora' => 'CUENTA_PAGAR_ELIMINADA',
+        ]);
     }
 
     public function test_rechaza_abono_superior_al_saldo_pendiente(): void
