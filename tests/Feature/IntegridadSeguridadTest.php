@@ -186,6 +186,13 @@ class IntegridadSeguridadTest extends TestCase
         $this->withHeader('Authorization', "Bearer {$tokenCajero}")
             ->getJson('/api/auth/me')
             ->assertStatus(401);
+
+        // Verificar que el usuario eliminado lógicamente (estado=0) ya NO aparece en la lista de usuarios
+        Sanctum::actingAs($this->adminPrincipal);
+        $resList = $this->getJson('/api/usuarios');
+        $resList->assertStatus(200);
+        $usuariosIds = collect($resList->json('data') ?? $resList->json())->pluck('usuario_id')->all();
+        $this->assertNotContains($cajero->usuario_id, $usuariosIds);
     }
 
     public function test_usuario_no_puede_desactivarse_a_si_mismo(): void
@@ -357,11 +364,20 @@ class IntegridadSeguridadTest extends TestCase
         $res3->assertJsonPath('success', false);
         $this->assertStringContainsString('bloqueada por exceder el límite de 3 intentos', $res3->json('message'));
 
-        // Verificar que en base de datos el usuario quedó en estado 0 (Inactivo / Bloqueado)
+        // Verificar que en base de datos el usuario quedó bloqueado (bloqueado = 1, pero estado = 1 para no considerarse eliminado)
         $cajeroTest->refresh();
-        $this->assertEquals(0, (int) $cajeroTest->estado);
+        $this->assertEquals(1, (int) $cajeroTest->bloqueado);
+        $this->assertEquals(1, (int) $cajeroTest->estado);
+
+        // Administrador consulta la lista de usuarios: el usuario bloqueado SÍ debe aparecer en la lista para poder ser gestionado
+        Sanctum::actingAs($this->adminPrincipal);
+        $resListBloqueado = $this->getJson('/api/usuarios');
+        $resListBloqueado->assertStatus(200);
+        $usuariosIdsBloqueado = collect($resListBloqueado->json('data') ?? $resListBloqueado->json())->pluck('usuario_id')->all();
+        $this->assertContains($cajeroTest->usuario_id, $usuariosIdsBloqueado);
 
         // Intento 4: Intentar con clave correcta mientras está bloqueado debe dar 403
+        $this->app['auth']->forgetGuards();
         $res4 = $this->postJson('/api/auth/login', [
             'nombre_usuario' => 'cajero_bloqueo',
             'contrasenia_usuario' => 'claveCorrecta123',
@@ -369,13 +385,14 @@ class IntegridadSeguridadTest extends TestCase
         $res4->assertStatus(403);
         $this->assertStringContainsString('inactiva o bloqueada', $res4->json('message'));
 
-        // Administrador reactiva la cuenta del usuario
+        // Administrador reactiva/desbloquea la cuenta del usuario cambiando bloqueado a 0
         Sanctum::actingAs($this->adminPrincipal);
         $resUpdate = $this->putJson("/api/usuarios/{$cajeroTest->usuario_id}", [
-            'estado' => 1,
+            'bloqueado' => 0,
         ]);
         $resUpdate->assertStatus(200);
         $cajeroTest->refresh();
+        $this->assertEquals(0, (int) $cajeroTest->bloqueado);
         $this->assertEquals(1, (int) $cajeroTest->estado);
 
         // Intento 5: Ahora el usuario puede iniciar sesión correctamente

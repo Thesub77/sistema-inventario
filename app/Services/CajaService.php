@@ -17,7 +17,7 @@ class CajaService
      */
     public function autorizar(Usuario $usuario, ?Caja_operacion $operacion = null): void
     {
-        CajaException::exigir((int) $usuario->estado === 1, 403, 'El usuario está inactivo.');
+        CajaException::exigir((int) $usuario->estado === 1 && (int) ($usuario->bloqueado ?? 0) === 0, 403, 'El usuario está inactivo o bloqueado.');
         CajaException::exigir($usuario->esAdmin() || $usuario->tienePermiso('cajas.gestionar') || $usuario->tienePermiso('pos.acceso'), 403, 'Sin acceso a cajas.');
         if ($operacion) {
             CajaException::exigir($usuario->esAdmin() || (int) $operacion->id_usuario === (int) $usuario->usuario_id, 403, 'El turno pertenece a otro usuario.');
@@ -81,7 +81,7 @@ class CajaService
      */
     public function paraVenta(?int $idCaja, Usuario $usuario): Caja_operacion
     {
-        CajaException::exigir((int) $usuario->estado === 1, 403, 'El usuario está inactivo.');
+        CajaException::exigir((int) $usuario->estado === 1 && (int) ($usuario->bloqueado ?? 0) === 0, 403, 'El usuario está inactivo o bloqueado.');
         CajaException::exigir($usuario->esAdmin() || $usuario->tienePermiso('ventas.crear') || $usuario->tienePermiso('pos.acceso'), 403, 'Sin permiso para registrar ventas.');
 
         // 1. Buscar si el usuario autenticado tiene un turno propio abierto

@@ -76,10 +76,10 @@
                 </div>
             </div>
             <div class="text-2xl font-display font-black text-emerald-600 dark:text-emerald-400"
-                x-text="usuarios.filter(u => Number(u.estado) === 1).length"></div>
+                x-text="usuarios.filter(u => Number(u.bloqueado) === 0).length"></div>
             <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
                 <span>Con acceso al sistema:</span>
-                <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="usuarios.filter(u => Number(u.estado) === 1).length + ' activos'"></span>
+                <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="usuarios.filter(u => Number(u.bloqueado) === 0).length + ' activos'"></span>
             </div>
         </div>
 
@@ -92,10 +92,10 @@
                 </div>
             </div>
             <div class="text-2xl font-display font-black text-rose-600 dark:text-rose-400"
-                x-text="usuarios.filter(u => Number(u.estado) === 0).length"></div>
+                x-text="usuarios.filter(u => Number(u.bloqueado) === 1).length"></div>
             <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
                 <span>Sin acceso:</span>
-                <span class="font-bold text-rose-600 dark:text-rose-400" x-text="usuarios.filter(u => Number(u.estado) === 0).length + ' bloqueados'"></span>
+                <span class="font-bold text-rose-600 dark:text-rose-400" x-text="usuarios.filter(u => Number(u.bloqueado) === 1).length + ' bloqueados'"></span>
             </div>
         </div>
 
@@ -167,8 +167,8 @@
                     <select x-model="userStatusFilter"
                         class="bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-brand-500 transition-colors cursor-pointer">
                         <option value="">Todos los Estados</option>
-                        <option value="1">Activos</option>
-                        <option value="0">Inactivos / Bloqueados</option>
+                        <option value="activos">Activos (Desbloqueados)</option>
+                        <option value="bloqueados">Bloqueados</option>
                     </select>
                 </div>
             </div>
@@ -187,21 +187,21 @@
                             <th class="py-3 px-4 font-semibold">Usuario & Nombre</th>
                             <th class="py-3 px-4 font-semibold">Rol Asignado</th>
                             <th class="py-3 px-4 font-semibold">Fecha Registro</th>
-                            <th class="py-3 px-4 text-center font-semibold">Estado</th>
+                            <th class="py-3 px-4 text-center font-semibold">Estado de Acceso</th>
                             <th class="py-3 px-4 text-center font-semibold">Acciones Rápidas</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800/60">
                         <template x-for="u in filteredUsersList" :key="u.usuario_id">
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
-                                :class="Number(u.estado) === 0 ? 'bg-slate-50/50 dark:bg-slate-900/40 opacity-80' : ''">
+                                :class="Number(u.bloqueado) === 1 ? 'bg-rose-500/5 dark:bg-rose-950/20' : ''">
                                 <!-- Nombre y Usuario -->
                                 <td class="py-3.5 px-4">
                                     <div class="flex items-center gap-3">
                                         <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs border"
-                                            :class="Number(u.estado) === 1
+                                            :class="Number(u.bloqueado) === 0
                                                 ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 border-brand-500/20'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'">
+                                                : 'bg-rose-500/10 text-rose-500 border-rose-500/20'">
                                             <span x-text="(u.nombre_apellido || 'U').charAt(0).toUpperCase()"></span>
                                         </div>
                                         <div>
@@ -239,15 +239,15 @@
                                 <td class="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400"
                                     x-text="u.fecha_registro ? formatDateOnly(u.fecha_registro) : 'Sin fecha'"></td>
 
-                                <!-- Estado (Activo / Inactivo) -->
+                                <!-- Estado de Acceso (Activo / Bloqueado) -->
                                 <td class="py-3.5 px-4 text-center">
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs rounded-full font-bold border"
-                                        :class="Number(u.estado) === 1
+                                        :class="Number(u.bloqueado) === 0
                                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
                                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'">
                                         <span class="w-1.5 h-1.5 rounded-full"
-                                            :class="Number(u.estado) === 1 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-                                        <span x-text="Number(u.estado) === 1 ? 'Activo' : 'Bloqueado'"></span>
+                                            :class="Number(u.bloqueado) === 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                                        <span x-text="Number(u.bloqueado) === 0 ? 'Activo' : 'Bloqueado'"></span>
                                     </span>
                                 </td>
 
@@ -275,11 +275,11 @@
                                             @click="toggleUserStatus(u)"
                                             :disabled="!canToggleUser(u)"
                                             class="p-2 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                            :class="Number(u.estado) === 1
+                                            :class="Number(u.bloqueado) === 0
                                                 ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/10'
                                                 : 'text-rose-500 hover:text-emerald-500 hover:bg-emerald-500/10'"
                                             :title="getUserActionTooltip(u, 'toggle')">
-                                            <i :data-lucide="Number(u.estado) === 1 ? 'lock' : 'unlock'" class="w-4 h-4"></i>
+                                            <i :data-lucide="Number(u.bloqueado) === 0 ? 'lock' : 'unlock'" class="w-4 h-4"></i>
                                         </button>
 
                                         <!-- Botón: Eliminar Usuario -->

@@ -24,12 +24,28 @@ class AuthController extends Controller
             ->where('nombre_usuario', $validated['nombre_usuario'])
             ->first();
 
-        // Si el usuario existe pero ya está inactivo o bloqueado
+        // Si el usuario existe pero está eliminado lógicamente del sistema
         if ($usuario && (int) $usuario->estado !== 1) {
             Bitacora::create([
                 'id_usuario' => $usuario->usuario_id,
                 'accion_bitacora' => 'LOGIN_BLOQUEADO',
-                'descripcion_bitacora' => "Intento de inicio de sesión con cuenta inactiva o bloqueada: {$usuario->nombre_usuario}",
+                'descripcion_bitacora' => "Intento de inicio de sesión con cuenta inactiva o dada de baja: {$usuario->nombre_usuario}",
+                'fecha_hora_bitacora' => now(),
+                'estado' => 1,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Credenciales incorrectas o la cuenta ha sido dada de baja del sistema.',
+            ], 403);
+        }
+
+        // Si el usuario existe y está activo, pero su acceso se encuentra bloqueado
+        if ($usuario && (int) $usuario->bloqueado === 1) {
+            Bitacora::create([
+                'id_usuario' => $usuario->usuario_id,
+                'accion_bitacora' => 'LOGIN_BLOQUEADO',
+                'descripcion_bitacora' => "Intento de inicio de sesión con cuenta bloqueada: {$usuario->nombre_usuario}",
                 'fecha_hora_bitacora' => now(),
                 'estado' => 1,
             ]);
@@ -78,7 +94,7 @@ class AuthController extends Controller
 
                 // 4. Bloqueo automático al tercer intento fallido consecutivo (para usuarios no administradores)
                 if (! $esAdmin && $intentosFallidos >= 3) {
-                    $usuario->update(['estado' => 0]);
+                    $usuario->update(['bloqueado' => 1]);
                     $usuario->tokens()->delete();
 
                     Bitacora::create([
