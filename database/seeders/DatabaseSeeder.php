@@ -3,8 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Caja;
-use App\Models\Cliente;
+use App\Models\Cuenta_por_pagar;
 use App\Models\Empresa;
+use App\Models\Proveedor;
 use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Database\Seeder;
@@ -59,12 +60,42 @@ class DatabaseSeeder extends Seeder
             'estado' => 1,
         ]);
 
-        // 5. Cliente Consumidor Final
-        Cliente::create([
-            'codigo_cliente' => 'CLI-0000',
-            'nombre_apellido_cliente' => 'Consumidor Final',
-            'telefono_cliente' => '00000000',
+        // 5. Proveedores Iniciales y Cuentas por Pagar de Prueba
+        $provCocaCola = Proveedor::create([
+            'nombre_comercial' => 'Coca-Cola FEMSA Nicaragua',
+            'contacto_vendedor' => 'Manuel Estrada (Ruta 4)',
+            'telefono' => '8845-1290',
+            'plazo_credito_dias' => 15,
             'estado' => 1,
+        ]);
+
+        $provBimbo = Proveedor::create([
+            'nombre_comercial' => 'Distribuidora Bimbo',
+            'contacto_vendedor' => 'Roberto Sánchez',
+            'telefono' => '8765-4321',
+            'plazo_credito_dias' => 7,
+            'estado' => 1,
+        ]);
+
+        $provCargill = Proveedor::create([
+            'nombre_comercial' => 'Cargill / Tip-Top Pollo',
+            'contacto_vendedor' => 'Javier Mendoza',
+            'telefono' => '8901-2345',
+            'plazo_credito_dias' => 7,
+            'estado' => 1,
+        ]);
+
+        // Factura de prueba pendiente
+        Cuenta_por_pagar::create([
+            'id_proveedor' => $provCocaCola->proveedor_id,
+            'numero_factura' => 'FAC-FEMSA-98214',
+            'descripcion' => 'Surtido semanal de bebidas gaseosas y jugos',
+            'fecha_emision' => date('Y-m-d', strtotime('-5 days')),
+            'fecha_vencimiento' => date('Y-m-d', strtotime('+10 days')),
+            'monto_total' => 3850.00,
+            'monto_pagado' => 0.00,
+            'saldo_pendiente' => 3850.00,
+            'estado' => 'Pendiente',
         ]);
 
         // 6. Cajas Físicas del Establecimiento

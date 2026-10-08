@@ -101,7 +101,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span>Cliente:</span>
-                    <span class="font-bold text-black" x-text="receiptData?.cliente?.nombre_apellido_cliente || 'Consumidor Final'"></span>
+                    <span class="font-bold text-black" x-text="receiptData?.cliente_nombre || 'Consumidor Final'"></span>
                 </div>
 
                 <div class="flex justify-between">

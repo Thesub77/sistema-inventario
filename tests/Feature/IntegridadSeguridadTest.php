@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Bitacora;
 use App\Models\Categoria;
-use App\Models\Cliente;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
+use App\Models\Proveedor;
 use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,42 +132,24 @@ class IntegridadSeguridadTest extends TestCase
         $res2->assertJsonValidationErrors(['codigo_categoria']);
     }
 
-    public function test_cliente_se_desactiva_logicamente(): void
+    public function test_proveedor_se_desactiva_logicamente(): void
     {
-        $cliente = Cliente::create([
-            'codigo_cliente' => 'CLI-100',
-            'nombre_apellido_cliente' => 'Cliente Corporativo S.A.',
-            'telefono_cliente' => '88889999',
+        $proveedor = Proveedor::create([
+            'nombre_comercial' => 'Distribuidora Central S.A.',
+            'contacto_nombre' => 'Juan Perez',
+            'telefono' => '88889999',
             'estado' => 1,
         ]);
 
-        $res = $this->deleteJson("/api/clientes/{$cliente->cliente_id}");
+        $res = $this->deleteJson("/api/proveedores/{$proveedor->proveedor_id}");
         $res->assertStatus(200);
         $res->assertJsonPath('success', true);
 
         // Verificar que el registro persiste pero con estado 0
-        $this->assertDatabaseHas('cliente', [
-            'cliente_id' => $cliente->cliente_id,
+        $this->assertDatabaseHas('proveedor', [
+            'proveedor_id' => $proveedor->proveedor_id,
             'estado' => 0,
         ]);
-    }
-
-    public function test_cliente_rechaza_codigo_duplicado(): void
-    {
-        Cliente::create([
-            'codigo_cliente' => 'CLI-200',
-            'nombre_apellido_cliente' => 'Primer Cliente',
-            'estado' => 1,
-        ]);
-
-        $res = $this->postJson('/api/clientes', [
-            'codigo_cliente' => 'CLI-200',
-            'nombre_apellido_cliente' => 'Segundo Cliente',
-            'estado' => 1,
-        ]);
-
-        $res->assertStatus(422);
-        $res->assertJsonValidationErrors(['codigo_cliente']);
     }
 
     public function test_usuario_se_desactiva_logicamente_y_revoca_tokens(): void
@@ -455,39 +437,38 @@ class IntegridadSeguridadTest extends TestCase
         $this->assertEquals(90, (float) $resUpdOk->json('precio_venta'));
     }
 
-    public function test_cliente_valida_formato_telefono_y_unicidad_codigo(): void
+    public function test_proveedor_valida_campos_requeridos_y_plazo_credito(): void
     {
-        // 1. Rechaza teléfono con formato inválido
-        $resTelInvalido = $this->postJson('/api/clientes', [
-            'codigo_cliente' => 'CLI-001',
-            'nombre_apellido_cliente' => 'Juan Perez',
-            'telefono_cliente' => 'abc-invalido',
+        // 1. Rechaza si falta nombre_comercial
+        $resSinNombre = $this->postJson('/api/proveedores', [
+            'contacto_vendedor' => 'Juan Vendedor',
+            'telefono' => '88889999',
             'estado' => 1,
         ]);
-        $resTelInvalido->assertStatus(422);
-        $resTelInvalido->assertJsonValidationErrors(['telefono_cliente']);
+        $resSinNombre->assertStatus(422);
+        $resSinNombre->assertJsonValidationErrors(['nombre_comercial']);
 
-        // 2. Permite teléfono válido (formato internacional o local)
-        $resTelOk = $this->postJson('/api/clientes', [
-            'codigo_cliente' => 'CLI-001',
-            'nombre_apellido_cliente' => 'Juan Perez',
-            'telefono_cliente' => '+504 9988-7766',
+        // 2. Rechaza plazo de crédito inválido (ej. negativo o string)
+        $resPlazoInvalido = $this->postJson('/api/proveedores', [
+            'nombre_comercial' => 'Proveedor Invalido',
+            'plazo_credito_dias' => -5,
             'estado' => 1,
         ]);
-        $resTelOk->assertStatus(201);
+        $resPlazoInvalido->assertStatus(422);
+        $resPlazoInvalido->assertJsonValidationErrors(['plazo_credito_dias']);
 
-        // 3. Rechaza duplicado de codigo_cliente
-        $resDup = $this->postJson('/api/clientes', [
-            'codigo_cliente' => 'CLI-001',
-            'nombre_apellido_cliente' => 'Maria Lopez',
-            'telefono_cliente' => '88776655',
+        // 3. Permite proveedor válido
+        $resOk = $this->postJson('/api/proveedores', [
+            'nombre_comercial' => 'Distribuidora Global',
+            'contacto_vendedor' => 'Carlos Gomez',
+            'telefono' => '88776655',
+            'plazo_credito_dias' => 15,
             'estado' => 1,
         ]);
-        $resDup->assertStatus(422);
-        $resDup->assertJsonValidationErrors(['codigo_cliente']);
+        $resOk->assertStatus(201);
     }
 
-    public function test_categoria_cliente_y_bitacora_soportan_paginacion_y_busqueda(): void
+    public function test_categoria_proveedor_y_bitacora_soportan_paginacion_y_busqueda(): void
     {
         // Setup categorías
         Categoria::create(['codigo_categoria' => 'CAT-PAG1', 'nombre_categoria' => 'Bebidas Frias', 'estado' => 1]);
@@ -505,19 +486,19 @@ class IntegridadSeguridadTest extends TestCase
         $resCatSearch->assertStatus(200);
         $this->assertCount(2, $resCatSearch->json());
 
-        // Setup clientes
-        Cliente::create(['codigo_cliente' => 'CLI-A1', 'nombre_apellido_cliente' => 'Carlos Mendoza', 'telefono_cliente' => '99001122', 'estado' => 1]);
-        Cliente::create(['codigo_cliente' => 'CLI-A2', 'nombre_apellido_cliente' => 'Lucia Fernandez', 'telefono_cliente' => '88001122', 'estado' => 1]);
+        // Setup proveedores
+        Proveedor::create(['nombre_comercial' => 'Carlos Mendoza Distribuidora', 'telefono' => '99001122', 'estado' => 1]);
+        Proveedor::create(['nombre_comercial' => 'Lucia Fernandez Comercial', 'telefono' => '88001122', 'estado' => 1]);
 
-        // Paginación y búsqueda de clientes
-        $resCliPag = $this->getJson('/api/clientes?por_pagina=1&page=1');
-        $resCliPag->assertStatus(200);
-        $resCliPag->assertJsonStructure(['data', 'current_page', 'per_page', 'total']);
-        $this->assertCount(1, $resCliPag->json('data'));
+        // Paginación y búsqueda de proveedores
+        $resProvPag = $this->getJson('/api/proveedores?por_pagina=1&page=1');
+        $resProvPag->assertStatus(200);
+        $resProvPag->assertJsonStructure(['data', 'current_page', 'per_page', 'total']);
+        $this->assertCount(1, $resProvPag->json('data'));
 
-        $resCliSearch = $this->getJson('/api/clientes?buscar=Mendoza');
-        $resCliSearch->assertStatus(200);
-        $this->assertCount(1, $resCliSearch->json());
+        $resProvSearch = $this->getJson('/api/proveedores?buscar=Mendoza');
+        $resProvSearch->assertStatus(200);
+        $this->assertCount(1, $resProvSearch->json());
 
         // Paginación de bitácoras
         $resBitPag = $this->getJson('/api/bitacoras?por_pagina=1&page=1');
@@ -680,8 +661,6 @@ class IntegridadSeguridadTest extends TestCase
         $movEntrada = $resEntrada->json('movimiento');
         $this->assertNull($movEntrada['tipo_merma']);
         $this->assertNull($movEntrada['costo_unitario']);
-        $this->assertNull($movEntrada['proveedor_nombre']);
-        $this->assertNull($movEntrada['numero_factura_recibo']);
 
         $this->assertDatabaseHas('movimiento_inventario', [
             'movimiento_inventario_id' => $movEntrada['movimiento_inventario_id'],
@@ -689,13 +668,11 @@ class IntegridadSeguridadTest extends TestCase
             'tipo_merma' => null,
             'costo_unitario' => null,
             'costo_total_perdida' => null,
-            'proveedor_nombre' => null,
-            'numero_factura_recibo' => null,
             'stock_resultante_producto' => 15,
         ]);
     }
 
-    public function test_entrada_inventario_permite_guardar_proveedor_y_factura_opcionalmente(): void
+    public function test_entrada_inventario_actualiza_stock_correctamente(): void
     {
         $cat = Categoria::create([
             'codigo_categoria' => 'CAT-PROV-1',
@@ -715,94 +692,24 @@ class IntegridadSeguridadTest extends TestCase
             'estado' => 1,
         ]);
 
-        // 1. Entrada de inventario CON proveedor y número de factura/recibo
-        $resConDatos = $this->postJson('/api/movimientos-inventario', [
+        // Entrada de inventario estándar
+        $res = $this->postJson('/api/movimientos-inventario', [
             'id_producto' => $prod->producto_id,
             'id_usuario' => $this->adminPrincipal->usuario_id,
             'tipo_movimiento' => 'Entrada por Compra',
             'cantidad_movimiento' => 10,
             'fecha_movimiento' => now()->toDateString(),
-            'proveedor_nombre' => 'Lácteos El Carmen S.A.',
-            'numero_factura_recibo' => 'FAC-2026-00458',
         ]);
 
-        $resConDatos->assertStatus(201);
-        $movCon = $resConDatos->json('movimiento');
-        $this->assertEquals('Lácteos El Carmen S.A.', $movCon['proveedor_nombre']);
-        $this->assertEquals('FAC-2026-00458', $movCon['numero_factura_recibo']);
+        $res->assertStatus(201);
+        $mov = $res->json('movimiento');
 
         $this->assertDatabaseHas('movimiento_inventario', [
-            'movimiento_inventario_id' => $movCon['movimiento_inventario_id'],
+            'movimiento_inventario_id' => $mov['movimiento_inventario_id'],
             'tipo_movimiento' => 'Entrada por Compra',
-            'proveedor_nombre' => 'Lácteos El Carmen S.A.',
-            'numero_factura_recibo' => 'FAC-2026-00458',
             'stock_resultante_producto' => 20,
         ]);
         $this->assertEquals(20, $prod->fresh()->existencia_bodega);
-
-        // 2. Entrada de inventario SIN proveedor ni número de factura/recibo (opcional)
-        $resSinDatos = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 5,
-            'fecha_movimiento' => now()->toDateString(),
-        ]);
-
-        $resSinDatos->assertStatus(201);
-        $movSin = $resSinDatos->json('movimiento');
-        $this->assertNull($movSin['proveedor_nombre']);
-        $this->assertNull($movSin['numero_factura_recibo']);
-
-        $this->assertDatabaseHas('movimiento_inventario', [
-            'movimiento_inventario_id' => $movSin['movimiento_inventario_id'],
-            'tipo_movimiento' => 'Entrada',
-            'proveedor_nombre' => null,
-            'numero_factura_recibo' => null,
-            'stock_resultante_producto' => 25,
-        ]);
-        $this->assertEquals(25, $prod->fresh()->existencia_bodega);
-
-        // 3. Validar longitud máxima de proveedor_nombre (máx 128)
-        $resProveedorLargo = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'proveedor_nombre' => str_repeat('P', 129),
-        ]);
-        $resProveedorLargo->assertStatus(422);
-        $resProveedorLargo->assertJsonValidationErrors(['proveedor_nombre']);
-
-        // 4. Validar longitud máxima de numero_factura_recibo (máx 64)
-        $resFacturaLarga = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Entrada',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'numero_factura_recibo' => str_repeat('F', 65),
-        ]);
-        $resFacturaLarga->assertStatus(422);
-        $resFacturaLarga->assertJsonValidationErrors(['numero_factura_recibo']);
-
-        // 5. Movimientos que no son entradas (ej. Salida por Merma) no almacenan proveedor ni factura
-        $resSalida = $this->postJson('/api/movimientos-inventario', [
-            'id_producto' => $prod->producto_id,
-            'id_usuario' => $this->adminPrincipal->usuario_id,
-            'tipo_movimiento' => 'Salida por Merma',
-            'tipo_merma' => 'Deterioro/Vencimiento',
-            'cantidad_movimiento' => 1,
-            'fecha_movimiento' => now()->toDateString(),
-            'justificacion' => 'Bolsa rota',
-            'proveedor_nombre' => 'Proveedor Ignorado',
-            'numero_factura_recibo' => 'FAC-IGNORADA',
-        ]);
-        $resSalida->assertStatus(201);
-        $movSalida = $resSalida->json('movimiento');
-        $this->assertNull($movSalida['proveedor_nombre']);
-        $this->assertNull($movSalida['numero_factura_recibo']);
     }
 
     public function test_dashboard_resumen_incluye_total_perdidas_mermas_del_mes_en_curso(): void

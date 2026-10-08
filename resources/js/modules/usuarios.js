@@ -78,10 +78,10 @@ export function usuariosModule() {
                 ]
             },
             {
-                nombre: 'Clientes',
-                icono: 'users',
+                nombre: 'Proveedores & CxP',
+                icono: 'truck',
                 permisos: [
-                    { clave: 'clientes.gestionar', etiqueta: 'Administrar Clientes', descripcion: 'Crear, editar y consultar cartera de clientes' }
+                    { clave: 'proveedores.gestionar', etiqueta: 'Proveedores & Cuentas por Pagar', descripcion: 'Gestión de proveedores, facturas de crédito y abonos' }
                 ]
             },
             {

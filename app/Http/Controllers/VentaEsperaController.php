@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Bitacora;
 use App\Models\Caja;
 use App\Models\Caja_operacion;
-use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Venta_espera;
 use App\Models\Venta_espera_detalle;
@@ -27,7 +26,6 @@ class VentaEsperaController extends Controller
         $idCaja = $request->query('id_caja');
 
         $query = Venta_espera::with([
-            'cliente',
             'usuario',
             'caja',
             'detalles' => function ($q) {
@@ -80,7 +78,7 @@ class VentaEsperaController extends Controller
         $validated = $request->validate([
             'id_usuario' => ['nullable', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
             'id_caja' => ['nullable', 'integer', Rule::exists('caja', 'caja_id')->where('estado', 1)],
-            'id_cliente' => ['nullable', 'integer', Rule::exists('cliente', 'cliente_id')->where('estado', 1)],
+            'cliente_nombre' => ['nullable', 'string', 'max:128'],
             'identificador_cuenta' => ['nullable', 'string', 'max:64'],
             'observaciones' => ['nullable', 'string', 'max:255'],
             'descuento' => ['nullable', 'numeric', 'min:0'],
@@ -104,20 +102,8 @@ class VentaEsperaController extends Controller
             $idCaja = $turnoActivo?->id_caja;
         }
 
-        // Determinar si el cliente es genérico (código con '0000' o nombre 'Consumidor Final' / 'Cliente Final')
-        $idCliente = $validated['id_cliente'] ?? null;
-        $cliente = $idCliente ? Cliente::find($idCliente) : null;
-
-        $isGeneric = false;
-        if ($cliente) {
-            $code = (string) $cliente->codigo_cliente;
-            $name = mb_strtolower(trim($cliente->nombre_apellido_cliente));
-            if (str_contains($code, '0000') || $name === 'consumidor final' || $name === 'cliente final') {
-                $isGeneric = true;
-            }
-        } else {
-            $isGeneric = true;
-        }
+        $clienteNombre = ! empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : 'Consumidor Final';
+        $isGeneric = in_array(mb_strtolower($clienteNombre), ['consumidor final', 'cliente final']) || str_contains($clienteNombre, '0000');
 
         $identificador = trim($validated['identificador_cuenta'] ?? '');
 
@@ -126,11 +112,11 @@ class VentaEsperaController extends Controller
                 $activeCount = Venta_espera::where('estado', 1)->count();
                 $identificador = 'Cliente'.($activeCount + 1);
             } else {
-                $identificador = $cliente->nombre_apellido_cliente;
+                $identificador = $clienteNombre;
             }
         }
 
-        return DB::transaction(function () use ($validated, $idUsuario, $idCaja, $identificador, $idCliente) {
+        return DB::transaction(function () use ($validated, $idUsuario, $idCaja, $identificador, $clienteNombre) {
             $subtotalVenta = 0;
             $detallesParaCrear = [];
 
@@ -162,7 +148,7 @@ class VentaEsperaController extends Controller
             $ventaEspera = Venta_espera::create([
                 'id_usuario' => $idUsuario,
                 'id_caja' => $idCaja,
-                'id_cliente' => $idCliente,
+                'cliente_nombre' => $clienteNombre,
                 'identificador_cuenta' => $identificador,
                 'observaciones' => $validated['observaciones'] ?? null,
                 'subtotal' => round($subtotalVenta, 2),
@@ -188,7 +174,7 @@ class VentaEsperaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Venta pausada exitosamente como '{$ventaEspera->identificador_cuenta}'",
-                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario', 'caja']),
+                'data' => $ventaEspera->load(['detalles.producto', 'usuario', 'caja']),
             ], 201);
         });
     }
@@ -200,7 +186,6 @@ class VentaEsperaController extends Controller
     public function show($id)
     {
         $ventaEspera = Venta_espera::with([
-            'cliente',
             'usuario',
             'caja',
             'detalles' => function ($q) {
@@ -239,7 +224,7 @@ class VentaEsperaController extends Controller
         $validated = $request->validate([
             'id_usuario' => ['nullable', 'integer', Rule::exists('usuario', 'usuario_id')->where('estado', 1)],
             'id_caja' => ['nullable', 'integer', Rule::exists('caja', 'caja_id')->where('estado', 1)],
-            'id_cliente' => ['nullable', 'integer', Rule::exists('cliente', 'cliente_id')->where('estado', 1)],
+            'cliente_nombre' => ['nullable', 'string', 'max:128'],
             'identificador_cuenta' => ['nullable', 'string', 'max:64'],
             'observaciones' => ['nullable', 'string', 'max:255'],
             'descuento' => ['nullable', 'numeric', 'min:0'],
@@ -284,7 +269,7 @@ class VentaEsperaController extends Controller
 
             $ventaEspera->update([
                 'id_caja' => array_key_exists('id_caja', $validated) ? $validated['id_caja'] : $ventaEspera->id_caja,
-                'id_cliente' => array_key_exists('id_cliente', $validated) ? $validated['id_cliente'] : $ventaEspera->id_cliente,
+                'cliente_nombre' => array_key_exists('cliente_nombre', $validated) ? $validated['cliente_nombre'] : $ventaEspera->cliente_nombre,
                 'identificador_cuenta' => $identificador,
                 'observaciones' => array_key_exists('observaciones', $validated) ? $validated['observaciones'] : $ventaEspera->observaciones,
                 'subtotal' => round($subtotalVenta, 2),
@@ -302,7 +287,7 @@ class VentaEsperaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Venta en espera '{$ventaEspera->identificador_cuenta}' actualizada exitosamente.",
-                'data' => $ventaEspera->load(['detalles.producto', 'cliente', 'usuario', 'caja']),
+                'data' => $ventaEspera->load(['detalles.producto', 'usuario', 'caja']),
             ]);
         });
     }

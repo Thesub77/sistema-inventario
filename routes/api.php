@@ -48,10 +48,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('movimientos-inventario', MovimientoInventarioController::class);
     });
 
-    // Módulo de Cajas y Clientes
-    Route::middleware('permission:cajas.gestionar,clientes.gestionar,pos.acceso')->group(function () {
+    // Módulo de Cajas
+    Route::middleware('permission:cajas.gestionar,pos.acceso')->group(function () {
         require __DIR__.'/api/caja_routes.php';
-        require __DIR__.'/api/cliente_routes.php';
+    });
+
+    // Módulo de Proveedores y Cuentas por Pagar (Exclusivo Administrador)
+    Route::middleware('permission:usuarios.gestionar,proveedores.gestionar')->group(function () {
+        require __DIR__.'/api/proveedor_routes.php';
     });
 
     // Módulo de Ventas y Facturación
@@ -59,7 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         require __DIR__.'/api/venta_routes.php';
     });
 
-    // Módulo de Reportes Fiscales (RF-27 - DGI Cuota Fija)
+    // Módulo de Reportes Fiscales (DGI Cuota Fija)
     Route::middleware('permission:ventas.ver,pos.acceso')->group(function () {
         Route::get('/fiscal/libro-diario', [FiscalController::class, 'libroDiario']);
     });

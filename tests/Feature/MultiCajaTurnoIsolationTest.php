@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Caja;
 use App\Models\Categoria;
-use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Rol;
@@ -35,8 +34,6 @@ class MultiCajaTurnoIsolationTest extends TestCase
     protected Caja $caja2;
 
     protected Producto $producto;
-
-    protected Cliente $cliente;
 
     protected function setUp(): void
     {
@@ -114,14 +111,6 @@ class MultiCajaTurnoIsolationTest extends TestCase
             'precio_venta' => 25.00,
             'estado' => 1,
         ]);
-
-        $this->cliente = Cliente::create([
-            'nombre_apellido_cliente' => 'Consumidor Final',
-            'codigo_cliente' => 'CLI-0000',
-            'telefono_cliente' => '00000000',
-            'direccion_cliente' => 'Ciudad',
-            'estado' => 1,
-        ]);
     }
 
     public function test_un_usuario_no_puede_abrir_dos_turnos_simultaneos(): void
@@ -177,7 +166,7 @@ class MultiCajaTurnoIsolationTest extends TestCase
         Sanctum::actingAs($this->cajero2);
         $res = $this->postJson('/api/ventas', [
             'id_caja' => $this->caja1->caja_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'codigo_venta' => 'FAC-TEST-0001',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),
@@ -217,7 +206,7 @@ class MultiCajaTurnoIsolationTest extends TestCase
         // Cajero 2 realiza venta en caja 2
         $res = $this->postJson('/api/ventas', [
             'id_caja' => $this->caja2->caja_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'codigo_venta' => 'FAC-TEST-0002',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now()->toDateTimeString(),

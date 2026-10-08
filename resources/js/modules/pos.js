@@ -10,7 +10,7 @@ export function posModule() {
         ventaQuickRange: '',
         cart: [],
         posSale: {
-            id_cliente: null,
+            cliente_nombre: 'Consumidor Final',
             metodo_pago: 'Efectivo',
             referencia_transferencia: '',
             monto_recibido: null,
@@ -104,6 +104,7 @@ export function posModule() {
         clearCart() {
             this.cart = [];
             this.resumedVentaEsperaId = null;
+            this.posSale.cliente_nombre = 'Consumidor Final';
             this.posSale.descuento_venta = 0;
             this.posSale.descuento_porcentaje = 0;
             this.posSale.tipo_descuento = 'monto';
@@ -204,7 +205,7 @@ export function posModule() {
             const salePayload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
                 id_caja: this.turnoActivo ? this.turnoActivo.id_caja : null,
-                id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
+                cliente_nombre: (this.posSale.cliente_nombre && this.posSale.cliente_nombre.trim()) ? this.posSale.cliente_nombre.trim() : 'Consumidor Final',
                 codigo_venta: candidateCode,
                 metodo_pago: this.posSale.metodo_pago,
                 referencia_transferencia: (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta')
@@ -615,14 +616,12 @@ export function posModule() {
                 this.notify('Caja Cerrada', 'Debes tener un turno de caja abierto para poner ventas en espera.', 'warning');
                 return;
             }
-            if (this.cart.length === 0) return;
-
-            const clienteId = this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null);
+            const clienteNombre = (this.posSale.cliente_nombre && this.posSale.cliente_nombre.trim()) ? this.posSale.cliente_nombre.trim() : 'Consumidor Final';
 
             const payload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
                 id_caja: this.turnoActivo?.id_caja || null,
-                id_cliente: clienteId,
+                cliente_nombre: clienteNombre,
                 descuento: this.posSale.descuento_venta || 0,
                 detalles: this.cart.map(i => ({
                     id_producto: i.id_producto,
@@ -701,9 +700,7 @@ export function posModule() {
                     existencia_bodega: Number(d.producto?.existencia_bodega || 0),
                 }));
 
-                if (v.id_cliente) {
-                    this.posSale.id_cliente = v.id_cliente;
-                }
+                this.posSale.cliente_nombre = v.cliente_nombre || 'Consumidor Final';
                 this.posSale.descuento_venta = Number(v.descuento || 0);
                 this.posSale.tipo_descuento = 'monto';
                 this.posSale.descuento_porcentaje = 0;

@@ -26,8 +26,6 @@ class Movimiento_inventario extends Model
         'tipo_merma',
         'costo_unitario',
         'costo_total_perdida',
-        'proveedor_nombre',
-        'numero_factura_recibo',
         'cantidad_movimimiento',
         'stock_anterior_producto',
         'stock_resultante_producto',

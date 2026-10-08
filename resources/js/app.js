@@ -4,7 +4,7 @@ import '../css/custom.css';
 import { posModule } from './modules/pos';
 import { productosModule } from './modules/productos';
 import { categoriasModule } from './modules/categorias';
-import { clientesModule } from './modules/clientes';
+import { proveedoresModule } from './modules/proveedores';
 import { usuariosModule } from './modules/usuarios';
 import { utilsModule } from './modules/utils';
 import { themeModule } from './modules/theme';
@@ -29,7 +29,8 @@ export function app() {
         // Entities Data
         productos: [],
         categorias: [],
-        clientes: [],
+        proveedores: [],
+        cuentasPorPagar: [],
         usuarios: [],
         roles: [],
         ventas: [],
@@ -105,14 +106,12 @@ export function app() {
             {
                 id: 'pos',
                 label: 'Punto de Venta (POS)',
-                icon: 'shopping-cart',
-                badge: () => (this.ventasEspera ? this.ventasEspera.length : 0)
+                icon: 'shopping-cart'
             },
             {
                 id: 'productos',
                 label: 'Productos & Stock',
-                icon: 'package',
-                badge: () => this.lowStockProducts.length
+                icon: 'package'
             },
             {
                 id: 'categorias',
@@ -125,9 +124,14 @@ export function app() {
                 icon: 'receipt'
             },
             {
-                id: 'clientes',
-                label: 'Clientes',
-                icon: 'users'
+                id: 'proveedores',
+                label: 'Proveedores',
+                icon: 'truck'
+            },
+            {
+                id: 'cuentas-por-pagar',
+                label: 'Cuentas por Pagar',
+                icon: 'credit-card'
             },
             {
                 id: 'caja',
@@ -151,6 +155,19 @@ export function app() {
             },
         ],
 
+        getNavBadge(tabId) {
+            if (tabId === 'pos') {
+                return (this.ventasEspera && Array.isArray(this.ventasEspera)) ? this.ventasEspera.length : 0;
+            }
+            if (tabId === 'productos') {
+                return (this.lowStockProducts && Array.isArray(this.lowStockProducts)) ? this.lowStockProducts.length : 0;
+            }
+            if (tabId === 'cuentas-por-pagar') {
+                return this.cxpKPIs ? Number(this.cxpKPIs.facturas_pendientes_count || 0) : 0;
+            }
+            return 0;
+        },
+
         // Computed Properties / Getters
         get currentTabTitle() {
             const found = this.navItems.find(i => i.id === this.currentTab);
@@ -164,9 +181,19 @@ export function app() {
 
         get isAdmin() {
             if (!this.currentUser) return false;
-            const rol = String(this.currentUser.rol || '').toLowerCase();
-            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
-            return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
+            const rolRaw = this.currentUser.rol;
+            const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
+                ? String(rolRaw.nombre_rol || '')
+                : String(rolRaw || '');
+            const permisos = Array.isArray(this.currentUser.permisos)
+                ? this.currentUser.permisos
+                : (Array.isArray(rolRaw?.permisos) ? rolRaw.permisos : []);
+            const idRol = Number(this.currentUser.id_rol || rolRaw?.rol_id || 0);
+
+            return idRol === 1
+                || rolNombre.toLowerCase().includes('admin')
+                || permisos.includes('*')
+                || permisos.includes('usuarios.gestionar');
         },
 
         get canAccessBusinessInfo() {
@@ -181,7 +208,9 @@ export function app() {
         hasPermission(permiso) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
-            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
+            const permisos = Array.isArray(this.currentUser.permisos)
+                ? this.currentUser.permisos
+                : (Array.isArray(this.currentUser.rol?.permisos) ? this.currentUser.rol.permisos : []);
             if (permisos.includes('*')) return true;
             return permisos.includes(permiso);
         },
@@ -189,22 +218,26 @@ export function app() {
         canAccessTab(tabId) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
-            const rol = String(this.currentUser.rol || '').toLowerCase();
+            const rolRaw = this.currentUser.rol;
+            const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
+                ? String(rolRaw.nombre_rol || '').toLowerCase()
+                : String(rolRaw || '').toLowerCase();
             switch (tabId) {
                 case 'dashboard':
                     return this.hasPermission('dashboard.ver') || this.hasPermission('usuarios.gestionar');
                 case 'pos':
-                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear') || rol.includes('cajer') || rol.includes('ventas');
+                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear') || rolNombre.includes('cajer') || rolNombre.includes('ventas');
                 case 'productos':
                     return this.hasPermission('productos.ver') || this.hasPermission('productos.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
                     return this.hasPermission('ventas.ver') || this.hasPermission('ventas.crear');
-                case 'clientes':
-                    return this.hasPermission('clientes.gestionar') || this.hasPermission('pos.acceso');
+                case 'proveedores':
+                case 'cuentas-por-pagar':
+                    return this.isAdmin || this.hasPermission('proveedores.gestionar');
                 case 'caja':
-                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso') || rol.includes('cajer');
+                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso') || rolNombre.includes('cajer');
                 case 'inventario':
                     return this.hasPermission('inventario.gestionar') || this.hasPermission('productos.gestionar');
                 case 'usuarios':
@@ -275,7 +308,8 @@ export function app() {
                 if (this.searchVenta) {
                     const term = this.searchVenta.toLowerCase().trim();
                     const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
-                    const clientMatch = v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term);
+                    const clientMatch = (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term)) ||
+                        (v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term));
                     const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
                     if (!codeMatch && !clientMatch && !refMatch) {
                         return false;
@@ -339,16 +373,6 @@ export function app() {
                 });
             }
             return Array.from(map.values()).sort((a, b) => a.nombre_apellido.localeCompare(b.nombre_apellido));
-        },
-
-        get filteredClientes() {
-            return this.clientes.filter(c => {
-                if (!this.searchCliente) return true;
-                const term = this.searchCliente.toLowerCase();
-                const nameMatch = c.nombre_apellido_cliente.toLowerCase().includes(term);
-                const codeMatch = c.codigo_cliente && c.codigo_cliente.toLowerCase().includes(term);
-                return nameMatch || codeMatch;
-            });
         },
 
         get cartSubtotal() {
@@ -456,7 +480,6 @@ export function app() {
                         await Promise.all([
                             this.fetchProductos(),
                             this.fetchCategorias(),
-                            this.fetchClientes(),
                             this.fetchVentas(),
                             this.fetchEmpresa(),
                             this.fetchVentasEspera()
@@ -483,8 +506,13 @@ export function app() {
                             this.fetchBitacoras().catch(() => {})
                         ]);
                         break;
-                    case 'clientes':
-                        await this.fetchClientes();
+                    case 'proveedores':
+                    case 'cuentas-por-pagar':
+                        await Promise.all([
+                            this.fetchProveedores(),
+                            this.fetchCuentasPorPagar(),
+                            this.fetchCxPKPIs()
+                        ]);
                         break;
                     case 'inventario':
                         await Promise.all([
@@ -532,6 +560,11 @@ export function app() {
                 if (!this.canAccessTab(this.currentTab)) {
                     this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                 }
+                if (this.currentTab === 'cuentas-por-pagar') {
+                    this.cxpActiveSubTab = 'cuentas';
+                } else if (this.currentTab === 'proveedores') {
+                    this.cxpActiveSubTab = 'proveedores';
+                }
                 this.loadTab(this.currentTab);
                 this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
@@ -565,6 +598,11 @@ export function app() {
                     if (!this.canAccessTab(newTab)) {
                         this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                         return;
+                    }
+                    if (newTab === 'cuentas-por-pagar') {
+                        this.cxpActiveSubTab = 'cuentas';
+                    } else if (newTab === 'proveedores') {
+                        this.cxpActiveSubTab = 'proveedores';
                     }
                     this.loadTab(newTab);
                     if (newTab === 'dashboard') {
@@ -604,20 +642,6 @@ export function app() {
             }
         },
 
-        async fetchClientes() {
-            try {
-                const res = await this.apiFetch('/api/clientes');
-                if (res.ok) {
-                    const data = await res.json();
-                    this.clientes = Array.isArray(data) ? data : [];
-                    if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
-                        this.posSale.id_cliente = this.clientes[0].cliente_id;
-                    }
-                }
-            } catch (e) {
-                console.error('Error cargando clientes:', e);
-            }
-        },
 
         async fetchUsuarios() {
             try {
@@ -1384,7 +1408,7 @@ export function app() {
         posModule(),
         productosModule(),
         categoriasModule(),
-        clientesModule(),
+        proveedoresModule(),
         usuariosModule(),
         utilsModule(),
         themeModule(),

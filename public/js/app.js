@@ -1253,78 +1253,538 @@ function productosModule() {
     };
 }
 
-// 8. Módulo de Clientes
-function clientesModule() {
+// 8. Módulo de Proveedores y Cuentas por Pagar (CxP)
+function proveedoresModule() {
     return {
-        searchCliente: '',
-        showCustomerModal: false,
-        isEditingCustomer: false,
-        customerForm: {
-            cliente_id: null,
-            codigo_cliente: '',
-            nombre_apellido_cliente: '',
-            telefono_cliente: '',
-            estado: 1,
+        // Estado de Proveedores y Cuentas por Pagar
+        proveedores: [],
+        cuentasPorPagar: [],
+        cxpKPIs: {
+            total_pendiente: 0,
+            total_vencido: 0,
+            total_pagado_mes: 0,
+            facturas_pendientes_count: 0,
+            facturas_vencidas_count: 0
+        },
+        cxpActiveSubTab: 'cuentas', // 'cuentas' | 'proveedores'
+        cxpSearch: '',
+        cxpEstadoFilter: '',
+        cxpProveedorFilter: '',
+        proveedorSearch: '',
+        loadingProveedores: false,
+        loadingCuentas: false,
+
+        // Modal y Formulario de Proveedor
+        showProveedorModal: false,
+        isEditingProveedor: false,
+        isSavingProveedor: false,
+        proveedorForm: {
+            proveedor_id: null,
+            nombre_comercial: '',
+            contacto_vendedor: '',
+            telefono: '',
+            plazo_credito_dias: 0,
+            estado: 1
         },
 
-        openCustomerModal(customer = null) {
-            if (customer) {
-                this.isEditingCustomer = true;
-                this.customerForm = { ...customer };
+        // Modal y Formulario de Cuenta por Pagar
+        showCuentaPorPagarModal: false,
+        isEditingCuentaPorPagar: false,
+        isSavingCuentaPorPagar: false,
+        cuentaPorPagarForm: {
+            cuenta_por_pagar_id: null,
+            id_proveedor: '',
+            numero_factura: '',
+            descripcion: '',
+            fecha_emision: '',
+            fecha_vencimiento: '',
+            monto_total: ''
+        },
+
+        // Modal y Formulario de Abono / Pago
+        showAbonoModal: false,
+        isSavingAbono: false,
+        selectedCuentaParaAbono: null,
+        abonoForm: {
+            monto_pago: '',
+            metodo_pago: 'Efectivo',
+            referencia_pago: '',
+            nota: '',
+            registrar_en_caja: true,
+            debitar_de_caja: true
+        },
+
+        // Modal de Historial de Pagos / Abonos
+        showHistorialAbonosModal: false,
+        selectedCuentaHistorial: null,
+
+        // Computed Getters
+        get filteredCuentasPorPagar() {
+            return (this.cuentasPorPagar || []).filter(c => {
+                if (this.cxpEstadoFilter && c.estado !== this.cxpEstadoFilter) {
+                    return false;
+                }
+                if (this.cxpProveedorFilter && Number(c.id_proveedor) !== Number(this.cxpProveedorFilter)) {
+                    return false;
+                }
+                if (this.cxpSearch) {
+                    const term = this.cxpSearch.toLowerCase().trim();
+                    const numMatch = (c.numero_factura || '').toLowerCase().includes(term);
+                    const descMatch = (c.descripcion || '').toLowerCase().includes(term);
+                    const provMatch = (c.proveedor?.nombre_comercial || '').toLowerCase().includes(term);
+                    return numMatch || descMatch || provMatch;
+                }
+                return true;
+            });
+        },
+
+        get filteredProveedores() {
+            return (this.proveedores || []).filter(p => {
+                if (!this.proveedorSearch) return true;
+                const term = this.proveedorSearch.toLowerCase().trim();
+                const nameMatch = (p.nombre_comercial || '').toLowerCase().includes(term);
+                const contactMatch = (p.contacto_vendedor || '').toLowerCase().includes(term);
+                const phoneMatch = (p.telefono || '').toLowerCase().includes(term);
+                return nameMatch || contactMatch || phoneMatch;
+            });
+        },
+
+        // Métodos de Carga de Datos
+        async fetchProveedores() {
+            if (!this.isAdmin && !this.hasPermission('proveedores.gestionar')) return;
+            try {
+                this.loadingProveedores = true;
+                const res = await this.apiFetch('/api/proveedores');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.proveedores = Array.isArray(data) ? data : (data.data || []);
+                }
+            } catch (err) {
+                console.error('Error cargando proveedores:', err);
+            } finally {
+                this.loadingProveedores = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }
+        },
+
+        async fetchCuentasPorPagar() {
+            if (!this.isAdmin && !this.hasPermission('proveedores.gestionar')) return;
+            try {
+                this.loadingCuentas = true;
+                const res = await this.apiFetch('/api/cuentas-por-pagar');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.cuentasPorPagar = Array.isArray(data) ? data : (data.data || []);
+                }
+            } catch (err) {
+                console.error('Error cargando cuentas por pagar:', err);
+            } finally {
+                this.loadingCuentas = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }
+        },
+
+        async fetchCxPKPIs() {
+            if (!this.isAdmin && !this.hasPermission('proveedores.gestionar')) return;
+            try {
+                const res = await this.apiFetch('/api/cuentas-por-pagar/resumen-kpis');
+                if (res.ok) {
+                    const data = await res.json();
+                    const kpis = (data && typeof data === 'object' && data.kpis) ? data.kpis : data;
+                    if (kpis && typeof kpis === 'object') {
+                        this.cxpKPIs = {
+                            total_pendiente: Number(kpis.total_pendiente ?? kpis.total_deuda_activa ?? 0),
+                            facturas_pendientes_count: Number(kpis.facturas_pendientes_count ?? 0),
+                            total_vencido: Number(kpis.total_vencido ?? kpis.monto_vencido ?? 0),
+                            facturas_vencidas_count: Number(kpis.facturas_vencidas_count ?? kpis.total_vencidas ?? 0),
+                            proximos_vencimientos: Number(kpis.proximos_vencimientos ?? 0),
+                            total_pagado_mes: Number(kpis.total_pagado_mes ?? 0)
+                        };
+                    }
+                }
+            } catch (err) {
+                console.error('Error cargando KPIs de cuentas por pagar:', err);
+            }
+        },
+
+        // Control de Proveedores (CRUD)
+        openProveedorModal(prov = null) {
+            if (prov) {
+                this.isEditingProveedor = true;
+                this.proveedorForm = {
+                    proveedor_id: prov.proveedor_id,
+                    nombre_comercial: prov.nombre_comercial || '',
+                    contacto_vendedor: prov.contacto_vendedor || '',
+                    telefono: prov.telefono || '',
+                    plazo_credito_dias: prov.plazo_credito_dias ?? 0,
+                    estado: prov.estado ?? 1
+                };
             } else {
-                this.isEditingCustomer = false;
-                this.customerForm = {
-                    cliente_id: null,
-                    codigo_cliente: `CLI-${String(this.clientes.length + 1).padStart(3, '0')}`,
-                    nombre_apellido_cliente: '',
-                    telefono_cliente: '',
+                this.isEditingProveedor = false;
+                this.proveedorForm = {
+                    proveedor_id: null,
+                    nombre_comercial: '',
+                    contacto_vendedor: '',
+                    telefono: '',
+                    plazo_credito_dias: 0,
                     estado: 1
                 };
             }
-            this.showCustomerModal = true;
+            this.showProveedorModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
         },
 
-        async saveCustomer() {
-            const url = this.isEditingCustomer ?
-                `/api/clientes/${this.customerForm.cliente_id}` :
-                '/api/clientes';
-            const method = this.isEditingCustomer ? 'PUT' : 'POST';
+        async saveProveedor() {
+            if (this.isSavingProveedor) return;
+            if (!this.proveedorForm.nombre_comercial.trim()) {
+                this.notify('Campo Requerido', 'El nombre comercial del proveedor es obligatorio.', 'warning');
+                return;
+            }
+
+            this.isSavingProveedor = true;
+            const isEdit = this.isEditingProveedor;
+            const url = isEdit ? `/api/proveedores/${this.proveedorForm.proveedor_id}` : '/api/proveedores';
+            const method = isEdit ? 'PUT' : 'POST';
 
             try {
                 const res = await this.apiFetch(url, {
                     method,
-                    body: JSON.stringify(this.customerForm)
+                    body: JSON.stringify(this.proveedorForm)
                 });
 
-                if (!res.ok) throw new Error('Error al guardar el cliente');
-                this.showCustomerModal = false;
-                this.notify('Cliente guardado', `"${this.customerForm.nombre_apellido_cliente}" se guardó correctamente.`, 'success');
-                await this.fetchClientes();
-            } catch (error) {
-                this.notify('Error al guardar cliente', error.message, 'error');
+                const data = await res.json();
+                if (!res.ok) {
+                    let msg = data.message || 'Error al guardar el proveedor';
+                    if (data.errors) {
+                        msg = Object.values(data.errors).flat().join('<br>');
+                    }
+                    throw new Error(msg);
+                }
+
+                this.showProveedorModal = false;
+                await this.fetchProveedores();
+                this.notify(
+                    isEdit ? '¡Proveedor Actualizado!' : '¡Proveedor Registrado!',
+                    data.message || `El proveedor "${this.proveedorForm.nombre_comercial}" se guardó exitosamente.`,
+                    'success'
+                );
+            } catch (err) {
+                this.notify('Error al guardar proveedor', err.message, 'error');
+            } finally {
+                this.isSavingProveedor = false;
             }
         },
 
-        async deleteCustomer(c) {
-            const result = await Swal.fire({
-                title: '¿Eliminar cliente?',
-                text: `Se eliminará "${c.nombre_apellido_cliente}"`,
+        async deleteProveedor(prov) {
+            const confirm = await Swal.fire({
                 icon: 'warning',
+                title: '¿Desactivar Proveedor?',
+                html: `¿Estás seguro de desactivar al proveedor <b>"${prov.nombre_comercial}"</b>?<br><small class="text-slate-400">Si tiene cuentas por pagar con saldo pendiente, el sistema impedirá su desactivación.</small>`,
                 showCancelButton: true,
-                confirmButtonColor: '#e11d48',
-                confirmButtonText: 'Sí, eliminar',
+                confirmButtonText: 'Sí, desactivar',
                 cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ef4444',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
             });
 
-            if (result.isConfirmed) {
-                await this.apiFetch(`/api/clientes/${c.cliente_id}`, {
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const res = await this.apiFetch(`/api/proveedores/${prov.proveedor_id}`, {
                     method: 'DELETE'
                 });
-                this.notify('Cliente Eliminado', `"${c.nombre_apellido_cliente}" fue eliminado.`, 'success');
-                await this.fetchClientes();
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Error al desactivar el proveedor');
+                }
+
+                await Promise.all([this.fetchProveedores(), this.fetchCuentasPorPagar(), this.fetchCxPKPIs()]);
+                this.notify('Proveedor Desactivado', data.message || 'El proveedor fue desactivado exitosamente.', 'success');
+            } catch (err) {
+                this.notify('No se pudo desactivar', err.message, 'error');
             }
+        },
+
+        // Control de Cuentas por Pagar (CRUD)
+        openCuentaPorPagarModal(cuenta = null) {
+            const today = new Date().toISOString().split('T')[0];
+            if (cuenta) {
+                this.isEditingCuentaPorPagar = true;
+                this.cuentaPorPagarForm = {
+                    cuenta_por_pagar_id: cuenta.cuenta_por_pagar_id,
+                    id_proveedor: cuenta.id_proveedor,
+                    numero_factura: cuenta.numero_factura || '',
+                    descripcion: cuenta.descripcion || '',
+                    fecha_emision: cuenta.fecha_emision || today,
+                    fecha_vencimiento: cuenta.fecha_vencimiento || today,
+                    monto_total: cuenta.monto_total
+                };
+            } else {
+                this.isEditingCuentaPorPagar = false;
+                const defaultProvId = this.proveedores.length > 0 ? this.proveedores[0].proveedor_id : '';
+                this.cuentaPorPagarForm = {
+                    cuenta_por_pagar_id: null,
+                    id_proveedor: defaultProvId,
+                    numero_factura: '',
+                    descripcion: '',
+                    fecha_emision: today,
+                    fecha_vencimiento: today,
+                    monto_total: ''
+                };
+                if (defaultProvId) {
+                    this.onProveedorSelectInCxP();
+                }
+            }
+            this.showCuentaPorPagarModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        onProveedorSelectInCxP() {
+            if (!this.cuentaPorPagarForm.id_proveedor) return;
+            const prov = this.proveedores.find(p => Number(p.proveedor_id) === Number(this.cuentaPorPagarForm.id_proveedor));
+            if (!prov) return;
+
+            const emisionStr = this.cuentaPorPagarForm.fecha_emision || new Date().toISOString().split('T')[0];
+            const emision = new Date(emisionStr + 'T00:00:00');
+            const diasCredito = Number(prov.plazo_credito_dias || 0);
+
+            if (!isNaN(emision.getTime())) {
+                emision.setDate(emision.getDate() + diasCredito);
+                const pad = n => String(n).padStart(2, '0');
+                this.cuentaPorPagarForm.fecha_vencimiento = `${emision.getFullYear()}-${pad(emision.getMonth() + 1)}-${pad(emision.getDate())}`;
+            }
+        },
+
+        async saveCuentaPorPagar() {
+            if (this.isSavingCuentaPorPagar) return;
+            if (!this.cuentaPorPagarForm.id_proveedor) {
+                this.notify('Campo Requerido', 'Debes seleccionar un proveedor.', 'warning');
+                return;
+            }
+            if (!this.cuentaPorPagarForm.numero_factura.trim()) {
+                this.notify('Campo Requerido', 'El número de factura es obligatorio.', 'warning');
+                return;
+            }
+            if (!this.cuentaPorPagarForm.monto_total || Number(this.cuentaPorPagarForm.monto_total) <= 0) {
+                this.notify('Monto Inválido', 'El monto total debe ser mayor a 0.', 'warning');
+                return;
+            }
+
+            this.isSavingCuentaPorPagar = true;
+            const isEdit = this.isEditingCuentaPorPagar;
+            const url = isEdit ? `/api/cuentas-por-pagar/${this.cuentaPorPagarForm.cuenta_por_pagar_id}` : '/api/cuentas-por-pagar';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            try {
+                const res = await this.apiFetch(url, {
+                    method,
+                    body: JSON.stringify(this.cuentaPorPagarForm)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    let msg = data.message || 'Error al guardar la factura de proveedor';
+                    if (data.errors) {
+                        msg = Object.values(data.errors).flat().join('<br>');
+                    }
+                    throw new Error(msg);
+                }
+
+                this.showCuentaPorPagarModal = false;
+                await Promise.all([this.fetchCuentasPorPagar(), this.fetchCxPKPIs(), this.fetchProveedores()]);
+                this.notify(
+                    isEdit ? '¡Factura Actualizada!' : '¡Factura Registrada!',
+                    data.message || 'La cuenta por pagar se guardó exitosamente.',
+                    'success'
+                );
+            } catch (err) {
+                this.notify('Error al guardar factura', err.message, 'error');
+            } finally {
+                this.isSavingCuentaPorPagar = false;
+            }
+        },
+
+        async deleteCuentaPorPagar(cuenta) {
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: '¿Eliminar Factura de Proveedor?',
+                html: `¿Estás seguro de eliminar la factura <b>"${cuenta.numero_factura}"</b>?<br><small class="text-slate-400">Si ya cuenta con pagos registrados no podrá eliminarse.</small>`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ef4444',
+                background: this.darkMode ? '#1e293b' : '#ffffff',
+                color: this.darkMode ? '#fff' : '#0f172a'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const res = await this.apiFetch(`/api/cuentas-por-pagar/${cuenta.cuenta_por_pagar_id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Error al eliminar la cuenta por pagar');
+                }
+
+                await Promise.all([this.fetchCuentasPorPagar(), this.fetchCxPKPIs(), this.fetchProveedores()]);
+                this.notify('Factura Eliminada', data.message || 'La factura fue eliminada correctamente.', 'success');
+            } catch (err) {
+                this.notify('No se pudo eliminar', err.message, 'error');
+            }
+        },
+
+        // Control de Pagos y Abonos
+        openAbonoModal(cuenta) {
+            this.selectedCuentaParaAbono = cuenta;
+            const tieneTurno = Boolean(this.turnoActivo);
+            this.abonoForm = {
+                monto_pago: Number(cuenta.saldo_pendiente || 0).toFixed(2),
+                metodo_pago: 'Efectivo',
+                referencia_pago: '',
+                nota: '',
+                registrar_en_caja: tieneTurno,
+                debitar_de_caja: tieneTurno
+            };
+            this.showAbonoModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        setPagarTotalidadAbono() {
+            if (this.selectedCuentaParaAbono) {
+                this.abonoForm.monto_pago = Number(this.selectedCuentaParaAbono.saldo_pendiente || 0).toFixed(2);
+            }
+        },
+
+        async saveAbono() {
+            if (this.isSavingAbono) return;
+            if (!this.selectedCuentaParaAbono) return;
+
+            const montoNum = Number(this.abonoForm.monto_pago);
+            if (isNaN(montoNum) || montoNum <= 0) {
+                this.notify('Monto Inválido', 'El monto del abono debe ser mayor a 0.', 'warning');
+                return;
+            }
+
+            if (montoNum > Number(this.selectedCuentaParaAbono.saldo_pendiente) + 0.001) {
+                this.notify('Monto Excede el Saldo', `El abono máximo permitido es de ${this.formatCurrency(this.selectedCuentaParaAbono.saldo_pendiente)}.`, 'warning');
+                return;
+            }
+
+            const debeDebitar = this.abonoForm.metodo_pago === 'Efectivo' && Boolean(this.abonoForm.registrar_en_caja || this.abonoForm.debitar_de_caja);
+
+            if (debeDebitar && !this.turnoActivo) {
+                this.notify('Caja Cerrada', 'Para registrar la salida de efectivo de caja, debes tener un turno activo abierto o desmarcar la casilla de descontar de caja.', 'warning');
+                return;
+            }
+
+            this.isSavingAbono = true;
+            try {
+                const payload = {
+                    monto_pago: montoNum,
+                    metodo_pago: this.abonoForm.metodo_pago,
+                    debitar_de_caja: debeDebitar,
+                    registrar_en_caja: debeDebitar,
+                    referencia_pago: this.abonoForm.referencia_pago ? this.abonoForm.referencia_pago.trim() : null,
+                    nota: this.abonoForm.nota ? this.abonoForm.nota.trim() : null,
+                    notas: [
+                        this.abonoForm.referencia_pago ? `Ref: ${this.abonoForm.referencia_pago.trim()}` : '',
+                        this.abonoForm.nota ? this.abonoForm.nota.trim() : ''
+                    ].filter(Boolean).join(' - ') || null
+                };
+
+                const res = await this.apiFetch(`/api/cuentas-por-pagar/${this.selectedCuentaParaAbono.cuenta_por_pagar_id}/pagos`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    let msg = data.message || 'Error al registrar el pago';
+                    if (data.errors) {
+                        msg = Object.values(data.errors).flat().join('<br>');
+                    }
+                    throw new Error(msg);
+                }
+
+                this.showAbonoModal = false;
+                await Promise.all([
+                    this.fetchCuentasPorPagar(),
+                    this.fetchCxPKPIs(),
+                    this.fetchProveedores(),
+                    this.fetchBitacoras()
+                ]);
+
+                // Si se registró egreso en caja, refrescar movimientos de caja
+                if (data.caja_movimiento && typeof this.fetchVentas === 'function') {
+                    this.fetchVentas();
+                }
+
+                this.notify(
+                    '¡Abono Registrado!',
+                    data.message || `Se abonó ${this.formatCurrency(montoNum)} a la factura ${this.selectedCuentaParaAbono.numero_factura}.`,
+                    'success'
+                );
+            } catch (err) {
+                this.notify('Error al registrar abono', err.message, 'error');
+            } finally {
+                this.isSavingAbono = false;
+            }
+        },
+
+        async openHistorialAbonos(cuenta) {
+            this.selectedCuentaHistorial = { ...cuenta };
+            this.showHistorialAbonosModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            try {
+                const res = await this.apiFetch(`/api/cuentas-por-pagar/${cuenta.cuenta_por_pagar_id}/pagos`);
+                if (res.ok) {
+                    const pagos = await res.json();
+                    if (this.selectedCuentaHistorial && this.selectedCuentaHistorial.cuenta_por_pagar_id === cuenta.cuenta_por_pagar_id) {
+                        this.selectedCuentaHistorial.pagos = pagos;
+                        this.$nextTick(() => {
+                            if (window.lucide) window.lucide.createIcons();
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Error al cargar historial de pagos:', e);
+            }
+        },
+
+        // Utilidades de Fechas y Estados
+        isCuentaVencida(cuenta) {
+            if (!cuenta || Number(cuenta.saldo_pendiente) <= 0 || cuenta.estado === 'Pagada' || cuenta.estado === 'Anulada') {
+                return false;
+            }
+            if (!cuenta.fecha_vencimiento) return false;
+            const today = new Date().toISOString().split('T')[0];
+            return cuenta.fecha_vencimiento < today;
+        },
+
+        diasHastaVencimiento(cuenta) {
+            if (!cuenta || !cuenta.fecha_vencimiento) return 0;
+            const today = new Date(new Date().toISOString().split('T')[0]);
+            const due = new Date(cuenta.fecha_vencimiento);
+            const diffTime = due.getTime() - today.getTime();
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         }
     };
 }
@@ -1410,10 +1870,10 @@ function usuariosModule() {
                 ]
             },
             {
-                nombre: 'Clientes',
-                icono: 'users',
+                nombre: 'Proveedores & CxP',
+                icono: 'truck',
                 permisos: [
-                    { clave: 'clientes.gestionar', etiqueta: 'Administrar Clientes', descripcion: 'Crear, editar y consultar cartera de clientes' }
+                    { clave: 'proveedores.gestionar', etiqueta: 'Proveedores & Cuentas por Pagar', descripcion: 'Gestión de proveedores, facturas de crédito y abonos' }
                 ]
             },
             {
@@ -1983,7 +2443,7 @@ function posModule() {
         ventaQuickRange: '',
         cart: [],
         posSale: {
-            id_cliente: null,
+            cliente_nombre: 'Consumidor Final',
             metodo_pago: 'Efectivo',
             referencia_transferencia: '',
             monto_recibido: null,
@@ -1995,7 +2455,13 @@ function posModule() {
         selectedSale: null,
         showCartDrawer: false,
 
-        // Estado y control del comprobante de venta imprimible
+        // Estado del modal de animación de facturación en curso
+        isProcessingBilling: false,
+        billingProgress: 15,
+        billingStatusText: 'Procesando transacción...',
+        billingCandidateCode: '',
+
+        // Estado del comprobante imprimible
         showReceiptModal: false,
         receiptData: null,
         receiptEmpresa: null,
@@ -2070,6 +2536,7 @@ function posModule() {
         clearCart() {
             this.cart = [];
             this.resumedVentaEsperaId = null;
+            this.posSale.cliente_nombre = 'Consumidor Final';
             this.posSale.descuento_venta = 0;
             this.posSale.descuento_porcentaje = 0;
             this.posSale.tipo_descuento = 'monto';
@@ -2170,7 +2637,7 @@ function posModule() {
             const salePayload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
                 id_caja: this.turnoActivo ? this.turnoActivo.id_caja : null,
-                id_cliente: this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null),
+                cliente_nombre: (this.posSale.cliente_nombre && this.posSale.cliente_nombre.trim()) ? this.posSale.cliente_nombre.trim() : 'Consumidor Final',
                 codigo_venta: candidateCode,
                 metodo_pago: this.posSale.metodo_pago,
                 referencia_transferencia: (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta')
@@ -2189,68 +2656,29 @@ function posModule() {
                 }))
             };
 
+            this.billingCandidateCode = candidateCode;
+            this.billingProgress = 15;
+            this.billingStatusText = 'Procesando transacción...';
+            this.isProcessingBilling = true;
             this.loading = true;
 
-            // Animación centrada en pantalla con barra de progreso mientras el backend emite la factura
-            let progressInterval = null;
-            Swal.fire({
-                title: 'Emitiendo Factura',
-                html: `
-                    <div class="py-3 px-1 space-y-4">
-                        <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full bg-brand-500/20 animate-ping"></div>
-                            <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/25">
-                                <svg class="w-7 h-7 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="space-y-1">
-                            <p id="pos-billing-status" class="text-sm font-semibold ${this.darkMode ? 'text-slate-200' : 'text-slate-700'} transition-all">
-                                Procesando transacción...
-                            </p>
-                            <p class="text-xs ${this.darkMode ? 'text-slate-400' : 'text-slate-500'} font-mono">
-                                Código: ${salePayload.codigo_venta}
-                            </p>
-                        </div>
-
-                        <div class="w-full ${this.darkMode ? 'bg-slate-700/60 border-slate-600/50' : 'bg-slate-200 border-slate-300'} rounded-full h-3 overflow-hidden p-0.5 border shadow-inner">
-                            <div id="pos-billing-bar" class="bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-300 ease-out" style="width: 15%"></div>
-                        </div>
-
-                        <p class="text-[11px] ${this.darkMode ? 'text-slate-400' : 'text-slate-500'}">
-                            Generando comprobante fiscal y deduciendo inventario...
-                        </p>
-                    </div>
-                `,
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                background: this.darkMode ? '#1e293b' : '#ffffff',
-                color: this.darkMode ? '#fff' : '#0f172a',
-                didOpen: () => {
-                    const bar = document.getElementById('pos-billing-bar');
-                    const statusText = document.getElementById('pos-billing-status');
-                    const steps = [
-                        { pct: 35, text: 'Verificando existencias...' },
-                        { pct: 60, text: 'Registrando pago...' },
-                        { pct: 80, text: 'Generando comprobante...' },
-                        { pct: 92, text: 'Finalizando emisión...' }
-                    ];
-                    let stepIdx = 0;
-                    progressInterval = setInterval(() => {
-                        if (stepIdx < steps.length) {
-                            if (bar) bar.style.width = steps[stepIdx].pct + '%';
-                            if (statusText) statusText.textContent = steps[stepIdx].text;
-                            stepIdx++;
-                        }
-                    }, 220);
-                },
-                willClose: () => {
-                    if (progressInterval) clearInterval(progressInterval);
-                }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
             });
+
+            // Progreso dinámico y reactivo en pantalla mientras el backend emite la factura
+            let progressInterval = setInterval(() => {
+                if (this.billingProgress < 90) {
+                    this.billingProgress += 15;
+                    if (this.billingProgress >= 30 && this.billingProgress < 55) {
+                        this.billingStatusText = 'Verificando existencias...';
+                    } else if (this.billingProgress >= 55 && this.billingProgress < 75) {
+                        this.billingStatusText = 'Registrando pago...';
+                    } else if (this.billingProgress >= 75) {
+                        this.billingStatusText = 'Generando comprobante fiscal...';
+                    }
+                }
+            }, 200);
 
             try {
                 let res = await this.apiFetch('/api/ventas', {
@@ -2282,11 +2710,9 @@ function posModule() {
                 const newSale = responseData.venta;
 
                 // Completar la barra de progreso al 100% con feedback positivo
-                if (progressInterval) clearInterval(progressInterval);
-                const bar = document.getElementById('pos-billing-bar');
-                const statusText = document.getElementById('pos-billing-status');
-                if (bar) bar.style.width = '100%';
-                if (statusText) statusText.textContent = '¡Factura emitida exitosamente!';
+                clearInterval(progressInterval);
+                this.billingProgress = 100;
+                this.billingStatusText = '¡Factura emitida exitosamente!';
                 await new Promise(r => setTimeout(r, 260));
 
                 // Descontar existencias localmente para respuesta visual instantánea (0ms)
@@ -2334,6 +2760,10 @@ function posModule() {
                     this.fetchBitacoras();
                 }, 100);
 
+                // Cerrar modal de facturación y abrir comprobante
+                this.isProcessingBilling = false;
+                await this.openReceiptModal(newSale.venta_id, newSale);
+
                 // Notificación sutil tipo tarjeta en esquina superior derecha
                 const cambioInfo = (salePayload.metodo_pago === 'Efectivo' && cambioCalculado > 0)
                     ? ` | Cambio: ${this.formatCurrency(cambioCalculado)}`
@@ -2341,6 +2771,8 @@ function posModule() {
                 this.notify('¡Venta Registrada!', `Factura ${newSale.codigo_venta} por ${this.formatCurrency(newSale.total_venta)}${cambioInfo}`, 'success', 3500);
 
             } catch (error) {
+                clearInterval(progressInterval);
+                this.isProcessingBilling = false;
                 this.notify('Error al procesar venta', error.message, 'error', 4000);
             } finally {
                 this.loading = false;
@@ -2616,12 +3048,12 @@ function posModule() {
             }
             if (this.cart.length === 0) return;
 
-            const clienteId = this.posSale.id_cliente || (this.clientes[0] ? this.clientes[0].cliente_id : null);
+            const clienteNombre = (this.posSale.cliente_nombre && this.posSale.cliente_nombre.trim()) ? this.posSale.cliente_nombre.trim() : 'Consumidor Final';
 
             const payload = {
                 id_usuario: this.currentUser?.usuario_id || (this.usuarios[0] ? this.usuarios[0].usuario_id : 1),
                 id_caja: this.turnoActivo?.id_caja || null,
-                id_cliente: clienteId,
+                cliente_nombre: clienteNombre,
                 descuento: this.posSale.descuento_venta || 0,
                 detalles: this.cart.map(i => ({
                     id_producto: i.id_producto,
@@ -2700,9 +3132,7 @@ function posModule() {
                     existencia_bodega: Number(d.producto?.existencia_bodega || 0),
                 }));
 
-                if (v.id_cliente) {
-                    this.posSale.id_cliente = v.id_cliente;
-                }
+                this.posSale.cliente_nombre = v.cliente_nombre || 'Consumidor Final';
                 this.posSale.descuento_venta = Number(v.descuento || 0);
                 this.posSale.tipo_descuento = 'monto';
                 this.posSale.descuento_porcentaje = 0;
@@ -2785,7 +3215,6 @@ function app() {
         // Datos de Entidades
         productos: [],
         categorias: [],
-        clientes: [],
         usuarios: [],
         roles: [],
         ventas: [],
@@ -2853,16 +3282,30 @@ function app() {
         // Navegación
         navItems: [
             { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-            { id: 'pos', label: 'Punto de Venta (POS)', icon: 'shopping-cart', badge: () => (this.ventasEspera ? this.ventasEspera.length : 0) },
-            { id: 'productos', label: 'Productos & Stock', icon: 'package', badge: () => this.lowStockProducts.length },
+            { id: 'pos', label: 'Punto de Venta (POS)', icon: 'shopping-cart' },
+            { id: 'productos', label: 'Productos & Stock', icon: 'package' },
             { id: 'categorias', label: 'Categorías', icon: 'tags' },
             { id: 'ventas', label: 'Historial de Ventas', icon: 'receipt' },
-            { id: 'clientes', label: 'Clientes', icon: 'users' },
+            { id: 'proveedores', label: 'Proveedores', icon: 'truck' },
+            { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', icon: 'credit-card' },
             { id: 'caja', label: 'Cajas & Arqueos', icon: 'wallet' },
             { id: 'inventario', label: 'Kardex / Movimientos', icon: 'arrow-left-right' },
             { id: 'usuarios', label: 'Usuarios & Roles', icon: 'user-cog' },
             { id: 'bitacora', label: 'Bitácora Auditoría', icon: 'shield-check' },
         ],
+
+        getNavBadge(tabId) {
+            if (tabId === 'pos') {
+                return (this.ventasEspera && Array.isArray(this.ventasEspera)) ? this.ventasEspera.length : 0;
+            }
+            if (tabId === 'productos') {
+                return (this.lowStockProducts && Array.isArray(this.lowStockProducts)) ? this.lowStockProducts.length : 0;
+            }
+            if (tabId === 'cuentas-por-pagar') {
+                return this.cxpKPIs ? Number(this.cxpKPIs.facturas_pendientes_count || 0) : 0;
+            }
+            return 0;
+        },
 
         // Propiedades Computadas
         get currentTabTitle() {
@@ -2877,9 +3320,19 @@ function app() {
 
         get isAdmin() {
             if (!this.currentUser) return false;
-            const rol = String(this.currentUser.rol || '').toLowerCase();
-            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
-            return rol.includes('admin') || permisos.includes('*') || permisos.includes('usuarios.gestionar');
+            const rolRaw = this.currentUser.rol;
+            const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
+                ? String(rolRaw.nombre_rol || '')
+                : String(rolRaw || '');
+            const permisos = Array.isArray(this.currentUser.permisos)
+                ? this.currentUser.permisos
+                : (Array.isArray(rolRaw?.permisos) ? rolRaw.permisos : []);
+            const idRol = Number(this.currentUser.id_rol || rolRaw?.rol_id || 0);
+
+            return idRol === 1
+                || rolNombre.toLowerCase().includes('admin')
+                || permisos.includes('*')
+                || permisos.includes('usuarios.gestionar');
         },
 
         get canAccessBusinessInfo() {
@@ -2894,7 +3347,9 @@ function app() {
         hasPermission(permiso) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
-            const permisos = Array.isArray(this.currentUser.permisos) ? this.currentUser.permisos : [];
+            const permisos = Array.isArray(this.currentUser.permisos)
+                ? this.currentUser.permisos
+                : (Array.isArray(this.currentUser.rol?.permisos) ? this.currentUser.rol.permisos : []);
             if (permisos.includes('*')) return true;
             return permisos.includes(permiso);
         },
@@ -2902,22 +3357,26 @@ function app() {
         canAccessTab(tabId) {
             if (!this.currentUser) return false;
             if (this.isAdmin) return true;
-            const rol = String(this.currentUser.rol || '').toLowerCase();
+            const rolRaw = this.currentUser.rol;
+            const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
+                ? String(rolRaw.nombre_rol || '').toLowerCase()
+                : String(rolRaw || '').toLowerCase();
             switch (tabId) {
                 case 'dashboard':
                     return this.hasPermission('dashboard.ver') || this.hasPermission('usuarios.gestionar');
                 case 'pos':
-                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear') || rol.includes('cajer') || rol.includes('ventas');
+                    return this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear') || rolNombre.includes('cajer') || rolNombre.includes('ventas');
                 case 'productos':
                     return this.hasPermission('productos.ver') || this.hasPermission('productos.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
                     return this.hasPermission('ventas.ver') || this.hasPermission('ventas.crear');
-                case 'clientes':
-                    return this.hasPermission('clientes.gestionar') || this.hasPermission('pos.acceso');
+                case 'proveedores':
+                case 'cuentas-por-pagar':
+                    return this.isAdmin || this.hasPermission('proveedores.gestionar');
                 case 'caja':
-                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso') || rol.includes('cajer');
+                    return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso') || rolNombre.includes('cajer');
                 case 'inventario':
                     return this.hasPermission('inventario.gestionar') || this.hasPermission('productos.gestionar');
                 case 'usuarios':
@@ -2988,7 +3447,8 @@ function app() {
                 if (this.searchVenta) {
                     const term = this.searchVenta.toLowerCase().trim();
                     const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
-                    const clientMatch = v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term);
+                    const clientMatch = (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term)) ||
+                        (v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term));
                     const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
                     if (!codeMatch && !clientMatch && !refMatch) {
                         return false;
@@ -3054,15 +3514,6 @@ function app() {
             return Array.from(map.values()).sort((a, b) => a.nombre_apellido.localeCompare(b.nombre_apellido));
         },
 
-        get filteredClientes() {
-            return this.clientes.filter(c => {
-                if (!this.searchCliente) return true;
-                const term = this.searchCliente.toLowerCase();
-                const nameMatch = c.nombre_apellido_cliente.toLowerCase().includes(term);
-                const codeMatch = c.codigo_cliente && c.codigo_cliente.toLowerCase().includes(term);
-                return nameMatch || codeMatch;
-            });
-        },
 
         get cartSubtotal() {
             return this.cart.reduce((sum, item) => sum + item.subtotal_venta_detalle, 0);
@@ -3169,7 +3620,6 @@ function app() {
                         await Promise.all([
                             this.fetchProductos(),
                             this.fetchCategorias(),
-                            this.fetchClientes(),
                             this.fetchVentas(),
                             this.fetchEmpresa(),
                             this.fetchVentasEspera()
@@ -3190,14 +3640,19 @@ function app() {
                             this.fetchUsuarios().catch(() => {})
                         ]);
                         break;
+                    case 'proveedores':
+                    case 'cuentas-por-pagar':
+                        await Promise.all([
+                            this.fetchProveedores(),
+                            this.fetchCuentasPorPagar(),
+                            this.fetchCxPKPIs()
+                        ]);
+                        break;
                     case 'caja':
                         await Promise.all([
                             this.fetchVentas(),
                             this.fetchBitacoras().catch(() => {})
                         ]);
-                        break;
-                    case 'clientes':
-                        await this.fetchClientes();
                         break;
                     case 'inventario':
                         await Promise.all([
@@ -3241,6 +3696,11 @@ function app() {
                 if (!this.canAccessTab(this.currentTab)) {
                     this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                 }
+                if (this.currentTab === 'cuentas-por-pagar') {
+                    this.cxpActiveSubTab = 'cuentas';
+                } else if (this.currentTab === 'proveedores') {
+                    this.cxpActiveSubTab = 'proveedores';
+                }
                 this.loadTab(this.currentTab);
                 this.fetchEmpresa();
                 if (this.currentTab === 'dashboard') {
@@ -3271,6 +3731,11 @@ function app() {
                     if (!this.canAccessTab(newTab)) {
                         this.currentTab = (this.visibleNavItems && this.visibleNavItems.length > 0) ? this.visibleNavItems[0].id : 'productos';
                         return;
+                    }
+                    if (newTab === 'cuentas-por-pagar') {
+                        this.cxpActiveSubTab = 'cuentas';
+                    } else if (newTab === 'proveedores') {
+                        this.cxpActiveSubTab = 'proveedores';
                     }
                     this.loadTab(newTab);
                     if (newTab === 'dashboard') {
@@ -3307,21 +3772,6 @@ function app() {
                 }
             } catch (e) {
                 console.error('Error cargando categorías:', e);
-            }
-        },
-
-        async fetchClientes() {
-            try {
-                const res = await this.apiFetch('/api/clientes');
-                if (res.ok) {
-                    const data = await res.json();
-                    this.clientes = Array.isArray(data) ? data : [];
-                    if (this.clientes.length > 0 && (!this.posSale.id_cliente || !this.clientes.some(c => c.cliente_id == this.posSale.id_cliente))) {
-                        this.posSale.id_cliente = this.clientes[0].cliente_id;
-                    }
-                }
-            } catch (e) {
-                console.error('Error cargando clientes:', e);
             }
         },
 
@@ -4086,7 +4536,7 @@ function app() {
         posModule(),
         productosModule(),
         categoriasModule(),
-        clientesModule(),
+        proveedoresModule(),
         usuariosModule(),
         utilsModule(),
         themeModule(),

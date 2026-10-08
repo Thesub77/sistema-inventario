@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Caja;
 use App\Models\Categoria;
-use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
@@ -22,8 +21,6 @@ class DashboardTest extends TestCase
     protected Usuario $usuario;
 
     protected Categoria $categoria;
-
-    protected Cliente $cliente;
 
     protected Caja $caja;
 
@@ -50,13 +47,6 @@ class DashboardTest extends TestCase
         $this->categoria = Categoria::create([
             'codigo_categoria' => 'CAT-TEST',
             'nombre_categoria' => 'Bebidas',
-            'estado' => 1,
-        ]);
-
-        $this->cliente = Cliente::create([
-            'nombre_apellido_cliente' => 'Cliente Fiel',
-            'codigo_cliente' => 'CLI-001',
-            'telefono_cliente' => '8888-8888',
             'estado' => 1,
         ]);
 
@@ -112,7 +102,7 @@ class DashboardTest extends TestCase
         // 2. Crear una venta de hoy con detalles
         $ventaHoy = Venta::create([
             'id_usuario' => $this->usuario->usuario_id,
-            'id_cliente' => $this->cliente->cliente_id,
+            'cliente_nombre' => 'Consumidor Final',
             'codigo_venta' => 'FAC-001',
             'metodo_pago' => 'Efectivo',
             'fecha_hora_venta' => now(),

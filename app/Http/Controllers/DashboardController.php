@@ -409,9 +409,8 @@ class DashboardController extends Controller
             'horas' => array_values($horasMap),
         ];
 
-        // 9. Últimas 6 Ventas Emitidas - RF-30
-        $ultimasVentas = Venta::with('cliente:cliente_id,nombre_apellido_cliente')
-            ->where('estado', 1)
+        // 9. Últimas 6 Ventas Emitidas
+        $ultimasVentas = Venta::where('estado', 1)
             ->orderByDesc('venta_id')
             ->limit(6)
             ->get()
@@ -419,7 +418,7 @@ class DashboardController extends Controller
                 return [
                     'venta_id' => $v->venta_id,
                     'codigo_venta' => $v->codigo_venta,
-                    'cliente_nombre' => $v->cliente?->nombre_apellido_cliente ?? 'Consumidor Final',
+                    'cliente_nombre' => $v->cliente_nombre ?? 'Consumidor Final',
                     'metodo_pago' => $v->metodo_pago,
                     'fecha_hora_venta' => $v->fecha_hora_venta,
                     'total_venta' => (float) $v->total_venta,

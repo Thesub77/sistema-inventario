@@ -231,14 +231,27 @@
 
                     <!-- Cliente y Método de Pago en 2 columnas compactas -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <!-- Cliente Selector -->
+                        <!-- Cliente Input -->
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">Cliente</label>
-                            <select x-model.number="posSale.id_cliente" class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-brand-500 transition-colors">
-                                <template x-for="c in clientes" :key="c.cliente_id">
-                                    <option :value="c.cliente_id" x-text="c.nombre_apellido_cliente + ' (' + (c.codigo_cliente || 'Sin código') + ')'"></option>
-                                </template>
-                            </select>
+                            <div class="flex items-center justify-between mb-0.5">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300">Cliente</label>
+                                <button type="button" 
+                                    x-show="posSale.cliente_nombre && posSale.cliente_nombre !== 'Consumidor Final'" 
+                                    @click="posSale.cliente_nombre = 'Consumidor Final'"
+                                    class="text-[10px] text-brand-600 dark:text-brand-400 hover:underline font-semibold cursor-pointer">
+                                    Restablecer
+                                </button>
+                            </div>
+                            <div class="relative">
+                                <input type="text"
+                                    x-model="posSale.cliente_nombre"
+                                    placeholder="Consumidor Final"
+                                    maxlength="128"
+                                    class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-7 pr-2.5 py-1 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-brand-500 transition-colors">
+                                <div class="absolute left-2 top-1.5 text-slate-400 pointer-events-none">
+                                    <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Método de Pago -->
@@ -561,8 +574,7 @@
                                 </div>
 
                                 <div class="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2 pt-0.5">
-                                    <span class="font-medium" x-show="item.cliente" x-text="item.cliente ? item.cliente.nombre_apellido_cliente : ''"></span>
-                                    <span class="text-slate-400" x-show="item.cliente && item.cliente.codigo_cliente" x-text="'(' + item.cliente.codigo_cliente + ')'"></span>
+                                    <span class="font-medium" x-text="item.cliente_nombre || 'Consumidor Final'"></span>
                                     <span class="text-slate-400 dark:text-slate-500">•</span>
                                     <span class="text-slate-500 dark:text-slate-400" x-text="(item.detalles ? item.detalles.length : 0) + ' productos'"></span>
                                 </div>
