@@ -308,7 +308,8 @@ export function app() {
                 if (this.searchVenta) {
                     const term = this.searchVenta.toLowerCase().trim();
                     const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
-                    const clientMatch = v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term);
+                    const clientMatch = (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term)) ||
+                        (v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term));
                     const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
                     if (!codeMatch && !clientMatch && !refMatch) {
                         return false;

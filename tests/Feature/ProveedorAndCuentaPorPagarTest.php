@@ -184,10 +184,62 @@ class ProveedorAndCuentaPorPagarTest extends TestCase
 
         $kpis = $this->getJson('/api/cuentas-por-pagar/resumen-kpis');
         $kpis->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('kpis.total_pendiente', 2000)
+            ->assertJsonPath('kpis.facturas_pendientes_count', 2)
+            ->assertJsonPath('kpis.total_vencido', 600)
+            ->assertJsonPath('kpis.facturas_vencidas_count', 1)
+            ->assertJsonPath('kpis.proximos_vencimientos', 1)
             ->assertJsonPath('total_deuda_activa', 2000)
             ->assertJsonPath('total_vencidas', 1)
             ->assertJsonPath('monto_vencido', 600)
             ->assertJsonPath('proximos_vencimientos', 1);
+    }
+
+    public function test_no_se_puede_registrar_factura_duplicada_para_el_mismo_proveedor(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        $prov1 = Proveedor::create([
+            'nombre_comercial' => 'Proveedor Alpha',
+            'estado' => 1,
+        ]);
+
+        $prov2 = Proveedor::create([
+            'nombre_comercial' => 'Proveedor Beta',
+            'estado' => 1,
+        ]);
+
+        $this->postJson('/api/cuentas-por-pagar', [
+            'id_proveedor' => $prov1->proveedor_id,
+            'numero_factura' => 'FAC-DUP-01',
+            'descripcion' => 'Factura inicial',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(5)->toDateString(),
+            'monto_total' => 500.00,
+        ])->assertStatus(201);
+
+        // Duplicada para el mismo proveedor debe fallar con 422
+        $resDuplicada = $this->postJson('/api/cuentas-por-pagar', [
+            'id_proveedor' => $prov1->proveedor_id,
+            'numero_factura' => 'FAC-DUP-01',
+            'descripcion' => 'Factura repetida',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(5)->toDateString(),
+            'monto_total' => 500.00,
+        ]);
+        $resDuplicada->assertStatus(422)
+            ->assertJsonValidationErrors(['numero_factura']);
+
+        // Misma factura para otro proveedor debe permitirse
+        $this->postJson('/api/cuentas-por-pagar', [
+            'id_proveedor' => $prov2->proveedor_id,
+            'numero_factura' => 'FAC-DUP-01',
+            'descripcion' => 'Mismo número pero otro proveedor',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(5)->toDateString(),
+            'monto_total' => 500.00,
+        ])->assertStatus(201);
     }
 
     public function test_abono_desde_caja_descuenta_saldo_y_genera_egreso_en_turno(): void

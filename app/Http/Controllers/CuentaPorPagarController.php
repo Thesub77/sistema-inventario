@@ -96,8 +96,10 @@ class CuentaPorPagarController extends Controller
         $todayStr = $today->toDateString();
         $inSevenDays = $today->copy()->addDays(7)->toDateString();
 
-        // Total deuda activa
-        $deudaActiva = (float) (Cuenta_por_pagar::whereIn('estado', ['Pendiente', 'Parcial'])->sum('saldo_pendiente') ?? 0.00);
+        // Total deuda activa y facturas pendientes
+        $pendientesQuery = Cuenta_por_pagar::whereIn('estado', ['Pendiente', 'Parcial']);
+        $deudaActiva = (float) ($pendientesQuery->sum('saldo_pendiente') ?? 0.00);
+        $facturasPendientesCount = (int) $pendientesQuery->count();
 
         // Facturas vencidas y monto vencido
         $vencidasQuery = Cuenta_por_pagar::whereIn('estado', ['Pendiente', 'Parcial'])
@@ -116,13 +118,23 @@ class CuentaPorPagarController extends Controller
         $endOfMonth = $today->copy()->endOfMonth()->toDateTimeString();
         $totalPagadoMes = (float) (Pago_cuenta_por_pagar::whereBetween('fecha_pago', [$startOfMonth, $endOfMonth])->sum('monto_pago') ?? 0.00);
 
-        return response()->json([
+        $kpis = [
+            'total_pendiente' => $deudaActiva,
+            'facturas_pendientes_count' => $facturasPendientesCount,
+            'total_vencido' => $montoVencido,
+            'facturas_vencidas_count' => $totalVencidas,
+            'proximos_vencimientos' => $proximosVencimientos,
+            'total_pagado_mes' => $totalPagadoMes,
+            // Aliases de retrocompatibilidad
             'total_deuda_activa' => $deudaActiva,
             'total_vencidas' => $totalVencidas,
             'monto_vencido' => $montoVencido,
-            'proximos_vencimientos' => $proximosVencimientos,
-            'total_pagado_mes' => $totalPagadoMes,
-        ]);
+        ];
+
+        return response()->json(array_merge([
+            'success' => true,
+            'kpis' => $kpis,
+        ], $kpis));
     }
 
     /**
@@ -134,7 +146,15 @@ class CuentaPorPagarController extends Controller
 
         $validated = $request->validate([
             'id_proveedor' => ['required', 'integer', Rule::exists('proveedor', 'proveedor_id')->where('estado', 1)],
-            'numero_factura' => 'required|string|min:1|max:64',
+            'numero_factura' => [
+                'required',
+                'string',
+                'min:1',
+                'max:64',
+                Rule::unique('cuenta_por_pagar', 'numero_factura')->where(function ($query) use ($request) {
+                    return $query->where('id_proveedor', $request->input('id_proveedor'));
+                }),
+            ],
             'descripcion' => 'nullable|string|max:255',
             'fecha_emision' => 'required|date',
             'fecha_vencimiento' => 'required|date|after_or_equal:fecha_emision',
@@ -142,6 +162,7 @@ class CuentaPorPagarController extends Controller
         ], [
             'id_proveedor.required' => 'Debe seleccionar un proveedor activo.',
             'numero_factura.required' => 'El número de factura o documento del proveedor es obligatorio.',
+            'numero_factura.unique' => 'Ya existe una factura registrada con este número para el proveedor seleccionado.',
             'fecha_emision.required' => 'La fecha de emisión es obligatoria.',
             'fecha_vencimiento.required' => 'La fecha de vencimiento es obligatoria.',
             'fecha_vencimiento.after_or_equal' => 'La fecha de vencimiento no puede ser anterior a la de emisión.',
@@ -202,10 +223,24 @@ class CuentaPorPagarController extends Controller
         $cuenta = Cuenta_por_pagar::findOrFail($id);
 
         $validated = $request->validate([
-            'numero_factura' => 'required|string|min:1|max:64',
+            'numero_factura' => [
+                'required',
+                'string',
+                'min:1',
+                'max:64',
+                Rule::unique('cuenta_por_pagar', 'numero_factura')
+                    ->where('id_proveedor', $cuenta->id_proveedor)
+                    ->ignore($cuenta->cuenta_por_pagar_id, 'cuenta_por_pagar_id'),
+            ],
             'descripcion' => 'nullable|string|max:255',
             'fecha_emision' => 'required|date',
             'fecha_vencimiento' => 'required|date|after_or_equal:fecha_emision',
+        ], [
+            'numero_factura.required' => 'El número de factura o documento del proveedor es obligatorio.',
+            'numero_factura.unique' => 'Ya existe una factura registrada con este número para el proveedor seleccionado.',
+            'fecha_emision.required' => 'La fecha de emisión es obligatoria.',
+            'fecha_vencimiento.required' => 'La fecha de vencimiento es obligatoria.',
+            'fecha_vencimiento.after_or_equal' => 'La fecha de vencimiento no puede ser anterior a la de emisión.',
         ]);
 
         $cuenta->update([

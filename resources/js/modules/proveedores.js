@@ -138,8 +138,16 @@ export function proveedoresModule() {
                 const res = await this.apiFetch('/api/cuentas-por-pagar/resumen-kpis');
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.success && data.kpis) {
-                        this.cxpKPIs = data.kpis;
+                    const kpis = (data && typeof data === 'object' && data.kpis) ? data.kpis : data;
+                    if (kpis && typeof kpis === 'object') {
+                        this.cxpKPIs = {
+                            total_pendiente: Number(kpis.total_pendiente ?? kpis.total_deuda_activa ?? 0),
+                            facturas_pendientes_count: Number(kpis.facturas_pendientes_count ?? 0),
+                            total_vencido: Number(kpis.total_vencido ?? kpis.monto_vencido ?? 0),
+                            facturas_vencidas_count: Number(kpis.facturas_vencidas_count ?? kpis.total_vencidas ?? 0),
+                            proximos_vencimientos: Number(kpis.proximos_vencimientos ?? 0),
+                            total_pagado_mes: Number(kpis.total_pagado_mes ?? 0)
+                        };
                     }
                 }
             } catch (err) {
