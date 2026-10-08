@@ -133,19 +133,152 @@ export function usuariosModule() {
             return 'Este rol actualmente no tiene permisos configurados en la base de datos.';
         },
 
-        // Indica si el usuario que se está editando es el usuario en sesión o posee rol Administrador
+        // Conteo de administradores activos en el sistema
+        get activeAdminsCount() {
+            if (!Array.isArray(this.usuarios)) return 0;
+            return this.usuarios.filter(u =>
+                Number(u.estado) === 1 &&
+                u.rol &&
+                (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')))
+            ).length;
+        },
+
+        // Determina si un usuario dado es el Administrador Principal (Super Admin / Propietario)
+        isUserPrincipal(u) {
+            if (!u) return false;
+            return Boolean(
+                u.es_principal ||
+                Number(u.usuario_id) === 1 ||
+                u.nombre_usuario === 'si_dquiroz'
+            );
+        },
+
+        // Determina si el usuario que se está editando en el modal es el usuario en sesión
+        get isEditingSelf() {
+            return Boolean(
+                this.isEditingUser &&
+                this.currentUser &&
+                this.userForm &&
+                Number(this.currentUser.usuario_id) === Number(this.userForm.usuario_id)
+            );
+        },
+
+        // Determina si el usuario que se está editando en el modal es el Administrador Principal
+        get isEditingPrincipal() {
+            if (!this.isEditingUser || !this.userForm || !this.userForm.usuario_id) return false;
+            const targetUser = (this.usuarios || []).find(u => Number(u.usuario_id) === Number(this.userForm.usuario_id));
+            if (targetUser) return this.isUserPrincipal(targetUser);
+            return Number(this.userForm.usuario_id) === 1 || this.userForm.nombre_usuario === 'si_dquiroz';
+        },
+
+        // Determina si el usuario que se está editando en el modal es el único administrador activo disponible
+        get isEditingLastAdmin() {
+            if (!this.isEditingUser || !this.userForm || !this.userForm.usuario_id) return false;
+            const targetUser = (this.usuarios || []).find(u => Number(u.usuario_id) === Number(this.userForm.usuario_id));
+            if (!targetUser) return false;
+            const isTargetAdmin = targetUser.rol && (targetUser.rol.nombre_rol === 'Administrador' || (Array.isArray(targetUser.rol.permisos) && targetUser.rol.permisos.includes('*')));
+            if (!isTargetAdmin || Number(targetUser.estado) !== 1) return false;
+
+            return this.activeAdminsCount <= 1;
+        },
+
+        // Determina si está permitido modificar el rol del usuario en el formulario
+        get canChangeUserRole() {
+            if (!this.isEditingUser) return true;
+            if (this.isEditingSelf) return false;
+            if (this.isEditingPrincipal) return false;
+            if (this.isEditingLastAdmin) return false;
+            return true;
+        },
+
+        // Determina si está permitido modificar el estado (activo/inactivo) del usuario en el formulario
+        get canChangeUserStatus() {
+            if (!this.isEditingUser) return true;
+            if (this.isEditingSelf) return false;
+            if (this.isEditingPrincipal) return false;
+            if (this.isEditingLastAdmin) return false;
+            return true;
+        },
+
+        // Retrocompatibilidad para cualquier referencia previa
         get isEditingAdminUser() {
-            if (!this.isEditingUser) return false;
-            // 1. Si es el usuario en sesión actual (ej. admin editando su propio perfil)
-            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(this.userForm.usuario_id)) {
-                return true;
+            return !this.canChangeUserRole;
+        },
+
+        // Determina si se puede editar un usuario desde la tabla
+        canEditUser(u) {
+            if (!u) return false;
+            const isTargetPrincipal = this.isUserPrincipal(u);
+            const isSelf = this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id);
+            if (isTargetPrincipal && !isSelf) return false;
+            return true;
+        },
+
+        // Determina si se puede restablecer la contraseña de un usuario desde la tabla
+        canResetPassword(u) {
+            if (!u) return false;
+            const isTargetPrincipal = this.isUserPrincipal(u);
+            const isSelf = this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id);
+            if (isTargetPrincipal && !isSelf) return false;
+            return true;
+        },
+
+        // Determina si se puede bloquear/desbloquear un usuario de la lista
+        canToggleUser(u) {
+            if (!u) return false;
+            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) return false;
+            if (this.isUserPrincipal(u)) return false;
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+                return false;
             }
-            // 2. Si el usuario seleccionado tiene asignado el rol de Administrador
-            const userObj = (this.usuarios || []).find(u => Number(u.usuario_id) === Number(this.userForm.usuario_id));
-            if (userObj && userObj.rol && (userObj.rol.nombre_rol === 'Administrador' || (Array.isArray(userObj.rol.permisos) && userObj.rol.permisos.includes('*')))) {
-                return true;
+            return true;
+        },
+
+        // Determina si se puede eliminar un usuario de la lista
+        canDeleteUser(u) {
+            if (!u) return false;
+            if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) return false;
+            if (this.isUserPrincipal(u)) return false;
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+                return false;
             }
-            return false;
+            return true;
+        },
+
+        getUserActionTooltip(u, action) {
+            if (!u) return '';
+            const isSelf = this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id);
+            const isTargetPrincipal = this.isUserPrincipal(u);
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            const isLastAdmin = esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1;
+
+            if (action === 'edit') {
+                if (isTargetPrincipal && !isSelf) return 'El Administrador Principal solo puede ser editado por sí mismo';
+                return 'Editar datos del usuario';
+            }
+
+            if (action === 'password') {
+                if (isTargetPrincipal && !isSelf) return 'No puedes restablecer la contraseña del Administrador Principal';
+                return 'Restablecer contraseña de acceso';
+            }
+
+            if (action === 'toggle') {
+                if (isSelf) return 'No puedes bloquear tu propia cuenta en sesión';
+                if (isTargetPrincipal) return 'No se puede bloquear al Administrador Principal del sistema';
+                if (isLastAdmin) return 'No se puede bloquear al único Administrador activo del sistema';
+                return Number(u.estado) === 1 ? 'Bloquear acceso al usuario' : 'Habilitar acceso al usuario';
+            }
+
+            if (action === 'delete') {
+                if (isSelf) return 'No puedes eliminar tu propia cuenta en sesión';
+                if (isTargetPrincipal) return 'No se puede eliminar al Administrador Principal del sistema';
+                if (isLastAdmin) return 'No se puede eliminar al único Administrador activo del sistema';
+                return 'Eliminar usuario';
+            }
+
+            return '';
         },
 
         // Contador auxiliar de usuarios por rol
@@ -156,6 +289,16 @@ export function usuariosModule() {
 
         // --- MÉTODOS DE USUARIOS ---
         openUserModal(user = null) {
+            if (user && !this.canEditUser(user)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'El Administrador Principal del sistema solo puede ser editado por sí mismo.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
             if (user) {
                 this.isEditingUser = true;
                 this.userForm = {
@@ -209,12 +352,16 @@ export function usuariosModule() {
                 nombre_usuario: (this.userForm.nombre_usuario || '').trim(),
             };
 
-            // Si es edición de cuenta administrador / propia, blindar estado en 1 y no enviar cambio de rol
-            if (this.isEditingAdminUser) {
-                payload.estado = 1;
-            } else {
+            // Solo enviar id_rol si está permitido modificarlo
+            if (this.canChangeUserRole) {
                 payload.id_rol = Number(this.userForm.id_rol);
+            }
+
+            // Solo enviar estado si está permitido modificarlo; si está protegido, se mantiene en 1
+            if (this.canChangeUserStatus) {
                 payload.estado = Number(this.userForm.estado);
+            } else {
+                payload.estado = 1;
             }
 
             if (this.userForm.fecha_registro) {
@@ -276,12 +423,23 @@ export function usuariosModule() {
                 return;
             }
 
-            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
-            if (esAdmin && Number(u.estado) === 1) {
+            if (this.isUserPrincipal(u)) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Acción No Permitida',
-                    text: 'No se puede bloquear o desactivar a una cuenta con rol Administrador.',
+                    text: 'No se puede desactivar o bloquear al Administrador Principal del sistema.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'No se puede desactivar o bloquear al único Administrador activo del sistema.',
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });
@@ -338,6 +496,16 @@ export function usuariosModule() {
 
         // --- MÉTODOS DE RESTABLECIMIENTO DE CONTRASEÑA ---
         openPasswordModal(u) {
+            if (u && !this.canResetPassword(u)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'No puedes restablecer la contraseña del Administrador Principal del sistema.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
             this.passwordUser = u;
             this.newPasswordValue = '';
             this.showPasswordPlainText = false;
@@ -428,12 +596,23 @@ export function usuariosModule() {
                 return;
             }
 
-            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
-            if (esAdmin) {
+            if (this.isUserPrincipal(u)) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Acción No Permitida',
-                    text: 'No se puede eliminar a una cuenta con rol Administrador.',
+                    text: 'No se puede eliminar o desactivar al Administrador Principal del sistema.',
+                    background: this.darkMode ? '#1e293b' : '#ffffff',
+                    color: this.darkMode ? '#fff' : '#0f172a'
+                });
+                return;
+            }
+
+            const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
+            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Acción No Permitida',
+                    text: 'No se puede eliminar o desactivar al único Administrador activo del sistema.',
                     background: this.darkMode ? '#1e293b' : '#ffffff',
                     color: this.darkMode ? '#fff' : '#0f172a'
                 });

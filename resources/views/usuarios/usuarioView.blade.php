@@ -207,8 +207,15 @@
                                         <div>
                                             <div class="flex items-center gap-1.5">
                                                 <span class="font-bold text-slate-900 dark:text-white" x-text="u.nombre_apellido"></span>
+                                                <!-- Badge si es el Administrador Principal / Propietario -->
+                                                <template x-if="isUserPrincipal(u)">
+                                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                                        <i data-lucide="crown" class="w-3 h-3 text-amber-500"></i>
+                                                        <span>Propietario</span>
+                                                    </span>
+                                                </template>
                                                 <!-- Badge si es el usuario en sesión actual -->
-                                                <template x-if="currentUser && currentUser.usuario_id === u.usuario_id">
+                                                <template x-if="currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id)">
                                                     <span class="px-1.5 py-0.2 text-[9px] font-extrabold uppercase rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
                                                         Tú
                                                     </span>
@@ -248,44 +255,38 @@
                                 <td class="py-3.5 px-4 text-center">
                                     <div class="flex items-center justify-center gap-1">
                                         <!-- Botón: Editar Usuario -->
-                                        <button type="button" @click="openUserModal(u)"
-                                            class="p-2 text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                                            title="Editar datos del usuario">
+                                        <button type="button" @click="canEditUser(u) && openUserModal(u)"
+                                            :disabled="!canEditUser(u)"
+                                            class="p-2 text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                            :title="getUserActionTooltip(u, 'edit')">
                                             <i data-lucide="edit-3" class="w-4 h-4"></i>
                                         </button>
 
                                         <!-- Botón: Restablecer Contraseña -->
-                                        <button type="button" @click="openPasswordModal(u)"
-                                            class="p-2 text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all cursor-pointer"
-                                            title="Restablecer contraseña de acceso">
+                                        <button type="button" @click="canResetPassword(u) && openPasswordModal(u)"
+                                            :disabled="!canResetPassword(u)"
+                                            class="p-2 text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                            :title="getUserActionTooltip(u, 'password')">
                                             <i data-lucide="key-round" class="w-4 h-4 text-amber-500"></i>
                                         </button>
 
                                         <!-- Botón: Bloquear / Desbloquear (Toggle) -->
                                         <button type="button"
                                             @click="toggleUserStatus(u)"
-                                            :disabled="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id)) || (u.rol && u.rol.nombre_rol === 'Administrador')"
+                                            :disabled="!canToggleUser(u)"
                                             class="p-2 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                             :class="Number(u.estado) === 1
                                                 ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/10'
                                                 : 'text-rose-500 hover:text-emerald-500 hover:bg-emerald-500/10'"
-                                            :title="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id))
-                                                ? 'No puedes bloquear tu propia cuenta'
-                                                : ((u.rol && u.rol.nombre_rol === 'Administrador')
-                                                    ? 'No se puede bloquear a una cuenta Administrador'
-                                                    : (Number(u.estado) === 1 ? 'Bloquear acceso al usuario' : 'Habilitar acceso al usuario'))">
+                                            :title="getUserActionTooltip(u, 'toggle')">
                                             <i :data-lucide="Number(u.estado) === 1 ? 'lock' : 'unlock'" class="w-4 h-4"></i>
                                         </button>
 
                                         <!-- Botón: Eliminar Usuario -->
                                         <button type="button" @click="deleteUser(u)"
-                                            :disabled="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id)) || (u.rol && u.rol.nombre_rol === 'Administrador')"
+                                            :disabled="!canDeleteUser(u)"
                                             class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                            :title="(currentUser && Number(currentUser.usuario_id) === Number(u.usuario_id))
-                                                ? 'No puedes eliminar tu propia cuenta'
-                                                : ((u.rol && u.rol.nombre_rol === 'Administrador')
-                                                    ? 'No se puede eliminar a una cuenta Administrador'
-                                                    : 'Eliminar o desactivar usuario')">
+                                            :title="getUserActionTooltip(u, 'delete')">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>

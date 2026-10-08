@@ -228,32 +228,62 @@ class IntegridadSeguridadTest extends TestCase
         ]);
     }
 
+    public function test_admin_secundario_no_puede_modificar_ni_eliminar_al_administrador_principal(): void
+    {
+        // Actuamos como adminSecundario
+        Sanctum::actingAs($this->adminSecundario);
+
+        // 1. Intentar modificar nombre / usuario del Admin Principal -> 403
+        $resMod = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'nombre_apellido' => 'Intento Hack',
+            'nombre_usuario' => 'hacked_admin',
+        ]);
+        $resMod->assertStatus(403);
+        $resMod->assertJsonPath('message', 'No se puede modificar la cuenta del Administrador Principal del sistema.');
+
+        // 2. Intentar cambiar rol del Admin Principal -> 403
+        $resRol = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'id_rol' => $this->rolCajero->rol_id,
+        ]);
+        $resRol->assertStatus(403);
+        $resRol->assertJsonPath('message', 'No se puede modificar la cuenta del Administrador Principal del sistema.');
+
+        // 3. Intentar desactivar vía PUT estado=0 -> 403
+        $resEstado = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'estado' => 0,
+        ]);
+        $resEstado->assertStatus(403);
+        $resEstado->assertJsonPath('message', 'No se puede modificar la cuenta del Administrador Principal del sistema.');
+
+        // 4. Intentar eliminar vía DELETE -> 403
+        $resDel = $this->deleteJson("/api/usuarios/{$this->adminPrincipal->usuario_id}");
+        $resDel->assertStatus(403);
+        $resDel->assertJsonPath('message', 'No se puede desactivar al Administrador Principal del sistema.');
+
+        // 5. El Administrador Principal sí puede editar sus propios datos (nombre, username)
+        Sanctum::actingAs($this->adminPrincipal);
+        $resSelf = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'nombre_apellido' => 'Diego Q.',
+            'nombre_usuario' => 'si_dquiroz_updated',
+        ]);
+        $resSelf->assertStatus(200);
+
+        // Pero el Administrador Principal NO puede cambiar su propio rol ni desactivarse
+        $resSelfRol = $this->putJson("/api/usuarios/{$this->adminPrincipal->usuario_id}", [
+            'id_rol' => $this->rolCajero->rol_id,
+        ]);
+        $resSelfRol->assertStatus(403);
+
+        $resSelfDel = $this->deleteJson("/api/usuarios/{$this->adminPrincipal->usuario_id}");
+        $resSelfDel->assertStatus(403);
+    }
+
     public function test_no_se_puede_desactivar_al_unico_administrador_activo(): void
     {
-        // Desactivamos al adminSecundario
-        $this->adminSecundario->update(['estado' => 0]);
+        // Desactivamos directamente a adminPrincipal para probar la protección sobre el último admin
+        Usuario::where('usuario_id', $this->adminPrincipal->usuario_id)->update(['estado' => 0]);
 
-        // Ahora solo queda adminPrincipal como administrador activo
-        // Actuamos como un tercer admin para no chocar con la regla de auto-eliminación
-        $tercerUsuario = Usuario::create([
-            'id_rol' => $this->rolAdmin->rol_id,
-            'nombre_apellido' => 'Admin Tres',
-            'nombre_usuario' => 'admin_tres',
-            'contrasenia_usuario' => bcrypt('123456'),
-            'fecha_registro' => now(),
-            'estado' => 1,
-        ]);
-        Sanctum::actingAs($tercerUsuario);
-
-        // Desactivamos al adminPrincipal (ahora adminTres es el único)
-        $this->deleteJson("/api/usuarios/{$this->adminPrincipal->usuario_id}")->assertStatus(200);
-
-        // Ahora intentamos desactivar a adminTres siendo el único activo
-        $res = $this->deleteJson("/api/usuarios/{$tercerUsuario->usuario_id}");
-        // Falla por auto-desactivación (403)
-        $res->assertStatus(403);
-
-        // Si creamos un supervisor con permiso pero no admin para intentar desactivar al único admin activo:
+        // Ahora solo queda adminSecundario como administrador activo
         $rolGerente = Rol::create([
             'nombre_rol' => 'Gerente',
             'permisos' => ['usuarios.gestionar'],
@@ -269,9 +299,24 @@ class IntegridadSeguridadTest extends TestCase
         ]);
         Sanctum::actingAs($gerente);
 
-        $resUnico = $this->deleteJson("/api/usuarios/{$tercerUsuario->usuario_id}");
+        // Intentar desactivar al único admin activo vía DELETE -> 403
+        $resUnico = $this->deleteJson("/api/usuarios/{$this->adminSecundario->usuario_id}");
         $resUnico->assertStatus(403);
         $resUnico->assertJsonPath('message', 'No se puede desactivar al único Administrador activo del sistema.');
+
+        // Intentar desactivar al único admin activo vía PUT estado=0 -> 403
+        $resPut = $this->putJson("/api/usuarios/{$this->adminSecundario->usuario_id}", [
+            'estado' => 0,
+        ]);
+        $resPut->assertStatus(403);
+        $resPut->assertJsonPath('message', 'No se puede desactivar o bloquear al único Administrador activo del sistema.');
+
+        // Intentar cambiar rol al único admin activo vía PUT id_rol -> 403
+        $resRol = $this->putJson("/api/usuarios/{$this->adminSecundario->usuario_id}", [
+            'id_rol' => $this->rolCajero->rol_id,
+        ]);
+        $resRol->assertStatus(403);
+        $resRol->assertJsonPath('message', 'No puedes cambiar el rol al único Administrador activo del sistema.');
     }
 
     public function test_bloqueo_automatico_tras_3_intentos_fallidos_y_desbloqueo_por_admin(): void
