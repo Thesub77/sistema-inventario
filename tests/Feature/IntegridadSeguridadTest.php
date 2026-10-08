@@ -405,6 +405,53 @@ class IntegridadSeguridadTest extends TestCase
         $resLogin->assertJsonPath('success', true);
     }
 
+    public function test_usuario_bloqueado_puede_ser_eliminado_logicamente_y_desaparece_del_sistema(): void
+    {
+        Sanctum::actingAs($this->adminPrincipal);
+
+        $usuario = Usuario::create([
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Usuario Para Eliminar',
+            'nombre_usuario' => 'user_bloq_elim',
+            'contrasenia_usuario' => bcrypt('password123'),
+            'fecha_registro' => now(),
+            'estado' => 1,
+            'bloqueado' => 1,
+        ]);
+
+        // 1. Estando bloqueado (bloqueado=1, estado=1), aparece en la lista de usuarios
+        $resList = $this->getJson('/api/usuarios');
+        $resList->assertStatus(200);
+        $ids = collect($resList->json('data') ?? $resList->json())->pluck('usuario_id')->all();
+        $this->assertContains($usuario->usuario_id, $ids);
+
+        // 2. Administrador decide eliminarlo lógicamente (DELETE /api/usuarios/{id})
+        $resDelete = $this->deleteJson("/api/usuarios/{$usuario->usuario_id}");
+        $resDelete->assertStatus(200);
+        $resDelete->assertJsonPath('success', true);
+
+        // 3. En BD: estado queda en 0 (baja lógica tiene mayor peso)
+        $usuario->refresh();
+        $this->assertEquals(0, (int) $usuario->estado);
+        $this->assertEquals(1, (int) $usuario->bloqueado);
+        $this->assertFalse($usuario->estaActivo());
+
+        // 4. Ya NO aparece en la lista de usuarios del sistema
+        $resListPostDelete = $this->getJson('/api/usuarios');
+        $resListPostDelete->assertStatus(200);
+        $idsPostDelete = collect($resListPostDelete->json('data') ?? $resListPostDelete->json())->pluck('usuario_id')->all();
+        $this->assertNotContains($usuario->usuario_id, $idsPostDelete);
+
+        // 5. Al intentar iniciar sesión, la eliminación lógica prevalece sobre el bloqueo
+        $this->app['auth']->forgetGuards();
+        $resLogin = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'user_bloq_elim',
+            'contrasenia_usuario' => 'password123',
+        ]);
+        $resLogin->assertStatus(403);
+        $this->assertStringContainsString('dada de baja', $resLogin->json('message'));
+    }
+
     public function test_bitacora_es_inmutable_y_rechaza_creacion_modificacion_o_eliminacion_directa(): void
     {
         $bitacora = Bitacora::create([
