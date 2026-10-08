@@ -40,8 +40,8 @@
 
         <!-- Formulario -->
         <form @submit.prevent="saveUser()" class="p-5 sm:p-6 space-y-4">
-            <!-- Selección de Rol y Botón para Administrar Roles (Oculto para Administrador / Cuenta Propia) -->
-            <template x-if="!isEditingAdminUser">
+            <!-- Selección de Rol y Botón para Administrar Roles -->
+            <template x-if="canChangeUserRole">
                 <div class="space-y-1.5">
                     <div class="flex items-center justify-between">
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -72,8 +72,8 @@
                 </div>
             </template>
 
-            <!-- Banner Informativo de Rol Protegido para Administrador -->
-            <template x-if="isEditingAdminUser">
+            <!-- Banner Informativo de Rol Protegido (Cuenta Propia o Último Administrador) -->
+            <template x-if="!canChangeUserRole">
                 <div class="space-y-1.5">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         Rol & Perfil de Acceso
@@ -84,8 +84,10 @@
                                 <i data-lucide="shield-check" class="w-4 h-4"></i>
                             </div>
                             <div>
-                                <p class="text-xs font-bold text-slate-900 dark:text-white">Administrador del Sistema</p>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Privilegios totales y acceso global a todos los módulos</p>
+                                <p class="text-xs font-bold text-slate-900 dark:text-white"
+                                    x-text="isEditingPrincipal ? 'Administrador Principal (Propietario)' : (isEditingSelf ? 'Tu Cuenta en Sesión' : 'Último Administrador del Sistema')"></p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400"
+                                    x-text="isEditingPrincipal ? 'El Administrador Principal posee privilegios inmutables en el sistema.' : (isEditingSelf ? 'No puedes modificar tu propio rol de acceso para evitar pérdida de permisos.' : 'No se puede modificar el rol al único Administrador activo del sistema.')"></p>
                             </div>
                         </div>
                         <span class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
@@ -145,8 +147,8 @@
                 </div>
             </div>
 
-            <!-- Estado de la Cuenta (Activo / Inactivo) - Oculto para Administrador / Cuenta Propia -->
-            <template x-if="!isEditingAdminUser">
+            <!-- Estado de la Cuenta (Activo / Inactivo) -->
+            <template x-if="canChangeUserStatus">
                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
                     <div>
                         <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
@@ -158,6 +160,20 @@
                             class="sr-only peer">
                         <div class="w-10 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                     </label>
+                </div>
+            </template>
+
+            <!-- Banner Informativo de Estado Protegido -->
+            <template x-if="!canChangeUserStatus">
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
+                    <div>
+                        <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400"
+                            x-text="isEditingPrincipal ? 'La cuenta del Administrador Principal no puede ser desactivada.' : (isEditingSelf ? 'No puedes bloquear o desactivar tu propia cuenta en sesión.' : 'No se puede desactivar al único Administrador activo del sistema.')"></p>
+                    </div>
+                    <span class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Activo (Protegido)
+                    </span>
                 </div>
             </template>
 

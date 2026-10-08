@@ -29,6 +29,10 @@ class Usuario extends Authenticatable
         'contrasenia_usuario',
     ];
 
+    protected $appends = [
+        'es_principal',
+    ];
+
     public function getAuthPassword()
     {
         return $this->contrasenia_usuario;
@@ -48,6 +52,17 @@ class Usuario extends Authenticatable
     public function esAdmin(): bool
     {
         return $this->rol && $this->rol->nombre_rol === 'Administrador';
+    }
+
+    public function esAdminPrincipal(): bool
+    {
+        return ((int) $this->usuario_id === 1 || $this->nombre_usuario === 'si_dquiroz')
+            && ($this->esAdmin() || (int) $this->id_rol === 1);
+    }
+
+    public function getEsPrincipalAttribute(): bool
+    {
+        return $this->esAdminPrincipal();
     }
 
     public function rol()

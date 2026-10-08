@@ -101,14 +101,30 @@ class UsuarioController extends Controller
         ]);
 
         $esMismoUsuario = Auth::check() && (int) Auth::id() === (int) $usuario->usuario_id;
+        $esTargetPrincipal = $usuario->esAdminPrincipal();
         $esAdmin = $usuario->rol && ($usuario->rol->nombre_rol === 'Administrador' || in_array('*', $usuario->rol->permisos ?? [], true));
 
-        // 1. Blindaje: Impedir cambio de rol propio o degradar al último administrador
+        // 1. Blindaje Admin Principal: Nadie más puede modificar al Administrador Principal del sistema
+        if ($esTargetPrincipal && ! $esMismoUsuario) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede modificar la cuenta del Administrador Principal del sistema.',
+            ], 403);
+        }
+
+        // 2. Blindaje: Impedir cambio de rol propio, o degradar al admin principal o al último administrador
         if (array_key_exists('id_rol', $validated) && (int) $validated['id_rol'] !== (int) $usuario->id_rol) {
             if ($esMismoUsuario) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No puedes modificar tu propio rol de usuario.',
+                ], 403);
+            }
+
+            if ($esTargetPrincipal) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede modificar el rol del Administrador Principal del sistema.',
                 ], 403);
             }
 
@@ -126,12 +142,19 @@ class UsuarioController extends Controller
             }
         }
 
-        // 2. Blindaje: Impedir auto-bloqueo o auto-desactivación y proteger cuenta administrador
+        // 3. Blindaje: Impedir auto-bloqueo o auto-desactivación y proteger cuenta administrador / admin principal
         if (array_key_exists('estado', $validated) && (int) $validated['estado'] !== (int) $usuario->estado) {
             if ($esMismoUsuario) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No puedes bloquear o cambiar el estado de tu propia cuenta en sesión.',
+                ], 403);
+            }
+
+            if ((int) $validated['estado'] === 0 && $esTargetPrincipal) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede desactivar o bloquear al Administrador Principal del sistema.',
                 ], 403);
             }
 
@@ -191,6 +214,13 @@ class UsuarioController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No puedes desactivar tu propio usuario en sesión.',
+            ], 403);
+        }
+
+        if ($usuario->esAdminPrincipal()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede desactivar al Administrador Principal del sistema.',
             ], 403);
         }
 

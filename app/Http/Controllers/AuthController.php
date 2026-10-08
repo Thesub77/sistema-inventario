@@ -134,6 +134,7 @@ class AuthController extends Controller
                 'nombre_usuario' => $usuario->nombre_usuario,
                 'rol' => $usuario->rol?->nombre_rol,
                 'permisos' => $usuario->rol?->permisos ?? [],
+                'es_principal' => $usuario->esAdminPrincipal(),
             ],
         ]);
     }
@@ -180,6 +181,7 @@ class AuthController extends Controller
                 'nombre_usuario' => $usuario->nombre_usuario,
                 'rol' => $usuario->rol?->nombre_rol,
                 'permisos' => $usuario->rol?->permisos ?? [],
+                'es_principal' => $usuario->esAdminPrincipal(),
             ],
         ]);
     }
