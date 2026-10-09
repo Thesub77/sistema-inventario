@@ -264,7 +264,8 @@ export function app() {
                 totalVentasMonto: totalVentasMonto > 0 ? totalVentasMonto : (this.dashboardData?.stats?.totalVentasMonto || 0),
                 totalVentasCount: (this.ventas || []).length || (this.dashboardData?.stats?.totalVentasCount || 0),
                 totalProductos: (this.productos || []).length || (this.dashboardData?.stats?.totalProductos || 0),
-                totalUnidades: totalUnidades > 0 ? totalUnidades : (this.dashboardData?.stats?.totalUnidades || 0)
+                totalUnidades: totalUnidades > 0 ? totalUnidades : (this.dashboardData?.stats?.totalUnidades || 0),
+                totalPerdidasMermasMes: this.perdidasMermasMes || 0
             };
         },
 
@@ -472,7 +473,8 @@ export function app() {
                         await Promise.allSettled([
                             this.fetchDashboardData(),
                             this.fetchVentas(),
-                            this.fetchProductos()
+                            this.fetchProductos(),
+                            this.fetchInventario()
                         ]);
                         this.initDashboardCharts();
                         break;
@@ -606,6 +608,8 @@ export function app() {
                     }
                     this.loadTab(newTab);
                     if (newTab === 'dashboard') {
+                        if (this.fetchDashboardData) this.fetchDashboardData();
+                        if (this.fetchInventario) this.fetchInventario();
                         this.initDashboardCharts();
                     }
                     this.$nextTick(() => {

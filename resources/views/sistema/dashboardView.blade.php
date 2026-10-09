@@ -86,7 +86,7 @@
             </div>
         </template>
 
-        <!-- Métricas del Turno: Total + Efectivo + Transferencia + Tarjeta -->
+        <!-- Métricas del Turno y KPIs: Total + Efectivo + Transferencia + Tarjeta -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             <!-- Turno Total -->
@@ -277,7 +277,7 @@
         </div>
     </div>
 
-    <!-- 5. SECCIÓN INFERIOR: ALERTAS DE STOCK BAJO Y BAJA ROTACIÓN -->
+    <!-- 5. SECCIÓN INFERIOR: ALERTAS DE STOCK BAJO Y BAJA ROTACIÓN  -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- PANEL: ALERTAS DE STOCK BAJO Y CRÍTICO -->
@@ -345,11 +345,11 @@
                             </div>
                         </div>
 
-                        <!-- Botón de Reposición Directa (abre modal de ajuste de stock) -->
+                        <!-- Botón de Reposición Directa (Optimizado para alta visibilidad en Modo Oscuro y Claro) -->
                         <div class="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
                             <button type="button" @click="openStockModal(p)"
-                                class="px-3 py-1.5 rounded-xl bg-brand-600/20 hover:bg-brand-600 text-brand-300 hover:text-white border border-brand-500/30 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95">
-                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                class="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-brand-600/30 border border-brand-500/40 active:scale-95 hover:scale-102">
+                                <i data-lucide="plus" class="w-3.5 h-3.5 text-white"></i>
                                 <span>Ajustar Stock</span>
                             </button>
                         </div>
@@ -434,6 +434,131 @@
                     <i data-lucide="check-circle-2" class="w-8 h-8 mx-auto text-emerald-400"></i>
                     <p class="text-sm font-bold">¡Excelente dinamismo de catálogo!</p>
                     <p class="text-xs text-slate-400">Todos los productos presentan un ritmo de ventas saludable.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. SECCIÓN: ADVERTENCIA DE PÉRDIDAS POR MERMAS DEL MES (UBICACIÓN INFERIOR DEDICADA) -->
+    <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shadow-xs flex-shrink-0">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white">Pérdidas por Mermas del Mes</h3>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-all"
+                            :class="perdidasMermasMes > 0 
+                                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60' 
+                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'">
+                            <span class="w-2 h-2 rounded-full" :class="perdidasMermasMes > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'"></span>
+                            <span x-text="perdidasMermasMes > 0 ? 'Alerta Activa' : 'Sin Pérdidas en el Período'"></span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Monitoreo financiero del capital descartado por deterioro, vencimiento, rotura o descarte
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido en Grid Balanceado: KPI a la izquierda y Listado a la derecha -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- TARJETA RESUMEN FINANCIERO (KPI) - Alto Contraste en Modo Claro y Oscuro -->
+            <div class="lg:col-span-5 xl:col-span-4 rounded-2xl p-5 bg-rose-50/90 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 flex flex-col justify-between space-y-4">
+                <div>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                            <i data-lucide="trending-down" class="w-4 h-4 text-rose-600 dark:text-rose-400"></i>
+                            Costo Total Descartado
+                        </span>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                            x-text="mermasDelMes.length + ' registro(s)'"></span>
+                    </div>
+
+                    <!-- Monto Gran Total de Pérdida -->
+                    <div class="mt-3">
+                        <div class="text-3xl sm:text-4xl font-display font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight"
+                            x-text="formatCurrency(perdidasMermasMes)"></div>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            Dinero no recuperable acumulado en el mes en curso
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Barra de Severidad y Nivel de Impacto -->
+                <div class="pt-3 border-t border-rose-200/80 dark:border-rose-900/40 space-y-2">
+                    <div class="flex justify-between text-xs">
+                        <span class="text-slate-600 dark:text-slate-400 font-medium">Nivel de Impacto:</span>
+                        <strong :class="perdidasMermasMes > 0 ? 'text-rose-700 dark:text-rose-400 font-bold' : 'text-emerald-700 dark:text-emerald-400 font-bold'"
+                            x-text="perdidasMermasMes > 0 ? 'Pérdida Financiera en Curso' : 'Inventario Íntegro'"></strong>
+                    </div>
+                    <div class="w-full h-2 bg-rose-200/60 dark:bg-dark-950 rounded-full overflow-hidden">
+                        <div class="h-full bg-rose-500 rounded-full transition-all duration-500"
+                            :style="`width: ${perdidasMermasMes > 0 ? '100' : '0'}%`"></div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400"
+                        x-text="perdidasMermasMes > 0 ? 'Se recomienda auditar los lotes y procesos de manipulación.' : 'No se han registrado bajas por descarte en el período.'"></p>
+                </div>
+            </div>
+
+            <!-- DESGLOSE Y LISTADO DE MERMAS -->
+            <div class="lg:col-span-7 xl:col-span-8 space-y-3 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 pb-1">
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="list" class="w-3.5 h-3.5 text-rose-500"></i>
+                        Detalle de Salidas por Merma del Mes
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-mono text-[11px]" x-show="mermasDelMes.length > 0"
+                        x-text="'Mostrando ' + mermasDelMes.length + ' descarga(s)'"></span>
+                </div>
+
+                <div class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    <template x-for="m in mermasDelMes" :key="m.movimiento_inventario_id || m.movimiento_id || (m.id_movimiento + '-' + m.created_at)">
+                        <div class="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-dark-900/70 border border-slate-200 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                   <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-sky-50 dark:bg-sky-500/20 text-sky-800 dark:text-white border-sky-200 dark:border-sky-500/30"
+                                         x-text="m.tipo_merma || 'Salida por Merma'">
+                                    </span>
+                                   <span class="text-xs text-slate-500 dark:text-slate-400 font-mono" x-text="m.producto?.codigo_producto || m.codigo_producto || ''"></span>
+                                </div>
+                                <h5 class="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate" x-text="m.producto?.nombre_producto || m.nombre_producto || 'Producto #' + m.id_producto"></h5>
+                                <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-600 dark:text-slate-400">
+                                    <span>Descargado: <strong class="text-slate-900 dark:text-slate-200 font-semibold" x-text="(m.cantidad_movimiento || m.cantidad_movimimiento || m.cantidad || 0) + ' uds.'"></strong></span>
+                                    <span>Costo Unit.: <span class="font-mono text-slate-700 dark:text-slate-300" x-text="formatCurrency(m.costo_unitario)"></span></span>
+                                    <span x-show="m.fecha_movimiento || m.created_at">Fecha: <span x-text="formatDate(m.fecha_movimiento || m.created_at)"></span></span>
+                                </div>
+                            </div>
+
+                            <div class="text-right flex-shrink-0 self-end sm:self-center pl-2 sm:border-l sm:border-slate-200 sm:dark:border-slate-800">
+                                <span class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block font-semibold">Costo Pérdida</span>
+                                <span class="font-display font-black text-base text-rose-600 dark:text-rose-400 font-mono"
+                                    x-text="'- ' + formatCurrency(m.costo_total_perdida)"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Estado cuando hay pérdidas en el backend pero no hay lista en memoria -->
+                    <div x-show="mermasDelMes.length === 0 && perdidasMermasMes > 0"
+                        class="p-6 text-center rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-slate-600 dark:text-slate-300 space-y-2">
+                        <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-rose-500"></i>
+                        <p class="text-xs font-semibold text-rose-700 dark:text-rose-400">Pérdidas acumuladas registradas en el sistema este mes</p>
+                        <button type="button" @click="currentTab = 'inventario'" class="text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold cursor-pointer">
+                            Consultar detalle de movimientos en el Kardex &rarr;
+                        </button>
+                    </div>
+
+                    <!-- Estado Vacío Saludable: Cuando no hay mermas este mes -->
+                    <div x-show="mermasDelMes.length === 0 && (!perdidasMermasMes || perdidasMermasMes <= 0)"
+                        class="p-8 text-center rounded-2xl bg-emerald-50/60 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-400 space-y-2">
+                        <i data-lucide="shield-check" class="w-9 h-9 mx-auto text-emerald-600 dark:text-emerald-400"></i>
+                        <p class="text-sm font-bold">¡Sin pérdidas por mermas este mes!</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">No se registran salidas por deterioro, rotura o descarte en el inventario durante el período actual.</p>
+                    </div>
                 </div>
             </div>
         </div>

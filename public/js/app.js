@@ -435,6 +435,50 @@ function dashboardModule() {
             return (this.productosBajaRotacion || []).reduce((sum, p) => sum + (p.capitalInmovilizado || 0), 0);
         },
 
+        // Pérdidas por Mermas del Mes (RF-48)
+        get perdidasMermasMes() {
+            let sumMemoria = 0;
+            let countMermas = 0;
+
+            if (Array.isArray(this.movimientosInventario) && this.movimientosInventario.length > 0) {
+                const currentYearMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+                this.movimientosInventario.forEach(m => {
+                    if (Number(m.estado) === 0 || m.tipo_movimiento !== 'Salida por Merma') return;
+                    const mDate = String(m.fecha_movimiento || m.created_at || '').slice(0, 7);
+                    if (mDate === currentYearMonth) {
+                        countMermas++;
+                        sumMemoria += Number(m.costo_total_perdida || 0);
+                    }
+                });
+            }
+
+            const backendVal = (this.dashboardData?.stats?.totalPerdidasMermasMes !== undefined)
+                ? Number(this.dashboardData.stats.totalPerdidasMermasMes || 0)
+                : ((this.dashboardData?.totalPerdidasMermasMes !== undefined)
+                    ? Number(this.dashboardData.totalPerdidasMermasMes || 0)
+                    : 0);
+
+            if (countMermas > 0) {
+                return Number(sumMemoria.toFixed(2));
+            }
+
+            return backendVal;
+        },
+
+        // Listado de mermas registradas durante el mes actual (RF-48)
+        get mermasDelMes() {
+            if (!Array.isArray(this.movimientosInventario) || this.movimientosInventario.length === 0) {
+                return [];
+            }
+            const currentYearMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+            const filtered = this.movimientosInventario.filter(m => {
+                if (Number(m.estado) === 0 || m.tipo_movimiento !== 'Salida por Merma') return false;
+                const mDate = String(m.fecha_movimiento || m.created_at || '').slice(0, 7);
+                return mDate === currentYearMonth;
+            });
+            return filtered.slice().reverse();
+        },
+
         // RF-30: Últimas 10 ventas emitidas en tiempo real
         get ultimasVentas() {
             const raw = (Array.isArray(this.ventas) && this.ventas.length > 0)
@@ -1085,9 +1129,13 @@ function productosModule() {
             producto_id: null,
             nombre_producto: '',
             stock_anterior: 0,
+            costo_compra: 0,
             cantidad: 10,
             tipo_movimiento: 'Entrada por Compra',
+            tipo_merma: 'Deterioro/Vencimiento',
             justificacion: '',
+            proveedor_nombre: '',
+            numero_factura_recibo: '',
         },
 
         openProductModal(product = null) {
@@ -1160,11 +1208,18 @@ function productosModule() {
                 producto_id: product.producto_id,
                 nombre_producto: product.nombre_producto,
                 stock_anterior: Number(product.existencia_bodega ?? product.stockActual ?? 0),
+                costo_compra: Number(product.costo_compra || 0),
                 cantidad: 10,
                 tipo_movimiento: 'Entrada por Compra',
+                tipo_merma: 'Deterioro/Vencimiento',
                 justificacion: '',
+                proveedor_nombre: '',
+                numero_factura_recibo: '',
             };
             this.showStockModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
         },
 
         async saveStockAdjustment() {
@@ -1215,6 +1270,19 @@ function productosModule() {
                 payload.justificacion = this.stockForm.justificacion.trim().slice(0, 90);
             }
 
+            // Inclusión opcional de proveedor y factura para movimientos de Entrada / Compra (RF-10 / Issue #46)
+            if (this.stockForm.proveedor_nombre && this.stockForm.proveedor_nombre.trim()) {
+                payload.proveedor_nombre = this.stockForm.proveedor_nombre.trim().slice(0, 128);
+            }
+            if (this.stockForm.numero_factura_recibo && this.stockForm.numero_factura_recibo.trim()) {
+                payload.numero_factura_recibo = this.stockForm.numero_factura_recibo.trim().slice(0, 64);
+            }
+
+            // Inclusión de causa tipificada para salidas por merma (RF-48)
+            if (this.stockForm.tipo_movimiento === 'Salida por Merma') {
+                payload.tipo_merma = this.stockForm.tipo_merma || 'Deterioro/Vencimiento';
+            }
+
             // Cierre inmediato del modal para agilizar la interacción visual (0ms)
             this.showStockModal = false;
 
@@ -1241,7 +1309,8 @@ function productosModule() {
                 await Promise.all([
                     this.fetchProductos(),
                     this.fetchInventario(),
-                    this.fetchBitacoras()
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => {}) : Promise.resolve()
                 ]);
 
                 // Notificación no intrusiva con temporizador automático
@@ -3634,7 +3703,8 @@ function app() {
                 totalVentasMonto: totalVentasMonto > 0 ? totalVentasMonto : (this.dashboardData?.stats?.totalVentasMonto || 0),
                 totalVentasCount: (this.ventas || []).length || (this.dashboardData?.stats?.totalVentasCount || 0),
                 totalProductos: (this.productos || []).length || (this.dashboardData?.stats?.totalProductos || 0),
-                totalUnidades: totalUnidades > 0 ? totalUnidades : (this.dashboardData?.stats?.totalUnidades || 0)
+                totalUnidades: totalUnidades > 0 ? totalUnidades : (this.dashboardData?.stats?.totalUnidades || 0),
+                totalPerdidasMermasMes: this.perdidasMermasMes || 0
             };
         },
 
@@ -3843,7 +3913,8 @@ function app() {
                         await Promise.allSettled([
                             this.fetchDashboardData(),
                             this.fetchVentas(),
-                            this.fetchProductos()
+                            this.fetchProductos(),
+                            this.fetchInventario()
                         ]);
                         this.initDashboardCharts();
                         break;
@@ -3970,6 +4041,8 @@ function app() {
                     }
                     this.loadTab(newTab);
                     if (newTab === 'dashboard') {
+                        if (this.fetchDashboardData) this.fetchDashboardData();
+                        if (this.fetchInventario) this.fetchInventario();
                         this.initDashboardCharts();
                     }
                     this.$nextTick(() => {

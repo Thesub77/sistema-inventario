@@ -214,8 +214,11 @@ html:not(.dark) .text-emerald-400 {
 }
 
 html:not(.dark) .text-rose-300,
-html:not(.dark) .text-rose-400 {
-    color: #e11d48 !important;
+html:not(.dark) .text-rose-400,
+html:not(.dark) .text-rose-500,
+html:not(.dark) .text-rose-600,
+html:not(.dark) .text-rose-700 {
+    color: #be123c !important;
 }
 
 /* Colores de alto contraste para modo claro (evita colores pasteles ilegibles sobre fondo blanco) */
@@ -290,10 +293,12 @@ html:not(.dark) .bg-black,
 html:not(.dark) .bg-black *,
 html:not(.dark) .force-white-text,
 html:not(.dark) .force-white-text *,
-html:not(.dark) .bg-gradient-to-r,
-html:not(.dark) .bg-gradient-to-r *,
-html:not(.dark) .bg-gradient-to-tr,
-html:not(.dark) .bg-gradient-to-tr * {
+html:not(.dark) button.bg-gradient-to-r,
+html:not(.dark) button.bg-gradient-to-r *,
+html:not(.dark) a.bg-gradient-to-r,
+html:not(.dark) a.bg-gradient-to-r *,
+html:not(.dark) button.bg-gradient-to-tr,
+html:not(.dark) button.bg-gradient-to-tr * {
     color: #ffffff !important;
 }
 

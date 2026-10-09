@@ -24,9 +24,13 @@ export function productosModule() {
             producto_id: null,
             nombre_producto: '',
             stock_anterior: 0,
+            costo_compra: 0,
             cantidad: 10,
             tipo_movimiento: 'Entrada por Compra',
+            tipo_merma: 'Deterioro/Vencimiento',
             justificacion: '',
+            proveedor_nombre: '',
+            numero_factura_recibo: '',
         },
 
         // Product CRUD Methods
@@ -102,11 +106,18 @@ export function productosModule() {
                 producto_id: product.producto_id,
                 nombre_producto: product.nombre_producto,
                 stock_anterior: Number(product.existencia_bodega ?? product.stockActual ?? 0),
+                costo_compra: Number(product.costo_compra || 0),
                 cantidad: 10,
                 tipo_movimiento: 'Entrada por Compra',
+                tipo_merma: 'Deterioro/Vencimiento',
                 justificacion: '',
+                proveedor_nombre: '',
+                numero_factura_recibo: '',
             };
             this.showStockModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
         },
 
         async saveStockAdjustment() {
@@ -157,6 +168,19 @@ export function productosModule() {
                 payload.justificacion = this.stockForm.justificacion.trim().slice(0, 90);
             }
 
+            // Inclusión opcional de proveedor y factura para movimientos de Entrada / Compra (RF-10 / Issue #46)
+            if (this.stockForm.proveedor_nombre && this.stockForm.proveedor_nombre.trim()) {
+                payload.proveedor_nombre = this.stockForm.proveedor_nombre.trim().slice(0, 128);
+            }
+            if (this.stockForm.numero_factura_recibo && this.stockForm.numero_factura_recibo.trim()) {
+                payload.numero_factura_recibo = this.stockForm.numero_factura_recibo.trim().slice(0, 64);
+            }
+
+            // Inclusión de causa tipificada para salidas por merma (RF-48)
+            if (this.stockForm.tipo_movimiento === 'Salida por Merma') {
+                payload.tipo_merma = this.stockForm.tipo_merma || 'Deterioro/Vencimiento';
+            }
+
             // Cierre inmediato del modal para agilizar la interacción visual (0ms)
             this.showStockModal = false;
 
@@ -183,7 +207,8 @@ export function productosModule() {
                 await Promise.all([
                     this.fetchProductos(),
                     this.fetchInventario(),
-                    this.fetchBitacoras()
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => {}) : Promise.resolve()
                 ]);
 
                 // Notificación no intrusiva con temporizador automático
