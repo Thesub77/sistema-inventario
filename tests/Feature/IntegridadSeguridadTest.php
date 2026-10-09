@@ -801,13 +801,15 @@ class IntegridadSeguridadTest extends TestCase
             'estado' => 1,
         ]);
 
-        // Entrada de inventario estándar
+        // Entrada de inventario estándar con proveedor y factura opcionales (RF-10)
         $res = $this->postJson('/api/movimientos-inventario', [
             'id_producto' => $prod->producto_id,
             'id_usuario' => $this->adminPrincipal->usuario_id,
             'tipo_movimiento' => 'Entrada por Compra',
             'cantidad_movimiento' => 10,
             'fecha_movimiento' => now()->toDateString(),
+            'proveedor_nombre' => 'Lácteos El Carmen',
+            'numero_factura_recibo' => 'FAC-9921',
         ]);
 
         $res->assertStatus(201);
@@ -817,8 +819,17 @@ class IntegridadSeguridadTest extends TestCase
             'movimiento_inventario_id' => $mov['movimiento_inventario_id'],
             'tipo_movimiento' => 'Entrada por Compra',
             'stock_resultante_producto' => 20,
+            'proveedor_nombre' => 'Lácteos El Carmen',
+            'numero_factura_recibo' => 'FAC-9921',
         ]);
         $this->assertEquals(20, $prod->fresh()->existencia_bodega);
+
+        // Al consultar el Kardex, deben retornar los datos de proveedor y factura para los badges de la vista
+        $resIndex = $this->getJson('/api/movimientos-inventario?id_producto='.$prod->producto_id);
+        $resIndex->assertStatus(200);
+        $movKardex = collect($resIndex->json())->firstWhere('movimiento_inventario_id', $mov['movimiento_inventario_id']);
+        $this->assertEquals('Lácteos El Carmen', $movKardex['proveedor_nombre']);
+        $this->assertEquals('FAC-9921', $movKardex['numero_factura_recibo']);
     }
 
     public function test_dashboard_resumen_incluye_total_perdidas_mermas_del_mes_en_curso(): void
