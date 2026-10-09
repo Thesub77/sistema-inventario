@@ -21,13 +21,7 @@ class Empresa extends Model
         'direccion_fisica',
         'mensaje_pie_ticket',
         'moneda_simbolo',
-        'regimen_tributario',
-        'techo_mensual_cuota_fija',
         'estado',
-    ];
-
-    protected $casts = [
-        'techo_mensual_cuota_fija' => 'decimal:2',
     ];
 
     public function cajas()

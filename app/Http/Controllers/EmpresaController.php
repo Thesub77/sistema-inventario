@@ -41,18 +41,12 @@ class EmpresaController extends Controller
             'direccion_fisica' => 'sometimes|required|string|max:255',
             'mensaje_pie_ticket' => 'nullable|string|max:255',
             'moneda_simbolo' => 'sometimes|required|string|max:8',
-            'regimen_tributario' => 'sometimes|required|string|max:64',
-            'techo_mensual_cuota_fija' => 'sometimes|required|numeric|min:0',
         ], [
             'nombre_comercial.required' => 'El nombre comercial de la empresa es obligatorio.',
             'numero_ruc.required' => 'El número RUC o identificación tributaria es obligatorio.',
             'telefono_contacto.required' => 'El teléfono de contacto es obligatorio.',
             'direccion_fisica.required' => 'La dirección física es obligatoria.',
             'correo_contacto.email' => 'El correo electrónico debe tener un formato válido.',
-            'regimen_tributario.required' => 'El régimen tributario es obligatorio.',
-            'techo_mensual_cuota_fija.required' => 'El techo mensual de cuota fija es obligatorio.',
-            'techo_mensual_cuota_fija.numeric' => 'El techo mensual debe ser un monto numérico válido.',
-            'techo_mensual_cuota_fija.min' => 'El techo mensual no puede ser negativo.',
         ]);
 
         if (! $empresa) {

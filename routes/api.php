@@ -17,8 +17,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Panel y Métricas Analíticas del Dashboard
     Route::get('/dashboard/resumen', [DashboardController::class, 'resumen'])
         ->middleware('permission:usuarios.gestionar,dashboard.ver');
-    Route::get('/dashboard/techo-fiscal', [DashboardController::class, 'techoFiscal'])
-        ->middleware('permission:usuarios.gestionar,dashboard.ver');
 
     // Identidad y Datos del Negocio (RF-21)
     Route::get('/empresa', [EmpresaController::class, 'show']);
