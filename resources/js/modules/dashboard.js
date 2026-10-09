@@ -362,6 +362,50 @@ export function dashboardModule() {
             return (this.productosBajaRotacion || []).reduce((sum, p) => sum + (p.capitalInmovilizado || 0), 0);
         },
 
+        // Pérdidas por Mermas del Mes (RF-48)
+        get perdidasMermasMes() {
+            let sumMemoria = 0;
+            let countMermas = 0;
+
+            if (Array.isArray(this.movimientosInventario) && this.movimientosInventario.length > 0) {
+                const currentYearMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+                this.movimientosInventario.forEach(m => {
+                    if (Number(m.estado) === 0 || m.tipo_movimiento !== 'Salida por Merma') return;
+                    const mDate = String(m.fecha_movimiento || m.created_at || '').slice(0, 7);
+                    if (mDate === currentYearMonth) {
+                        countMermas++;
+                        sumMemoria += Number(m.costo_total_perdida || 0);
+                    }
+                });
+            }
+
+            const backendVal = (this.dashboardData?.stats?.totalPerdidasMermasMes !== undefined)
+                ? Number(this.dashboardData.stats.totalPerdidasMermasMes || 0)
+                : ((this.dashboardData?.totalPerdidasMermasMes !== undefined)
+                    ? Number(this.dashboardData.totalPerdidasMermasMes || 0)
+                    : 0);
+
+            if (countMermas > 0) {
+                return Number(sumMemoria.toFixed(2));
+            }
+
+            return backendVal;
+        },
+
+        // Listado de mermas registradas durante el mes actual (RF-48)
+        get mermasDelMes() {
+            if (!Array.isArray(this.movimientosInventario) || this.movimientosInventario.length === 0) {
+                return [];
+            }
+            const currentYearMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+            const filtered = this.movimientosInventario.filter(m => {
+                if (Number(m.estado) === 0 || m.tipo_movimiento !== 'Salida por Merma') return false;
+                const mDate = String(m.fecha_movimiento || m.created_at || '').slice(0, 7);
+                return mDate === currentYearMonth;
+            });
+            return filtered.slice().reverse();
+        },
+
         // Últimas 10 ventas emitidas en tiempo real
         get ultimasVentas() {
             const raw = (Array.isArray(this.ventas) && this.ventas.length > 0)
