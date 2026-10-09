@@ -62,6 +62,8 @@ class MovimientoInventarioController extends Controller
             'fecha_movimiento' => 'required|date',
             'estado' => 'sometimes|integer|in:1',
             'justificacion' => [Rule::requiredIf($ajuste || in_array($request->input('tipo_movimiento'), ['Salida', 'Salida por Merma'], true)), 'nullable', 'string', 'max:90'],
+            'proveedor_nombre' => 'nullable|string|max:128',
+            'numero_factura_recibo' => 'nullable|string|max:64',
         ]);
 
         return DB::transaction(function () use ($datos, $ajuste, $esMerma) {
@@ -86,6 +88,8 @@ class MovimientoInventarioController extends Controller
             $costoUnitario = $esMerma ? (float) $producto->costo_compra : null;
             $costoTotalPerdida = $esMerma ? round($cantidad * (float) $producto->costo_compra, 2) : null;
             $tipoMerma = $esMerma ? ($datos['tipo_merma'] ?? null) : null;
+            $proveedorNombre = $entrada ? ($datos['proveedor_nombre'] ?? null) : null;
+            $numeroFactura = $entrada ? ($datos['numero_factura_recibo'] ?? null) : null;
 
             $movimiento = Movimiento_inventario::create([
                 'id_producto' => $producto->producto_id,
@@ -94,6 +98,8 @@ class MovimientoInventarioController extends Controller
                 'tipo_merma' => $tipoMerma,
                 'costo_unitario' => $costoUnitario,
                 'costo_total_perdida' => $costoTotalPerdida,
+                'proveedor_nombre' => $proveedorNombre,
+                'numero_factura_recibo' => $numeroFactura,
                 'cantidad_movimimiento' => $cantidad,
                 'stock_anterior_producto' => $anterior,
                 'stock_resultante_producto' => $nuevo,
@@ -101,10 +107,13 @@ class MovimientoInventarioController extends Controller
                 'estado' => 1,
             ]);
             $producto->update(['existencia_bodega' => $nuevo]);
+
+            $desc = 'Movimiento #'.$movimiento->movimiento_inventario_id.': '.($datos['justificacion'] ?? $datos['tipo_movimiento']);
+
             Bitacora::create([
                 'id_usuario' => $datos['id_usuario'],
                 'accion_bitacora' => 'MOVIMIENTO_INVENTARIO',
-                'descripcion_bitacora' => 'Movimiento #'.$movimiento->movimiento_inventario_id.': '.($datos['justificacion'] ?? $datos['tipo_movimiento']),
+                'descripcion_bitacora' => mb_substr($desc, 0, 128),
                 'fecha_hora_bitacora' => now(),
                 'estado' => 1,
             ]);

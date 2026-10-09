@@ -114,6 +114,9 @@ export function productosModule() {
                 proveedor_nombre: '',
                 numero_factura_recibo: '',
             };
+            if (typeof this.fetchProveedores === 'function' && (!this.proveedores || this.proveedores.length === 0)) {
+                this.fetchProveedores().catch(() => {});
+            }
             this.showStockModal = true;
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();

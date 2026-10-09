@@ -78,8 +78,14 @@
                         </label>
                         <div class="relative">
                             <input type="text" maxlength="128" x-model="stockForm.proveedor_nombre"
+                                list="proveedoresAjusteDatalist"
                                 placeholder="Ej. Maxi Palí, Distribuidora"
                                 class="w-full bg-white dark:bg-dark-950 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors">
+                            <datalist id="proveedoresAjusteDatalist">
+                                <template x-for="prov in proveedores" :key="prov.proveedor_id || prov.nombre_comercial">
+                                    <option :value="prov.nombre_comercial" x-text="prov.contacto_vendedor ? (prov.nombre_comercial + ' (' + prov.contacto_vendedor + ')') : prov.nombre_comercial"></option>
+                                </template>
+                            </datalist>
                             <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2m10 0a2 2 0 100 4 2 2 0 000-4zm-8 0a2 2 0 100 4 2 2 0 000-4z"/>
