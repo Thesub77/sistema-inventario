@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Empresa;
 use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -442,6 +443,70 @@ class DashboardController extends Controller
             'distribucionHoraria' => $distribucionHoraria,
             'demandaHoraria' => $distribucionHoraria,
             'ultimasVentas' => $ultimasVentas,
+        ]);
+    }
+
+    /**
+     * Calcula las métricas analíticas del techo fiscal de Cuota Fija (Ley 822)
+     * y el semáforo preventivo (RF-28).
+     *
+     * - Consulta ventas brutas del mes actual y del año fiscal excluyendo anuladas (estado = 1).
+     * - Evalúa el semáforo: normal (<75%), alerta (75% - 99.99%) y excedido (>=100%).
+     */
+    public function techoFiscal(Request $request): JsonResponse
+    {
+        $fechaHoy = $request->query('fecha', Carbon::today()->toDateString());
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHoy)) {
+            $fechaHoy = Carbon::today()->toDateString();
+        }
+
+        $carbonFecha = Carbon::parse($fechaHoy);
+        $mes = (int) $carbonFecha->month;
+        $anio = (int) $carbonFecha->year;
+
+        $empresa = Empresa::where('estado', 1)->first() ?? Empresa::first();
+        $regimen = $empresa?->regimen_tributario ?? 'Cuota Fija';
+        $techoMensual = (float) ($empresa?->techo_mensual_cuota_fija ?? 100000.00);
+        $techoAnual = round($techoMensual * 12, 2);
+
+        // Ventas brutas del mes actual (considerando estrictamente estado = 1)
+        $ventasMes = (float) (Venta::query()
+            ->where('estado', 1)
+            ->whereYear('fecha_hora_venta', $anio)
+            ->whereMonth('fecha_hora_venta', $mes)
+            ->sum('total_venta') ?? 0);
+        $ventasMes = round($ventasMes, 2);
+
+        // Acumulado del año fiscal en curso (considerando estrictamente estado = 1)
+        $ventasAnual = (float) (Venta::query()
+            ->where('estado', 1)
+            ->whereYear('fecha_hora_venta', $anio)
+            ->sum('total_venta') ?? 0);
+        $ventasAnual = round($ventasAnual, 2);
+
+        $porcentajeConsumido = $techoMensual > 0
+            ? round(($ventasMes / $techoMensual) * 100, 2)
+            : ($ventasMes > 0 ? 100.00 : 0.00);
+
+        $saldoDisponible = max(0.00, round($techoMensual - $ventasMes, 2));
+
+        if ($porcentajeConsumido < 75.0) {
+            $estadoSemaforo = 'normal';
+        } elseif ($porcentajeConsumido < 100.0) {
+            $estadoSemaforo = 'alerta';
+        } else {
+            $estadoSemaforo = 'excedido';
+        }
+
+        return response()->json([
+            'regimen' => $regimen,
+            'ventas_mes' => $ventasMes,
+            'techo_mensual' => $techoMensual,
+            'porcentaje_consumido' => $porcentajeConsumido,
+            'saldo_disponible' => $saldoDisponible,
+            'estado_semaforo' => $estadoSemaforo,
+            'ventas_anual_acumulado' => $ventasAnual,
+            'techo_anual' => $techoAnual,
         ]);
     }
 }
