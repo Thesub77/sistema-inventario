@@ -23,6 +23,12 @@ class Usuario extends Authenticatable
         'contrasenia_usuario',
         'fecha_registro',
         'estado',
+        'bloqueado',
+    ];
+
+    protected $casts = [
+        'estado' => 'integer',
+        'bloqueado' => 'integer',
     ];
 
     protected $hidden = [
@@ -32,6 +38,16 @@ class Usuario extends Authenticatable
     protected $appends = [
         'es_principal',
     ];
+
+    public function estaBloqueado(): bool
+    {
+        return (int) $this->bloqueado === 1;
+    }
+
+    public function estaActivo(): bool
+    {
+        return (int) $this->estado === 1;
+    }
 
     public function getAuthPassword()
     {

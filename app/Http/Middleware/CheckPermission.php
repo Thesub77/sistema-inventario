@@ -24,6 +24,13 @@ class CheckPermission
             ], 401);
         }
 
+        if ((int) $usuario->estado !== 1 || (int) ($usuario->bloqueado ?? 0) === 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Su cuenta se encuentra inactiva o bloqueada. Comuníquese con el administrador.',
+            ], 403);
+        }
+
         if ($usuario->esAdmin()) {
             return $next($request);
         }

@@ -21,6 +21,7 @@ export function usuariosModule() {
             contrasenia_usuario: '',
             fecha_registro: '',
             estado: 1,
+            bloqueado: 0,
         },
 
         // Estado del Modal de Restablecimiento de Contraseña
@@ -107,8 +108,10 @@ export function usuariosModule() {
                 if (roleFilter && String(u.id_rol) !== String(roleFilter)) {
                     return false;
                 }
-                if (statusFilter !== '' && String(u.estado) !== String(statusFilter)) {
-                    return false;
+                if (statusFilter === 'activos' || statusFilter === '1') {
+                    if (Number(u.bloqueado) === 1) return false;
+                } else if (statusFilter === 'bloqueados' || statusFilter === '0') {
+                    if (Number(u.bloqueado) !== 1) return false;
                 }
                 if (query) {
                     const name = (u.nombre_apellido || '').toLowerCase();
@@ -133,11 +136,12 @@ export function usuariosModule() {
             return 'Este rol actualmente no tiene permisos configurados en la base de datos.';
         },
 
-        // Conteo de administradores activos en el sistema
+        // Conteo de administradores activos y desbloqueados en el sistema
         get activeAdminsCount() {
             if (!Array.isArray(this.usuarios)) return 0;
             return this.usuarios.filter(u =>
                 Number(u.estado) === 1 &&
+                Number(u.bloqueado) === 0 &&
                 u.rol &&
                 (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')))
             ).length;
@@ -177,7 +181,7 @@ export function usuariosModule() {
             const targetUser = (this.usuarios || []).find(u => Number(u.usuario_id) === Number(this.userForm.usuario_id));
             if (!targetUser) return false;
             const isTargetAdmin = targetUser.rol && (targetUser.rol.nombre_rol === 'Administrador' || (Array.isArray(targetUser.rol.permisos) && targetUser.rol.permisos.includes('*')));
-            if (!isTargetAdmin || Number(targetUser.estado) !== 1) return false;
+            if (!isTargetAdmin || Number(targetUser.estado) !== 1 || Number(targetUser.bloqueado) === 1) return false;
 
             return this.activeAdminsCount <= 1;
         },
@@ -229,7 +233,7 @@ export function usuariosModule() {
             if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) return false;
             if (this.isUserPrincipal(u)) return false;
             const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
-            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+            if (esAdmin && Number(u.bloqueado) === 0 && this.activeAdminsCount <= 1) {
                 return false;
             }
             return true;
@@ -268,7 +272,7 @@ export function usuariosModule() {
                 if (isSelf) return 'No puedes bloquear tu propia cuenta en sesión';
                 if (isTargetPrincipal) return 'No se puede bloquear al Administrador Principal del sistema';
                 if (isLastAdmin) return 'No se puede bloquear al único Administrador activo del sistema';
-                return Number(u.estado) === 1 ? 'Bloquear acceso al usuario' : 'Habilitar acceso al usuario';
+                return Number(u.bloqueado) === 1 ? 'Desbloquear acceso al usuario' : 'Bloquear acceso al usuario';
             }
 
             if (action === 'delete') {
@@ -308,7 +312,8 @@ export function usuariosModule() {
                     nombre_usuario: user.nombre_usuario || '',
                     contrasenia_usuario: '',
                     fecha_registro: user.fecha_registro || '',
-                    estado: user.estado !== undefined ? Number(user.estado) : 1
+                    estado: user.estado !== undefined ? Number(user.estado) : 1,
+                    bloqueado: user.bloqueado !== undefined ? Number(user.bloqueado) : 0
                 };
             } else {
                 this.isEditingUser = false;
@@ -319,7 +324,8 @@ export function usuariosModule() {
                     nombre_usuario: '',
                     contrasenia_usuario: '',
                     fecha_registro: new Date().toISOString().slice(0, 10),
-                    estado: 1
+                    estado: 1,
+                    bloqueado: 0
                 };
             }
             this.showUserFormPassword = false;
@@ -350,6 +356,7 @@ export function usuariosModule() {
             const payload = {
                 nombre_apellido: (this.userForm.nombre_apellido || '').trim(),
                 nombre_usuario: (this.userForm.nombre_usuario || '').trim(),
+                estado: 1
             };
 
             // Solo enviar id_rol si está permitido modificarlo
@@ -357,11 +364,11 @@ export function usuariosModule() {
                 payload.id_rol = Number(this.userForm.id_rol);
             }
 
-            // Solo enviar estado si está permitido modificarlo; si está protegido, se mantiene en 1
+            // Solo enviar bloqueado si está permitido modificarlo; si está protegido, se mantiene en 0 (desbloqueado)
             if (this.canChangeUserStatus) {
-                payload.estado = Number(this.userForm.estado);
+                payload.bloqueado = Number(this.userForm.bloqueado);
             } else {
-                payload.estado = 1;
+                payload.bloqueado = 0;
             }
 
             if (this.userForm.fecha_registro) {
@@ -435,7 +442,7 @@ export function usuariosModule() {
             }
 
             const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
-            if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
+            if (esAdmin && Number(u.bloqueado) === 0 && this.activeAdminsCount <= 1) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Acción No Permitida',
@@ -446,16 +453,16 @@ export function usuariosModule() {
                 return;
             }
 
-            const nuevoEstado = Number(u.estado) === 1 ? 0 : 1;
-            const accion = nuevoEstado === 1 ? 'habilitar' : 'bloquear';
+            const nuevoBloqueado = Number(u.bloqueado) === 1 ? 0 : 1;
+            const accion = nuevoBloqueado === 1 ? 'bloquear' : 'desbloquear';
 
             const confirm = await Swal.fire({
                 title: `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} usuario?`,
-                html: `¿Estás seguro de que deseas <b>${accion}</b> a <b>${u.nombre_apellido}</b> (@${u.nombre_usuario})?<br><small class="text-slate-400">${nuevoEstado === 0 ? 'El usuario no podrá acceder al sistema hasta ser rehabilitado.' : 'El usuario podrá volver a iniciar sesión de inmediato.'}</small>`,
-                icon: nuevoEstado === 0 ? 'warning' : 'question',
+                html: `¿Estás seguro de que deseas <b>${accion}</b> a <b>${u.nombre_apellido}</b> (@${u.nombre_usuario})?<br><small class="text-slate-400">${nuevoBloqueado === 1 ? 'El usuario no podrá acceder al sistema hasta ser rehabilitado.' : 'El usuario podrá volver a iniciar sesión de inmediato.'}</small>`,
+                icon: nuevoBloqueado === 1 ? 'warning' : 'question',
                 showCancelButton: true,
-                confirmButtonColor: nuevoEstado === 0 ? '#e11d48' : '#10b981',
-                confirmButtonText: nuevoEstado === 0 ? 'Sí, Bloquear' : 'Sí, Habilitar',
+                confirmButtonColor: nuevoBloqueado === 1 ? '#e11d48' : '#10b981',
+                confirmButtonText: nuevoBloqueado === 1 ? 'Sí, Bloquear' : 'Sí, Desbloquear',
                 cancelButtonText: 'Cancelar',
                 background: this.darkMode ? '#1e293b' : '#ffffff',
                 color: this.darkMode ? '#fff' : '#0f172a'
@@ -466,21 +473,21 @@ export function usuariosModule() {
             try {
                 const res = await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ estado: nuevoEstado })
+                    body: JSON.stringify({ bloqueado: nuevoBloqueado })
                 });
 
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    throw new Error(data.message || 'No se pudo actualizar el estado del usuario.');
+                    throw new Error(data.message || 'No se pudo actualizar el estado de acceso del usuario.');
                 }
 
-                u.estado = nuevoEstado;
+                u.bloqueado = nuevoBloqueado;
                 await this.fetchUsuarios();
 
                 this.notify(
-                    nuevoEstado === 1 ? 'Usuario Habilitado' : 'Usuario Bloqueado',
-                    `"${u.nombre_usuario}" ahora está ${nuevoEstado === 1 ? 'activo' : 'bloqueado'}.`,
-                    nuevoEstado === 1 ? 'success' : 'warning',
+                    nuevoBloqueado === 0 ? 'Usuario Desbloqueado' : 'Usuario Bloqueado',
+                    `"${u.nombre_usuario}" ahora está ${nuevoBloqueado === 0 ? 'activo' : 'bloqueado'}.`,
+                    nuevoBloqueado === 0 ? 'success' : 'warning',
                     2500
                 );
             } catch (err) {

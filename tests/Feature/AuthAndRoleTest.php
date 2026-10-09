@@ -266,9 +266,10 @@ class AuthAndRoleTest extends TestCase
         ]);
         $res->assertStatus(200);
 
-        // Verificar que el cajero quedó con estado 0 (Bloqueado)
+        // Verificar que el cajero quedó bloqueado (bloqueado = 1) sin ser eliminado (estado = 1)
         $this->cajero->refresh();
-        $this->assertEquals(0, (int) $this->cajero->estado);
+        $this->assertEquals(1, (int) $this->cajero->bloqueado);
+        $this->assertEquals(1, (int) $this->cajero->estado);
 
         // Verificar que sus tokens fueron revocados
         $this->assertDatabaseMissing('personal_access_tokens', [

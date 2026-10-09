@@ -72,7 +72,7 @@ class RolController extends Controller
         if (isset($validated['estado']) && (int) $validated['estado'] === 0 && (int) $rol->estado === 1) {
             $usuariosAfectados = $rol->usuarios()->where('estado', 1)->get();
             foreach ($usuariosAfectados as $u) {
-                $u->update(['estado' => 0]);
+                $u->update(['bloqueado' => 1]);
                 $u->tokens()->delete();
 
                 Bitacora::create([

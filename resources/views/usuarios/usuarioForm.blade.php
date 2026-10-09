@@ -147,18 +147,22 @@
                 </div>
             </div>
 
-            <!-- Estado de la Cuenta (Activo / Inactivo) -->
+            <!-- Estado de la Cuenta (Acceso Habilitado / Bloqueado) -->
             <template x-if="canChangeUserStatus">
                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
                     <div>
-                        <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Si está inactivo, el usuario no podrá iniciar sesión en ningún módulo</p>
+                        <span class="text-xs font-bold text-slate-900 dark:text-white">Acceso a la Cuenta</span>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                            <span :class="Number(userForm.bloqueado) === 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-500 font-semibold'"
+                                x-text="Number(userForm.bloqueado) === 0 ? '✓ Acceso Habilitado (Desbloqueado)' : '🔒 Acceso Denegado (Bloqueado)'"></span>
+                            - Permite al usuario iniciar sesión en el sistema
+                        </p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" :checked="Number(userForm.estado) === 1"
-                            @change="userForm.estado = $event.target.checked ? 1 : 0"
+                        <input type="checkbox" :checked="Number(userForm.bloqueado) === 0"
+                            @change="userForm.bloqueado = $event.target.checked ? 0 : 1"
                             class="sr-only peer">
-                        <div class="w-10 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                        <div class="w-10 h-6 bg-rose-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                     </label>
                 </div>
             </template>
@@ -167,12 +171,12 @@
             <template x-if="!canChangeUserStatus">
                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
                     <div>
-                        <span class="text-xs font-bold text-slate-900 dark:text-white">Estado de la Cuenta</span>
+                        <span class="text-xs font-bold text-slate-900 dark:text-white">Acceso a la Cuenta</span>
                         <p class="text-[11px] text-slate-500 dark:text-slate-400"
-                            x-text="isEditingPrincipal ? 'La cuenta del Administrador Principal no puede ser desactivada.' : (isEditingSelf ? 'No puedes bloquear o desactivar tu propia cuenta en sesión.' : 'No se puede desactivar al único Administrador activo del sistema.')"></p>
+                            x-text="isEditingPrincipal ? 'La cuenta del Administrador Principal no puede ser bloqueada.' : (isEditingSelf ? 'No puedes bloquear tu propia cuenta en sesión.' : 'No se puede bloquear al único Administrador activo del sistema.')"></p>
                     </div>
                     <span class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        Activo (Protegido)
+                        Desbloqueado (Protegido)
                     </span>
                 </div>
             </template>
