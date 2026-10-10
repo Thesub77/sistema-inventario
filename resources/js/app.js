@@ -10,6 +10,7 @@ import { utilsModule } from './modules/utils';
 import { themeModule } from './modules/theme';
 import { authModule } from './modules/auth';
 import { dashboardModule } from './modules/dashboard';
+import { fiscalModule } from './modules/fiscal';
 
 // Función auxiliar para combinar módulos preservando getters y setters reactivos de Alpine.js
 function mergeModules(target, ...sources) {
@@ -93,7 +94,9 @@ export function app() {
             correo_contacto: '',
             direccion_fisica: '',
             mensaje_pie_ticket: '',
-            moneda_simbolo: 'C$'
+            moneda_simbolo: 'C$',
+            regimen_tributario: 'Cuota Fija',
+            techo_mensual_cuota_fija: 100000.00
         },
 
         // Navigation Sidebar Configuration
@@ -122,6 +125,11 @@ export function app() {
                 id: 'ventas',
                 label: 'Historial de Ventas',
                 icon: 'receipt'
+            },
+            {
+                id: 'libro-diario',
+                label: 'Libro Fiscal',
+                icon: 'book-open'
             },
             {
                 id: 'proveedores',
@@ -232,7 +240,8 @@ export function app() {
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
-                    return this.hasPermission('ventas.ver') || this.hasPermission('ventas.crear');
+                case 'libro-diario':
+                    return this.hasPermission('ventas.ver') || this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
                 case 'proveedores':
                 case 'cuentas-por-pagar':
                     return this.isAdmin || this.hasPermission('proveedores.gestionar');
@@ -502,6 +511,13 @@ export function app() {
                             this.fetchUsuarios().catch(() => {})
                         ]);
                         break;
+                    case 'libro-diario':
+                        await Promise.all([
+                            this.fetchLibroDiario(),
+                            this.fetchEmpresa(),
+                            this.fetchVentas().catch(() => {})
+                        ]);
+                        break;
                     case 'caja':
                         await Promise.all([
                             this.fetchVentas(),
@@ -729,7 +745,9 @@ export function app() {
                     correo_contacto: this.empresa.correo_contacto || '',
                     direccion_fisica: this.empresa.direccion_fisica || '',
                     mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
-                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$'
+                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
+                    regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
+                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00
                 };
             }
             this.showEmpresaModal = true;
@@ -784,6 +802,10 @@ export function app() {
                 this.receiptEmpresa = this.empresa;
                 this.showEmpresaModal = false;
 
+                if (typeof this.fetchTechoFiscal === 'function') {
+                    this.fetchTechoFiscal();
+                }
+
                 this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
             } catch (error) {
                 this.notify('Error al Guardar', error.message, 'error');
@@ -808,7 +830,9 @@ export function app() {
                             correo_contacto: data.correo_contacto || '',
                             direccion_fisica: data.direccion_fisica || '',
                             mensaje_pie_ticket: data.mensaje_pie_ticket || '',
-                            moneda_simbolo: data.moneda_simbolo || 'C$'
+                            moneda_simbolo: data.moneda_simbolo || 'C$',
+                            regimen_tributario: data.regimen_tributario || 'Cuota Fija',
+                            techo_mensual_cuota_fija: data.techo_mensual_cuota_fija !== undefined ? Number(data.techo_mensual_cuota_fija) : 100000.00
                         };
                     }
                 }
@@ -1417,7 +1441,8 @@ export function app() {
         utilsModule(),
         themeModule(),
         authModule(),
-        dashboardModule()
+        dashboardModule(),
+        fiscalModule()
     );
 }
 
