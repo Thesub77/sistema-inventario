@@ -395,12 +395,15 @@ html:not(.dark) .swal2-html-container {
         display: none !important;
     }
 
-    /* Mostrar exclusivamente el área del ticket */
+    /* Mostrar exclusivamente el área activa de impresión (Ticket Térmico o Libro Diario Fiscal) */
     #printableReceiptArea,
-    #printableReceiptArea * {
+    #printableReceiptArea *,
+    #printableLibroDiarioArea,
+    #printableLibroDiarioArea * {
         visibility: visible !important;
     }
 
+    /* Formato Ticket Térmico Oficial (80mm) */
     #printableReceiptArea {
         position: absolute !important;
         left: 0 !important;
@@ -421,5 +424,43 @@ html:not(.dark) .swal2-html-container {
 
     #printableReceiptArea table {
         width: 100% !important;
+    }
+
+    /* Formato Oficial de Libro Diario para Auditoría Fiscal (Carta / A4 Formal) */
+    #printableLibroDiarioArea {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm 15mm !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+        font-size: 10pt !important;
+        line-height: 1.35 !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    #printableLibroDiarioArea table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    #printableLibroDiarioArea th,
+    #printableLibroDiarioArea td {
+        border: 1px solid #000000 !important;
+        padding: 5px 8px !important;
+        color: #000000 !important;
+    }
+
+    #printableLibroDiarioArea th {
+        background-color: #f1f5f9 !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        font-size: 8.5pt !important;
     }
 }

@@ -77,6 +77,9 @@ function themeModule() {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
+                if (this.currentTab === 'dashboard' && typeof this.renderDashboardCharts === 'function') {
+                    this.renderDashboardCharts();
+                }
             });
         }
     };
@@ -92,25 +95,55 @@ function dashboardModule() {
         stockAlertFiltro: 'todos',
         chartVentasInstance: null,
         chartTopInstance: null,
+        topProductosFiltro: 'unidades', // 'unidades', 'utilidad'
+        techoFiscalData: null,
+        loadingTechoFiscal: false,
 
         // Carga optimizada de métricas calculadas en el servidor (Issue #19)
         async fetchDashboardData() {
             try {
                 const localDate = new Date().toLocaleDateString('en-CA');
-                const res = await this.apiFetch(`/api/dashboard/resumen?fecha=${localDate}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.success) {
-                        this.dashboardData = json;
-                        if (this.currentTab === 'dashboard') {
-                            this.initDashboardCharts();
+                await Promise.allSettled([
+                    (async () => {
+                        const res = await this.apiFetch(`/api/dashboard/resumen?fecha=${localDate}`);
+                        if (res.ok) {
+                            const json = await res.json();
+                            if (json.success) {
+                                this.dashboardData = json;
+                                if (this.currentTab === 'dashboard') {
+                                    this.initDashboardCharts();
+                                }
+                            }
+                        } else {
+                            console.warn('Dashboard resumen API respondió con estado:', res.status);
                         }
-                    }
-                } else {
-                    console.warn('Dashboard resumen API respondió con estado:', res.status);
-                }
+                    })(),
+                    this.fetchTechoFiscal(localDate)
+                ]);
             } catch (error) {
                 console.error('Error cargando métricas optimizadas del Dashboard:', error);
+            }
+        },
+
+        // Carga del cálculo de techo fiscal y semáforo preventivo (RF-28)
+        async fetchTechoFiscal(fecha = null) {
+            this.loadingTechoFiscal = true;
+            try {
+                const localDate = fecha || new Date().toLocaleDateString('en-CA');
+                const res = await this.apiFetch(`/api/dashboard/techo-fiscal?fecha=${localDate}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.techoFiscalData = data;
+                } else {
+                    console.warn('Dashboard techo-fiscal API respondió con estado:', res.status);
+                }
+            } catch (error) {
+                console.error('Error cargando semáforo de techo fiscal:', error);
+            } finally {
+                this.loadingTechoFiscal = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
             }
         },
 
@@ -359,6 +392,88 @@ function dashboardModule() {
             return backendTop;
         },
 
+        // Top 5 Productos por Mayor Utilidad / Ganancia Real (RF-29)
+        get topRentabilidad() {
+            const backendRent = Array.isArray(this.dashboardData?.topRentabilidad) ? this.dashboardData.topRentabilidad : [];
+
+            if (!Array.isArray(this.ventas) || this.ventas.length === 0) {
+                return backendRent;
+            }
+
+            const productMap = {};
+
+            (this.productos || []).forEach(p => {
+                if (!p || !p.producto_id) return;
+                productMap[p.producto_id] = {
+                    producto_id: p.producto_id,
+                    codigo: p.codigo_producto || '',
+                    nombre: p.nombre_producto || '',
+                    categoria: p.categoria?.nombre_categoria || 'General',
+                    precio: Number(p.precio_venta || 0),
+                    costo: Number(p.costo_compra || 0),
+                    stock: Number(p.existencia_bodega || 0),
+                    cantidadVendida: 0,
+                    totalRecaudado: 0,
+                    utilidadTotal: 0
+                };
+            });
+
+            this.ventas.forEach(v => {
+                if (Number(v.estado) === 0) return;
+                const detalles = Array.isArray(v.venta_detalles) ? v.venta_detalles : [];
+                detalles.forEach(d => {
+                    const pid = d.id_producto;
+                    const cant = Number(d.cantidad || 0);
+                    const sub = Number(d.subtotal_venta_detalle || (cant * Number(d.precio_unitario || 0)));
+
+                    if (productMap[pid]) {
+                        productMap[pid].cantidadVendida += cant;
+                        productMap[pid].totalRecaudado += sub;
+                        const costoUnit = productMap[pid].costo;
+                        productMap[pid].utilidadTotal += (sub - (costoUnit * cant));
+                    } else if (pid) {
+                        const costoUnit = Number(d.producto?.costo_compra || 0);
+                        productMap[pid] = {
+                            producto_id: pid,
+                            codigo: d.producto?.codigo_producto || ('PROD-' + pid),
+                            nombre: d.producto?.nombre_producto || ('Producto #' + pid),
+                            categoria: d.producto?.categoria?.nombre_categoria || 'General',
+                            precio: Number(d.precio_unitario || 0),
+                            costo: costoUnit,
+                            stock: Number(d.producto?.existencia_bodega || 0),
+                            cantidadVendida: cant,
+                            totalRecaudado: sub,
+                            utilidadTotal: sub - (costoUnit * cant)
+                        };
+                    }
+                });
+            });
+
+            const sorted = Object.values(productMap)
+                .filter(p => p.utilidadTotal > 0 || p.cantidadVendida > 0)
+                .sort((a, b) => b.utilidadTotal - a.utilidadTotal);
+
+            if (sorted.length > 0) {
+                const top5 = sorted.slice(0, 5);
+                const maxUtilidad = top5[0].utilidadTotal > 0 ? top5[0].utilidadTotal : 1;
+                return top5.map((p, idx) => {
+                    const utilidad = Number(p.utilidadTotal.toFixed(2));
+                    const recaudado = Number(p.totalRecaudado.toFixed(2));
+                    const margenPct = recaudado > 0 ? Number(((utilidad / recaudado) * 100).toFixed(1)) : 0;
+                    return {
+                        ...p,
+                        posicion: idx + 1,
+                        utilidadTotal: utilidad,
+                        totalRecaudado: recaudado,
+                        margenPct,
+                        porcentajeRelativo: Math.round((Math.max(0, utilidad) / maxUtilidad) * 100)
+                    };
+                });
+            }
+
+            return backendRent;
+        },
+
         // RF-33: Productos con baja o nula rotación
         get productosBajaRotacion() {
             const backendBaja = Array.isArray(this.dashboardData?.productosBajaRotacion) ? this.dashboardData.productosBajaRotacion : null;
@@ -509,216 +624,732 @@ function dashboardModule() {
             });
         },
 
-        // RF-31 & RF-32: Renderizado de gráficos con Chart.js en tiempo real
-        renderDashboardCharts() {
+        // Utilidad Bruta del Período en tiempo real (RF-29)
+        get utilidadBrutaPeriodo() {
+            const backendVal = (this.dashboardData?.stats?.utilidadBrutaMes !== undefined)
+                ? Number(this.dashboardData.stats.utilidadBrutaMes)
+                : ((this.dashboardData?.utilidadBrutaMes !== undefined)
+                    ? Number(this.dashboardData.utilidadBrutaMes)
+                    : ((this.dashboardData?.stats?.utilidad_bruta_mes !== undefined)
+                        ? Number(this.dashboardData.stats.utilidad_bruta_mes)
+                        : null));
+
+            if (backendVal !== null && (!Array.isArray(this.ventas) || this.ventas.length === 0)) {
+                return Number(backendVal.toFixed(2));
+            }
+
+            // Cálculo en tiempo real sobre ventas locales en memoria (mes actual)
+            const currentMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+            let sumUtilidad = 0;
+            let hasSalesThisMonth = false;
+
+            (this.ventas || []).forEach(v => {
+                if (Number(v.estado) === 0 || !v.fecha_hora_venta) return;
+                if (v.fecha_hora_venta.slice(0, 7) !== currentMonth) return;
+                hasSalesThisMonth = true;
+                (v.venta_detalles || []).forEach(d => {
+                    const cant = Number(d.cantidad || 0);
+                    const sub = Number(d.subtotal_venta_detalle || (cant * Number(d.precio_unitario || 0)));
+                    const costoUnit = Number(d.producto?.costo_compra || 0);
+                    sumUtilidad += (sub - (costoUnit * cant));
+                });
+            });
+
+            if (hasSalesThisMonth) {
+                return Number(sumUtilidad.toFixed(2));
+            }
+
+            return backendVal !== null ? Number(backendVal.toFixed(2)) : 0;
+        },
+
+        // Margen porcentual de utilidad bruta sobre ventas
+        get margenUtilidadBruta() {
+            const totalVentas = Number(this.dashboardData?.stats?.totalVentasMonto || (this.ventas || []).filter(v => Number(v.estado) === 1).reduce((s, v) => s + Number(v.total_venta || 0), 0));
+            const utilidad = this.utilidadBrutaPeriodo;
+            if (totalVentas <= 0 || utilidad <= 0) return 0;
+            return Number(((utilidad / totalVentas) * 100).toFixed(1));
+        },
+
+        // Flujo y distribución de demanda por franja horaria (RF-30)
+        get distribucionHoraria() {
+            const backendHoras = this.dashboardData?.distribucionHoraria || this.dashboardData?.demandaHoraria;
+
+            const horasMap = {};
+            for (let h = 0; h < 24; h++) {
+                const label = String(h).padStart(2, '0') + ':00';
+                horasMap[h] = { hora: h, label, monto: 0, tickets: 0 };
+            }
+
+            const hoy = new Date().toLocaleDateString('en-CA');
+            let hasTodaySales = false;
+
+            (this.ventas || []).forEach(v => {
+                if (Number(v.estado) === 0 || !v.fecha_hora_venta) return;
+                if (v.fecha_hora_venta.slice(0, 10) === hoy) {
+                    const hora = new Date(v.fecha_hora_venta.replace(' ', 'T')).getHours();
+                    if (horasMap[hora] !== undefined) {
+                        horasMap[hora].monto += Number(v.total_venta || 0);
+                        horasMap[hora].tickets += 1;
+                        hasTodaySales = true;
+                    }
+                }
+            });
+
+            if (hasTodaySales) {
+                const list = Object.values(horasMap);
+                return {
+                    labels: list.map(item => item.label),
+                    dataMonto: list.map(item => Number(item.monto.toFixed(2))),
+                    dataTickets: list.map(item => item.tickets),
+                    horas: list
+                };
+            }
+
+            if (backendHoras && Array.isArray(backendHoras.labels)) {
+                return backendHoras;
+            }
+
+            const list = Object.values(horasMap);
+            return {
+                labels: list.map(item => item.label),
+                dataMonto: list.map(item => item.monto),
+                dataTickets: list.map(item => item.tickets),
+                horas: list
+            };
+        },
+
+        // Detección automática de la hora pico de mayor venta
+        get horaPicoInfo() {
+            const dist = this.distribucionHoraria;
+            const dataMonto = dist.dataMonto || [];
+            const labels = dist.labels || [];
+            const dataTickets = dist.dataTickets || [];
+
+            let maxMonto = 0;
+            let maxIdx = -1;
+
+            dataMonto.forEach((m, idx) => {
+                if (m > maxMonto) {
+                    maxMonto = m;
+                    maxIdx = idx;
+                }
+            });
+
+            if (maxIdx >= 0 && maxMonto > 0) {
+                const rawLabel = labels[maxIdx] || '12:00';
+                const h = parseInt(rawLabel.slice(0, 2), 10);
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                const h12 = h % 12 || 12;
+                return {
+                    hora: h,
+                    rawLabel,
+                    label: `${h12}:00 ${ampm}`,
+                    monto: maxMonto,
+                    tickets: dataTickets[maxIdx] || 0
+                };
+            }
+
+            return {
+                hora: 12,
+                rawLabel: '12:00',
+                label: '12:00 PM',
+                monto: 0,
+                tickets: 0
+            };
+        },
+
+        // Cantidad de franjas horarias con ventas activas
+        get horasConVentasCount() {
+            const dataMonto = this.distribucionHoraria.dataMonto || [];
+            return dataMonto.filter(m => m > 0).length;
+        },
+
+        // Cambiar filtro de top productos y refrescar gráfico
+        setTopProductosFiltro(tipo) {
+            this.topProductosFiltro = tipo;
+            this.$nextTick(() => {
+                this.renderTopChart();
+            });
+        },
+
+        // Renderizado del Gráfico de Ventas (Últimos 7 Días / Semanas)
+        renderVentasChart() {
             if (typeof window.Chart === 'undefined') return;
+            const canvasVentas = document.getElementById('chartVentas');
+            if (!canvasVentas) return;
+
+            if (this.chartVentasInstance) {
+                this.chartVentasInstance.destroy();
+                this.chartVentasInstance = null;
+            }
 
             const isDark = Boolean(this.darkMode);
             const textColor = isDark ? '#94a3b8' : '#64748b';
             const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
-            // 1. Gráfico de Ventas (RF-31: Indicador de ventas por días o semanas en tiempo real)
-            const canvasVentas = document.getElementById('chartVentas');
-            if (canvasVentas) {
-                if (this.chartVentasInstance) {
-                    this.chartVentasInstance.destroy();
-                    this.chartVentasInstance = null;
+            let labels = [];
+            let dataMonto = [];
+            let dataTickets = [];
+
+            if (this.dashboardVentasView === 'dias') {
+                const diasMap = {};
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const key = d.toLocaleDateString('en-CA');
+                    const dayName = i === 0 ? 'Hoy' : d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+                    diasMap[key] = { label: dayName, monto: 0, tickets: 0 };
                 }
 
-                let labels = [];
-                let dataMonto = [];
-                let dataTickets = [];
-
-                if (this.dashboardVentasView === 'dias') {
-                    // Cálculo dinámico en tiempo real: Últimos 7 Días
-                    const diasMap = {};
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date();
-                        d.setDate(d.getDate() - i);
-                        const key = d.toLocaleDateString('en-CA');
-                        const dayName = i === 0 ? 'Hoy' : d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-                        diasMap[key] = { label: dayName, monto: 0, tickets: 0 };
-                    }
-
-                    if (Array.isArray(this.ventas) && this.ventas.length > 0) {
-                        this.ventas.forEach(v => {
-                            if (!v.fecha_hora_venta || Number(v.estado) === 0) return;
-                            const key = v.fecha_hora_venta.slice(0, 10);
-                            if (diasMap[key]) {
-                                diasMap[key].monto += Number(v.total_venta || 0);
-                                diasMap[key].tickets += 1;
-                            }
-                        });
-                        labels = Object.values(diasMap).map(d => d.label);
-                        dataMonto = Object.values(diasMap).map(d => Number(d.monto.toFixed(2)));
-                        dataTickets = Object.values(diasMap).map(d => d.tickets);
-                    } else if (this.dashboardData?.chartVentas?.dias) {
-                        labels = this.dashboardData.chartVentas.dias.labels;
-                        dataMonto = this.dashboardData.chartVentas.dias.dataMonto;
-                        dataTickets = this.dashboardData.chartVentas.dias.dataTickets;
-                    } else {
-                        labels = Object.values(diasMap).map(d => d.label);
-                        dataMonto = Object.values(diasMap).map(d => d.monto);
-                        dataTickets = Object.values(diasMap).map(d => d.tickets);
-                    }
+                if (Array.isArray(this.ventas) && this.ventas.length > 0) {
+                    this.ventas.forEach(v => {
+                        if (!v.fecha_hora_venta || Number(v.estado) === 0) return;
+                        const key = v.fecha_hora_venta.slice(0, 10);
+                        if (diasMap[key]) {
+                            diasMap[key].monto += Number(v.total_venta || 0);
+                            diasMap[key].tickets += 1;
+                        }
+                    });
+                    labels = Object.values(diasMap).map(d => d.label);
+                    dataMonto = Object.values(diasMap).map(d => Number(d.monto.toFixed(2)));
+                    dataTickets = Object.values(diasMap).map(d => d.tickets);
+                } else if (this.dashboardData?.chartVentas?.dias) {
+                    labels = this.dashboardData.chartVentas.dias.labels;
+                    dataMonto = this.dashboardData.chartVentas.dias.dataMonto;
+                    dataTickets = this.dashboardData.chartVentas.dias.dataTickets;
                 } else {
-                    // Cálculo dinámico en tiempo real: Últimas 4 Semanas
-                    labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
-                    dataMonto = [0, 0, 0, 0];
-                    dataTickets = [0, 0, 0, 0];
-
-                    if (Array.isArray(this.ventas) && this.ventas.length > 0) {
-                        const now = new Date();
-                        this.ventas.forEach(v => {
-                            if (!v.fecha_hora_venta || Number(v.estado) === 0) return;
-                            const vDate = new Date(v.fecha_hora_venta.replace(' ', 'T'));
-                            const diffDays = Math.floor((now - vDate) / (1000 * 60 * 60 * 24));
-                            if (diffDays >= 0 && diffDays < 28) {
-                                const semIndex = 3 - Math.floor(diffDays / 7);
-                                if (semIndex >= 0 && semIndex <= 3) {
-                                    dataMonto[semIndex] += Number(v.total_venta || 0);
-                                    dataTickets[semIndex] += 1;
-                                }
-                            }
-                        });
-                        dataMonto = dataMonto.map(m => Number(m.toFixed(2)));
-                    } else if (this.dashboardData?.chartVentas?.semanas) {
-                        labels = this.dashboardData.chartVentas.semanas.labels;
-                        dataMonto = this.dashboardData.chartVentas.semanas.dataMonto;
-                        dataTickets = this.dashboardData.chartVentas.semanas.dataTickets;
-                    }
+                    labels = Object.values(diasMap).map(d => d.label);
+                    dataMonto = Object.values(diasMap).map(d => d.monto);
+                    dataTickets = Object.values(diasMap).map(d => d.tickets);
                 }
+            } else {
+                labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
+                dataMonto = [0, 0, 0, 0];
+                dataTickets = [0, 0, 0, 0];
 
-                const ctx = canvasVentas.getContext('2d');
-                const gradient = ctx.createLinearGradient(0, 0, 0, 260);
-                gradient.addColorStop(0, 'rgba(99, 102, 241, 0.9)');
-                gradient.addColorStop(1, 'rgba(79, 70, 229, 0.15)');
+                if (Array.isArray(this.ventas) && this.ventas.length > 0) {
+                    const now = new Date();
+                    this.ventas.forEach(v => {
+                        if (!v.fecha_hora_venta || Number(v.estado) === 0) return;
+                        const vDate = new Date(v.fecha_hora_venta.replace(' ', 'T'));
+                        const diffDays = Math.floor((now - vDate) / (1000 * 60 * 60 * 24));
+                        if (diffDays >= 0 && diffDays < 28) {
+                            const semIndex = 3 - Math.floor(diffDays / 7);
+                            if (semIndex >= 0 && semIndex <= 3) {
+                                dataMonto[semIndex] += Number(v.total_venta || 0);
+                                dataTickets[semIndex] += 1;
+                            }
+                        }
+                    });
+                    dataMonto = dataMonto.map(m => Number(m.toFixed(2)));
+                } else if (this.dashboardData?.chartVentas?.semanas) {
+                    labels = this.dashboardData.chartVentas.semanas.labels;
+                    dataMonto = this.dashboardData.chartVentas.semanas.dataMonto;
+                    dataTickets = this.dashboardData.chartVentas.semanas.dataTickets;
+                }
+            }
 
-                this.chartVentasInstance = new window.Chart(canvasVentas, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [
-                            {
-                                label: 'Total Facturado',
-                                data: dataMonto,
-                                backgroundColor: gradient,
-                                borderColor: '#6366f1',
-                                borderWidth: 2,
-                                borderRadius: 8,
-                                borderSkipped: false,
-                                maxBarThickness: 38,
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: { duration: 400 },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                                titleColor: isDark ? '#ffffff' : '#0f172a',
-                                bodyColor: isDark ? '#94a3b8' : '#334155',
-                                borderColor: isDark ? '#334155' : '#e2e8f0',
-                                borderWidth: 1,
-                                padding: 12,
-                                displayColors: false,
-                                callbacks: {
-                                    label: (ctx) => {
-                                        const tickets = dataTickets[ctx.dataIndex] || 0;
-                                        return [
-                                            `Total: ${this.formatCurrency(ctx.parsed.y)}`,
-                                            `Transacciones: ${tickets} venta(s)`
-                                        ];
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                grid: { display: false },
-                                ticks: { color: textColor, font: { size: 11, family: 'Plus Jakarta Sans' } }
-                            },
-                            y: {
-                                grid: { color: gridColor },
-                                ticks: {
-                                    color: textColor,
-                                    font: { size: 10, family: 'Plus Jakarta Sans' },
-                                    callback: (val) => this.formatCurrency(val)
+            const ctx = canvasVentas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.9)');
+            gradient.addColorStop(1, 'rgba(79, 70, 229, 0.15)');
+
+            this.chartVentasInstance = new window.Chart(canvasVentas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Total Facturado',
+                            data: dataMonto,
+                            backgroundColor: gradient,
+                            borderColor: '#6366f1',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            borderSkipped: false,
+                            maxBarThickness: 38,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                            titleColor: isDark ? '#ffffff' : '#0f172a',
+                            bodyColor: isDark ? '#94a3b8' : '#334155',
+                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: (ctx) => {
+                                    const tickets = dataTickets[ctx.dataIndex] || 0;
+                                    return [
+                                        `Total: ${this.formatCurrency(ctx.parsed.y)}`,
+                                        `Transacciones: ${tickets} venta(s)`
+                                    ];
                                 }
                             }
                         }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11, family: 'Plus Jakarta Sans' } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 10, family: 'Plus Jakarta Sans' },
+                                callback: (val) => this.formatCurrency(val)
+                            }
+                        }
                     }
-                });
+                }
+            });
+        },
+
+        // Renderizado del Gráfico Doughnut de Top Productos (Rotación vs Rentabilidad)
+        renderTopChart() {
+            if (typeof window.Chart === 'undefined') return;
+            const canvasTop = document.getElementById('chartTopProductos');
+            if (!canvasTop) return;
+
+            if (this.chartTopInstance) {
+                this.chartTopInstance.destroy();
+                this.chartTopInstance = null;
             }
 
-            // 2. Gráfico de Top Productos Rotación (RF-32)
-            const canvasTop = document.getElementById('chartTopProductos');
-            if (canvasTop) {
-                if (this.chartTopInstance) {
-                    this.chartTopInstance.destroy();
-                    this.chartTopInstance = null;
-                }
+            const isDark = Boolean(this.darkMode);
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const esUtilidad = this.topProductosFiltro === 'utilidad';
 
-                const topData = this.topProductosVendidos;
-                const hasData = topData.length > 0 && topData.some(p => p.cantidadVendida > 0);
+            let labels = [];
+            let data = [];
+            let colors = [];
+            let hasData = false;
 
-                const labels = hasData
-                    ? topData.map(p => (p.nombre || p.nombre_producto || '').slice(0, 18))
-                    : ['Sin datos de ventas'];
-                const data = hasData
-                    ? topData.map(p => p.cantidadVendida)
+            if (esUtilidad) {
+                const rentData = this.topRentabilidad || [];
+                hasData = rentData.length > 0 && rentData.some(p => (p.utilidadTotal || p.utilidad_total || 0) > 0);
+                labels = hasData
+                    ? rentData.map(p => (p.nombre || p.nombre_producto || '').slice(0, 18))
+                    : ['Sin datos de utilidad'];
+                data = hasData
+                    ? rentData.map(p => Math.max(0, Number(p.utilidadTotal || p.utilidad_total || 0)))
                     : [1];
-                const colors = hasData
+                colors = hasData
+                    ? ['#10b981', '#059669', '#14b8a6', '#0d9488', '#06b6d4']
+                    : [isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'];
+            } else {
+                const volData = this.topProductosVendidos || [];
+                hasData = volData.length > 0 && volData.some(p => p.cantidadVendida > 0);
+                labels = hasData
+                    ? volData.map(p => (p.nombre || p.nombre_producto || '').slice(0, 18))
+                    : ['Sin datos de ventas'];
+                data = hasData
+                    ? volData.map(p => p.cantidadVendida)
+                    : [1];
+                colors = hasData
                     ? ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#ec4899']
                     : [isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'];
+            }
 
-                this.chartTopInstance = new window.Chart(canvasTop, {
-                    type: 'doughnut',
-                    data: {
-                        labels,
-                        datasets: [{
-                            data,
-                            backgroundColor: colors,
-                            borderWidth: 2,
-                            borderColor: isDark ? '#0f172a' : '#ffffff',
-                            hoverOffset: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '72%',
-                        animation: { duration: 400 },
-                        plugins: {
-                            legend: {
-                                display: hasData,
-                                position: 'bottom',
-                                labels: {
-                                    color: textColor,
-                                    font: { size: 11, family: 'Plus Jakarta Sans' },
-                                    boxWidth: 10,
-                                    padding: 8
-                                }
-                            },
-                            tooltip: {
-                                enabled: hasData,
-                                backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                                titleColor: isDark ? '#ffffff' : '#0f172a',
-                                bodyColor: isDark ? '#94a3b8' : '#334155',
-                                borderColor: isDark ? '#334155' : '#e2e8f0',
-                                borderWidth: 1,
-                                padding: 10,
-                                callbacks: {
-                                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed} uds. vendidas`
+            this.chartTopInstance = new window.Chart(canvasTop, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: isDark ? '#0f172a' : '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    animation: { duration: 400 },
+                    plugins: {
+                        legend: {
+                            display: hasData,
+                            position: 'bottom',
+                            labels: {
+                                color: textColor,
+                                font: { size: 11, family: 'Plus Jakarta Sans' },
+                                boxWidth: 10,
+                                padding: 8
+                            }
+                        },
+                        tooltip: {
+                            enabled: hasData,
+                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                            titleColor: isDark ? '#ffffff' : '#0f172a',
+                            bodyColor: isDark ? '#94a3b8' : '#334155',
+                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: (ctx) => {
+                                    if (esUtilidad) {
+                                        const rentList = this.topRentabilidad || [];
+                                        const item = rentList[ctx.dataIndex];
+                                        const margen = item ? (item.margenPct || item.margen_pct || 0) : 0;
+                                        return [
+                                            ` ${ctx.label}`,
+                                            ` Ganancia: ${this.formatCurrency(ctx.parsed)}`,
+                                            ` Margen: ${margen}%`
+                                        ];
+                                    }
+                                    return ` ${ctx.label}: ${ctx.parsed} uds. vendidas`;
                                 }
                             }
                         }
                     }
+                }
+            });
+        },
+
+        // Renderizado general de todos los gráficos del Dashboard
+        renderDashboardCharts() {
+            this.renderVentasChart();
+            this.renderTopChart();
+        },
+
+        // Métrica analítica reactiva del techo fiscal de Cuota Fija (Ley 822) y semáforo preventivo (RF-28)
+        get techoFiscal() {
+            const raw = this.techoFiscalData;
+            const defaultTecho = Number(this.empresa?.techo_mensual_cuota_fija !== undefined ? this.empresa.techo_mensual_cuota_fija : 100000.00);
+            const regimen = this.empresa?.regimen_tributario || raw?.regimen || 'Cuota Fija';
+
+            if (raw) {
+                const techoMensual = Number(raw.techo_mensual !== undefined ? raw.techo_mensual : defaultTecho);
+                const ventasMes = Number(raw.ventas_mes || 0);
+                const porcentaje = techoMensual > 0 ? (ventasMes / techoMensual) * 100 : (ventasMes > 0 ? 100 : 0);
+                const saldoDisponible = Math.max(0, techoMensual - ventasMes);
+                const estadoSemaforo = raw.estado_semaforo || (porcentaje < 75 ? 'normal' : (porcentaje < 100 ? 'alerta' : 'excedido'));
+
+                return {
+                    regimen: raw.regimen || regimen,
+                    ventas_mes: ventasMes,
+                    techo_mensual: techoMensual,
+                    porcentaje_consumido: Number(porcentaje.toFixed(2)),
+                    saldo_disponible: Number(saldoDisponible.toFixed(2)),
+                    estado_semaforo: estadoSemaforo,
+                    ventas_anual_acumulado: Number(raw.ventas_anual_acumulado || 0),
+                    techo_anual: Number(raw.techo_anual || (techoMensual * 12))
+                };
+            }
+
+            // Fallback reactivo local basado en this.ventas
+            const now = new Date();
+            const curYear = now.getFullYear();
+            const curMonth = now.getMonth();
+            const validVentas = (this.ventas || []).filter(v => Number(v.estado) === 1);
+            
+            const ventasMes = validVentas
+                .filter(v => {
+                    if (!v.fecha_hora_venta) return false;
+                    const d = new Date(v.fecha_hora_venta.replace(' ', 'T'));
+                    return d.getFullYear() === curYear && d.getMonth() === curMonth;
+                })
+                .reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
+
+            const ventasAnual = validVentas
+                .filter(v => {
+                    if (!v.fecha_hora_venta) return false;
+                    const d = new Date(v.fecha_hora_venta.replace(' ', 'T'));
+                    return d.getFullYear() === curYear;
+                })
+                .reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
+
+            const techoMensual = defaultTecho;
+            const porcentaje = techoMensual > 0 ? (ventasMes / techoMensual) * 100 : (ventasMes > 0 ? 100 : 0);
+            const saldo = Math.max(0, techoMensual - ventasMes);
+            const estado = porcentaje < 75 ? 'normal' : (porcentaje < 100 ? 'alerta' : 'excedido');
+
+            return {
+                regimen: regimen,
+                ventas_mes: Number(ventasMes.toFixed(2)),
+                techo_mensual: techoMensual,
+                porcentaje_consumido: Number(porcentaje.toFixed(2)),
+                saldo_disponible: Number(saldo.toFixed(2)),
+                estado_semaforo: estado,
+                ventas_anual_acumulado: Number(ventasAnual.toFixed(2)),
+                techo_anual: Number((techoMensual * 12).toFixed(2))
+            };
+        }
+    };
+}
+
+// 3.8. Módulo Fiscal: Libro Diario de Ventas (DGI Cuota Fija - RF-27)
+function fiscalModule() {
+    const now = new Date();
+    return {
+        libroDiarioMes: now.getMonth() + 1,
+        libroDiarioAnio: now.getFullYear(),
+        libroDiarioLoading: false,
+        libroDiarioEmisionFecha: '',
+        showLibroComprobantesDetalle: false,
+        libroDiarioData: {
+            success: true,
+            anio: now.getFullYear(),
+            mes: now.getMonth() + 1,
+            total_acumulado_mes: '0.00',
+            total_transacciones_mes: 0,
+            dias: []
+        },
+
+        mesesList: [
+            { id: 1, label: 'Enero' },
+            { id: 2, label: 'Febrero' },
+            { id: 3, label: 'Marzo' },
+            { id: 4, label: 'Abril' },
+            { id: 5, label: 'Mayo' },
+            { id: 6, label: 'Junio' },
+            { id: 7, label: 'Julio' },
+            { id: 8, label: 'Agosto' },
+            { id: 9, label: 'Septiembre' },
+            { id: 10, label: 'Octubre' },
+            { id: 11, label: 'Noviembre' },
+            { id: 12, label: 'Diciembre' }
+        ],
+
+        get aniosList() {
+            const currentYear = new Date().getFullYear();
+            const years = [];
+            for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+                years.push(y);
+            }
+            return years;
+        },
+
+        get nombreMesSeleccionado() {
+            const m = this.mesesList.find(item => Number(item.id) === Number(this.libroDiarioMes));
+            return m ? m.label : 'Mes ' + this.libroDiarioMes;
+        },
+
+        get libroDiarioVentasDetalle() {
+            const mesSel = Number(this.libroDiarioMes);
+            const anioSel = Number(this.libroDiarioAnio);
+
+            return (this.ventas || [])
+                .filter(v => {
+                    if (Number(v.estado) === 0) return false;
+                    if (!v.fecha_hora_venta) return false;
+                    const d = new Date(v.fecha_hora_venta);
+                    return d.getFullYear() === anioSel && (d.getMonth() + 1) === mesSel;
+                })
+                .sort((a, b) => new Date(a.fecha_hora_venta) - new Date(b.fecha_hora_venta));
+        },
+
+        formatDateTime(dateInput) {
+            if (!dateInput) return '';
+            const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+            if (isNaN(d.getTime())) return String(dateInput);
+            return d.toLocaleString('es-NI', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        },
+
+        setLibroDiarioMesActual() {
+            const n = new Date();
+            this.libroDiarioMes = n.getMonth() + 1;
+            this.libroDiarioAnio = n.getFullYear();
+            this.fetchLibroDiario();
+        },
+
+        setLibroDiarioMesAnterior() {
+            let m = Number(this.libroDiarioMes) - 1;
+            let a = Number(this.libroDiarioAnio);
+            if (m < 1) {
+                m = 12;
+                a -= 1;
+            }
+            this.libroDiarioMes = m;
+            this.libroDiarioAnio = a;
+            this.fetchLibroDiario();
+        },
+
+        async fetchLibroDiario() {
+            this.libroDiarioLoading = true;
+            this.libroDiarioEmisionFecha = this.formatDateTime(new Date());
+
+            try {
+                const mes = Number(this.libroDiarioMes);
+                const anio = Number(this.libroDiarioAnio);
+
+                const res = await this.apiFetch(`/api/fiscal/libro-diario?mes=${mes}&anio=${anio}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success) {
+                        this.libroDiarioData = data;
+                        this.libroDiarioLoading = false;
+                        this.$nextTick(() => {
+                            if (window.lucide) window.lucide.createIcons();
+                        });
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('Fallo al consultar /api/fiscal/libro-diario, calculando desde ventas locales:', err);
+            }
+
+            this.calcularLibroDiarioLocal();
+            this.libroDiarioLoading = false;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        calcularLibroDiarioLocal() {
+            const mesSel = Number(this.libroDiarioMes);
+            const anioSel = Number(this.libroDiarioAnio);
+
+            const ventasMes = (this.ventas || []).filter(v => {
+                if (Number(v.estado) === 0) return false;
+                if (!v.fecha_hora_venta) return false;
+                const d = new Date(v.fecha_hora_venta);
+                return d.getFullYear() === anioSel && (d.getMonth() + 1) === mesSel;
+            });
+
+            const diasMap = {};
+            let totalAcumulado = 0;
+            let totalTransacciones = 0;
+
+            ventasMes.forEach(v => {
+                const fechaStr = v.fecha_hora_venta.substring(0, 10);
+                if (!diasMap[fechaStr]) {
+                    diasMap[fechaStr] = {
+                        fecha: fechaStr,
+                        cantidad_transacciones: 0,
+                        codigos: [],
+                        total_dia: 0
+                    };
+                }
+                diasMap[fechaStr].cantidad_transacciones += 1;
+                diasMap[fechaStr].codigos.push(v.codigo_venta || '');
+                diasMap[fechaStr].total_dia += Number(v.total_venta || 0);
+
+                totalAcumulado += Number(v.total_venta || 0);
+                totalTransacciones += 1;
+            });
+
+            const diasArray = Object.values(diasMap)
+                .sort((a, b) => a.fecha.localeCompare(b.fecha))
+                .map(d => {
+                    const codigosValidos = d.codigos.filter(Boolean).sort();
+                    return {
+                        fecha: d.fecha,
+                        cantidad_transacciones: d.cantidad_transacciones,
+                        comprobante_inicial: codigosValidos[0] || '---',
+                        comprobante_final: codigosValidos[codigosValidos.length - 1] || '---',
+                        total_dia: d.total_dia.toFixed(2)
+                    };
+                });
+
+            this.libroDiarioData = {
+                success: true,
+                anio: anioSel,
+                mes: mesSel,
+                total_acumulado_mes: totalAcumulado.toFixed(2),
+                total_transacciones_mes: totalTransacciones,
+                dias: diasArray
+            };
+        },
+
+        // Disparador de impresión formal del Libro Diario con nombre oficial de guardado
+        printLibroDiario() {
+            this.libroDiarioEmisionFecha = this.formatDateTime(new Date());
+            const originalTitle = document.title;
+            const mesNombre = this.nombreMesSeleccionado || `Mes-${this.libroDiarioMes}`;
+            const comercioNombre = (this.empresa?.nombre_comercial || 'Comercio')
+                .replace(/[/\\?%*:|"<>]/g, '-').trim();
+            const fileName = `Libro Fiscal ${mesNombre} ${comercioNombre}`;
+
+            // Configurar el título del documento para que "Guardar como PDF" sugiera el nombre oficial requerido
+            document.title = fileName;
+
+            window.print();
+
+            // Restaurar título de pestaña
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+            window.addEventListener('afterprint', () => {
+                document.title = originalTitle;
+            }, { once: true });
+        },
+
+        // Exportación a CSV oficial para auditoría fiscal y apertura en Excel
+        exportLibroDiarioCSV() {
+            this.libroDiarioEmisionFecha = this.formatDateTime(new Date());
+            const empNombre = this.empresa?.nombre_comercial || 'EMPRESA';
+            const empRuc = this.empresa?.numero_ruc || 'N/A';
+            const mesNombre = this.nombreMesSeleccionado;
+            const anio = this.libroDiarioAnio;
+            const comercioNombre = (this.empresa?.nombre_comercial || 'Comercio')
+                .replace(/[/\\?%*:|"<>]/g, '-').trim();
+
+            let csvContent = '\uFEFF'; // BOM UTF-8 para apertura correcta en Microsoft Excel
+
+            // Membrete en CSV
+            csvContent += `"${empNombre}"\r\n`;
+            csvContent += `"RUC: ${empRuc}"\r\n`;
+            csvContent += `"LIBRO DIARIO DE VENTAS - RÉGIMEN SIMPLIFICADO CUOTA FIJA"\r\n`;
+            csvContent += `"Período Fiscal: ${mesNombre} ${anio}"\r\n`;
+            csvContent += `"Fecha de Emisión del Libro: ${this.libroDiarioEmisionFecha}"\r\n\r\n`;
+
+            // Encabezados
+            csvContent += `"Fecha","Cantidad de Tickets","Comprobante Inicial","Comprobante Final","Rango de Comprobantes","Total Diario (C$)"\r\n`;
+
+            // Filas diarias
+            (this.libroDiarioData?.dias || []).forEach(d => {
+                const rango = d.comprobante_inicial === d.comprobante_final 
+                    ? d.comprobante_inicial 
+                    : `${d.comprobante_inicial} al ${d.comprobante_final}`;
+                csvContent += `"${d.fecha}","${d.cantidad_transacciones}","${d.comprobante_inicial}","${d.comprobante_final}","${rango}","${d.total_dia}"\r\n`;
+            });
+
+            // Fila de Total Acumulado del Mes
+            csvContent += `"TOTAL ACUMULADO DEL MES","${this.libroDiarioData?.total_transacciones_mes || 0}","","","","${this.libroDiarioData?.total_acumulado_mes || '0.00'}"\r\n\r\n`;
+
+            // Desglose individual de facturas del mes
+            const ventasDetalle = this.libroDiarioVentasDetalle;
+            if (ventasDetalle.length > 0) {
+                csvContent += `"DETALLE INDIVIDUAL DE COMPROBANTES EMITIDOS EN EL PERÍODO"\r\n`;
+                csvContent += `"N° Factura / Ticket","Fecha y Hora","Cliente","Método de Pago","Total Facturado (C$)"\r\n`;
+                ventasDetalle.forEach(v => {
+                    csvContent += `"${v.codigo_venta}","${v.fecha_hora_venta}","${v.cliente_nombre || 'Consumidor Final'}","${v.metodo_pago || 'Efectivo'}","${Number(v.total_venta || 0).toFixed(2)}"\r\n`;
                 });
             }
+
+            // Descarga con el formato oficial: "Libro Fiscal + mes + comercio-nombre.csv"
+            const downloadFileName = `Libro Fiscal ${mesNombre} ${comercioNombre}.csv`;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', downloadFileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            this.notify('Libro Diario Exportado', `Se descargó "${downloadFileName}".`, 'success');
         }
     };
 }
@@ -3170,9 +3801,160 @@ function posModule() {
             return 'COMPROBANTE DE VENTA';
         },
 
-        // Disparador de impresión nativa del sistema
+        // Disparador de impresión nativa del sistema con nombre sugerido para PDF
         printReceipt() {
+            const originalTitle = document.title;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+
+            // Configurar el título para que "Guardar como PDF" use el código de la factura
+            document.title = safeCodigo;
+
             window.print();
+
+            // Restaurar título original
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+            window.addEventListener('afterprint', () => {
+                document.title = originalTitle;
+            }, { once: true });
+        },
+
+        // Descargar el comprobante directamente en formato PDF (.pdf) con el código de factura como nombre
+        async downloadReceiptPDF() {
+            if (!this.receiptData) return;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+            const fileName = `${safeCodigo}.pdf`;
+
+            const element = document.getElementById('printableReceiptArea');
+            if (!element) {
+                this.notify('Error', 'No se encontró el contenedor del comprobante.', 'error');
+                return;
+            }
+
+            // Asegurar que la librería html2pdf esté cargada
+            if (typeof window.html2pdf !== 'function') {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                } catch (e) {
+                    console.warn('No se pudo cargar html2pdf CDN, utilizando asistente de impresión:', e);
+                }
+            }
+
+            if (typeof window.html2pdf === 'function') {
+                this.notify('Generando PDF', `Preparando ${fileName}...`, 'info', 1500);
+
+                // Calcular dimensiones exactas para formato ticket térmico continuo (80mm) sin cortes de página
+                const clientWidth = element.offsetWidth || 340;
+                const clientHeight = element.scrollHeight || 600;
+                const pdfWidth = 80;
+                const margin = 2; // mm
+                const printableWidth = pdfWidth - (margin * 2); // 76mm
+                const pdfHeight = Math.max(120, Math.ceil((clientHeight / clientWidth) * printableWidth) + (margin * 2) + 6);
+
+                const opt = {
+                    margin: [margin, margin, margin, margin],
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2, 
+                        useCORS: true, 
+                        backgroundColor: '#ffffff',
+                        logging: false
+                    },
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: [pdfWidth, pdfHeight], 
+                        orientation: 'portrait' 
+                    },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                try {
+                    await window.html2pdf().set(opt).from(element).save();
+                    this.notify('Factura Descargada', `Se descargó "${fileName}".`, 'success');
+                    return;
+                } catch (e) {
+                    console.error('Error generando PDF con html2pdf:', e);
+                }
+            }
+
+            // Fallback: Disparar la impresión nativa (configurada para sugerir el código como nombre de PDF)
+            this.printReceipt();
+        },
+
+        // Descarga rápida de PDF directamente desde tablas y listados
+        async downloadReceiptDirectPDF(ventaId, ventaObj = null) {
+            await this.openReceiptModal(ventaId, ventaObj);
+            const start = Date.now();
+            while (Date.now() - start < 3000) {
+                if (!this.loadingReceipt && this.receiptData && document.getElementById('printableReceiptArea')) {
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 80));
+            }
+            await new Promise(r => setTimeout(r, 200));
+            await this.downloadReceiptPDF();
+        },
+
+        // Descargar copia del comprobante de venta (descarga en PDF por defecto)
+        async downloadReceipt() {
+            await this.downloadReceiptPDF();
+        },
+
+        // Descargar copia del comprobante de venta en formato texto (.txt)
+        downloadReceiptTXT() {
+            if (!this.receiptData) return;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+            const comercio = this.receiptEmpresa?.nombre_comercial || (this.receiptData?.empresa?.nombre_comercial || 'SISTEMA COMERCIAL');
+            const ruc = (this.receiptEmpresa?.numero_ruc || this.receiptData?.empresa?.numero_ruc) ? `RUC: ${this.receiptEmpresa?.numero_ruc || this.receiptData?.empresa?.numero_ruc}` : '';
+            const fecha = this.formatDate(this.receiptData?.fecha_hora_venta);
+            const cliente = this.receiptData?.cliente_nombre || 'Consumidor Final';
+            const metodo = this.receiptData?.metodo_pago || 'Efectivo';
+            const total = Number(this.receiptData?.total_venta || 0).toFixed(2);
+
+            let txt = `========================================\r\n`;
+            txt += `           ${comercio.toUpperCase()}\r\n`;
+            if (ruc) txt += `             ${ruc}\r\n`;
+            txt += `========================================\r\n`;
+            txt += `FACTURA N°: ${codigo}\r\n`;
+            txt += `FECHA:     ${fecha}\r\n`;
+            txt += `CLIENTE:   ${cliente}\r\n`;
+            txt += `PAGO:      ${metodo.toUpperCase()}\r\n`;
+            txt += `----------------------------------------\r\n`;
+            txt += `CANT  DESCRIPCIÓN              TOTAL\r\n`;
+            txt += `----------------------------------------\r\n`;
+            (this.receiptData?.venta_detalles || []).forEach(d => {
+                const prod = (d.producto?.nombre_producto || `Item #${d.id_producto}`).padEnd(22).substring(0, 22);
+                const cant = String(d.cantidad).padStart(4);
+                const sub = Number(d.subtotal || (d.cantidad * d.precio_unitario)).toFixed(2).padStart(8);
+                txt += `${cant}  ${prod} ${sub}\r\n`;
+            });
+            txt += `----------------------------------------\r\n`;
+            txt += `TOTAL:                   C$ ${total}\r\n`;
+            txt += `========================================\r\n`;
+            txt += `      ¡GRACIAS POR SU COMPRA!\r\n`;
+            txt += `========================================\r\n`;
+
+            const blob = new Blob([txt], { type: 'text/plain;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${safeCodigo}.txt`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            this.notify('Factura Descargada', `Se descargó el comprobante "${safeCodigo}".`, 'success');
         },
 
         viewSaleDetails(sale) {
@@ -3579,7 +4361,9 @@ function app() {
             correo_contacto: '',
             direccion_fisica: '',
             mensaje_pie_ticket: '',
-            moneda_simbolo: 'C$'
+            moneda_simbolo: 'C$',
+            regimen_tributario: 'Cuota Fija',
+            techo_mensual_cuota_fija: 100000.00
         },
 
         // Navegación
@@ -3589,6 +4373,7 @@ function app() {
             { id: 'productos', label: 'Productos & Stock', icon: 'package' },
             { id: 'categorias', label: 'Categorías', icon: 'tags' },
             { id: 'ventas', label: 'Historial de Ventas', icon: 'receipt' },
+            { id: 'libro-diario', label: 'Libro Fiscal', icon: 'book-open' },
             { id: 'proveedores', label: 'Proveedores', icon: 'truck' },
             { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', icon: 'credit-card' },
             { id: 'caja', label: 'Cajas & Arqueos', icon: 'wallet' },
@@ -3674,7 +4459,8 @@ function app() {
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
-                    return this.hasPermission('ventas.ver') || this.hasPermission('ventas.crear');
+                case 'libro-diario':
+                    return this.hasPermission('ventas.ver') || this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
                 case 'proveedores':
                 case 'cuentas-por-pagar':
                     return this.isAdmin || this.hasPermission('proveedores.gestionar');
@@ -3945,6 +4731,13 @@ function app() {
                             this.fetchUsuarios().catch(() => {})
                         ]);
                         break;
+                    case 'libro-diario':
+                        await Promise.all([
+                            this.fetchLibroDiario(),
+                            this.fetchEmpresa(),
+                            this.fetchVentas().catch(() => {})
+                        ]);
+                        break;
                     case 'proveedores':
                     case 'cuentas-por-pagar':
                         await Promise.all([
@@ -4164,7 +4957,9 @@ function app() {
                     correo_contacto: this.empresa.correo_contacto || '',
                     direccion_fisica: this.empresa.direccion_fisica || '',
                     mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
-                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$'
+                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
+                    regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
+                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00
                 };
             }
             this.showEmpresaModal = true;
@@ -4219,6 +5014,10 @@ function app() {
                 this.receiptEmpresa = this.empresa;
                 this.showEmpresaModal = false;
 
+                if (typeof this.fetchTechoFiscal === 'function') {
+                    this.fetchTechoFiscal();
+                }
+
                 this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
             } catch (error) {
                 this.notify('Error al Guardar', error.message, 'error');
@@ -4243,7 +5042,9 @@ function app() {
                             correo_contacto: data.correo_contacto || '',
                             direccion_fisica: data.direccion_fisica || '',
                             mensaje_pie_ticket: data.mensaje_pie_ticket || '',
-                            moneda_simbolo: data.moneda_simbolo || 'C$'
+                            moneda_simbolo: data.moneda_simbolo || 'C$',
+                            regimen_tributario: data.regimen_tributario || 'Cuota Fija',
+                            techo_mensual_cuota_fija: data.techo_mensual_cuota_fija !== undefined ? Number(data.techo_mensual_cuota_fija) : 100000.00
                         };
                     }
                 }
@@ -4848,7 +5649,8 @@ function app() {
         utilsModule(),
         themeModule(),
         authModule(),
-        dashboardModule()
+        dashboardModule(),
+        fiscalModule()
     );
 }
 

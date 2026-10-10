@@ -158,6 +158,36 @@
                             </div>
                         </div>
 
+                        <!-- Régimen Tributario (Ley 822) -->
+                        <div class="space-y-1">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <span>Régimen Fiscal (Ley 822)</span>
+                                <span class="text-rose-500 font-bold">*</span>
+                            </label>
+                            <select x-model="empresaForm.regimen_tributario"
+                                required
+                                class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors">
+                                <option value="Cuota Fija">Cuota Fija (Régimen Simplificado)</option>
+                                <option value="Régimen General">Régimen General</option>
+                            </select>
+                        </div>
+
+                        <!-- Techo Mensual Cuota Fija (C$) -->
+                        <div class="space-y-1 sm:col-span-2">
+                            <label class="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <span>Techo Mensual Cuota Fija (Parámetro Fiscal)</span>
+                                <span class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" x-text="empresaForm.moneda_simbolo || 'C$'"></span>
+                            </label>
+                            <input type="number"
+                                step="1000"
+                                min="0"
+                                x-model.number="empresaForm.techo_mensual_cuota_fija"
+                                required
+                                placeholder="100000.00"
+                                class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors font-mono">
+                            <p class="text-[10px] text-slate-400">Límite legal mensual Ley 822 (Por defecto C$ 100,000.00 / C$ 1,200,000 anual)</p>
+                        </div>
+
                         <!-- Mensaje Pie de Ticket -->
                         <div class="space-y-1 sm:col-span-2">
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -218,6 +248,10 @@
                                 <div class="flex justify-between">
                                     <span>Moneda:</span>
                                     <span class="font-bold" x-text="empresaForm.moneda_simbolo || 'C$'"></span>
+                                </div>
+                                <div class="flex justify-between" x-show="empresaForm.regimen_tributario">
+                                    <span>Régimen:</span>
+                                    <span class="font-bold" x-text="empresaForm.regimen_tributario"></span>
                                 </div>
                             </div>
 
