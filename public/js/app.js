@@ -4339,6 +4339,17 @@ function app() {
             observacion_cierre: ''
         },
 
+        // Estado de Historial de Turnos y Auditoría
+        cajaActiveSubTab: 'cajas',
+        showTurnoAuditoriaModal: false,
+        loadingTurnoAuditoria: false,
+        selectedTurnoAuditoria: null,
+        turnoAuditoriaSubTab: 'resumen',
+        turnoFiltroCaja: '',
+        turnoFiltroUsuario: '',
+        turnoFiltroEstado: '',
+        turnoSearch: '',
+
         // Estado de Gestión de Cajas Físicas
         showCajaFormModal: false,
         isSavingCaja: false,
@@ -5161,6 +5172,86 @@ function app() {
             };
         },
 
+        // Getters de Historial de Turnos y Auditoría de Caja
+        get filteredTurnos() {
+            let list = Array.isArray(this.turnos) ? this.turnos : [];
+            const filtroCaja = this.turnoFiltroCaja ? String(this.turnoFiltroCaja) : '';
+            const filtroUsuario = this.turnoFiltroUsuario ? String(this.turnoFiltroUsuario) : '';
+            const filtroEstado = this.turnoFiltroEstado || '';
+            const term = (this.turnoSearch || '').trim().toLowerCase();
+
+            // 1. Filtrado de alcance por rol (Cajeros solo ven sus turnos históricos)
+            if (!this.isAdmin) {
+                const myUserId = this.currentUser?.usuario_id;
+                if (myUserId) {
+                    list = list.filter(t => Number(t.id_usuario) === Number(myUserId));
+                }
+            } else if (filtroUsuario) {
+                list = list.filter(t => Number(t.id_usuario) === Number(filtroUsuario) || Number(t.id_usuario_cierre) === Number(filtroUsuario));
+            }
+
+            // 2. Filtro por caja física
+            if (filtroCaja) {
+                list = list.filter(t => Number(t.id_caja) === Number(filtroCaja));
+            }
+
+            // 3. Filtro por estado de arqueo
+            if (filtroEstado) {
+                list = list.filter(t => {
+                    const isOpen = t.fecha_hora_cierre === null || (t.estado !== undefined && Number(t.estado) === 1 && !t.fecha_hora_cierre);
+                    if (filtroEstado === 'abierto') return isOpen;
+                    if (isOpen) return false;
+                    const diff = Number(t.diferencia || 0);
+                    if (filtroEstado === 'exacto') return diff === 0;
+                    if (filtroEstado === 'faltante') return diff < 0;
+                    if (filtroEstado === 'sobrante') return diff > 0;
+                    return true;
+                });
+            }
+
+            // 4. Búsqueda por texto (N° Turno, nombre caja, cajero, observación)
+            if (term) {
+                list = list.filter(t => {
+                    const idStr = String(t.caja_operacion_id || '');
+                    const cajaDesc = (t.caja?.descripcion_caja || ('Caja #' + t.id_caja)).toLowerCase();
+                    const userApertura = (t.usuario?.nombre_apellido || '').toLowerCase();
+                    const userCierre = (t.usuario_cierre?.nombre_apellido || '').toLowerCase();
+                    const obs = (t.observacion_cierre || '').toLowerCase();
+                    return idStr.includes(term) || cajaDesc.includes(term) || userApertura.includes(term) || userCierre.includes(term) || obs.includes(term);
+                });
+            }
+
+            return list;
+        },
+
+        get turnosStats() {
+            const list = Array.isArray(this.turnos) ? this.turnos : [];
+            let exactos = 0;
+            let descuadres = 0;
+            let abiertos = 0;
+
+            list.forEach(t => {
+                const isOpen = t.fecha_hora_cierre === null || (t.estado !== undefined && Number(t.estado) === 1 && !t.fecha_hora_cierre);
+                if (isOpen) {
+                    abiertos++;
+                } else {
+                    const diff = Number(t.diferencia || 0);
+                    if (diff === 0) {
+                        exactos++;
+                    } else {
+                        descuadres++;
+                    }
+                }
+            });
+
+            return {
+                exactos,
+                descuadres,
+                abiertos,
+                total: list.length
+            };
+        },
+
         getMovimientoConcepto(mov) {
             if (!mov) return 'Movimiento';
             if (mov.venta && mov.venta.codigo_venta) {
@@ -5631,6 +5722,59 @@ function app() {
             } finally {
                 this.isSavingCaja = false;
             }
+        },
+
+        verTurnosDeCaja(cajaId) {
+            this.cajaActiveSubTab = 'turnos';
+            this.turnoFiltroCaja = String(cajaId);
+            this.turnoFiltroEstado = '';
+            this.turnoSearch = '';
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async openTurnoAuditoriaModal(turnoId) {
+            if (!turnoId) return;
+
+            this.showTurnoAuditoriaModal = true;
+            this.loadingTurnoAuditoria = true;
+            this.selectedTurnoAuditoria = null;
+            this.turnoAuditoriaSubTab = 'resumen';
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            try {
+                const res = await this.apiFetch(`/api/caja-operaciones/${turnoId}`);
+                if (!res.ok) {
+                    throw new Error('No se pudo cargar la auditoría del turno.');
+                }
+                const data = await res.json();
+                this.selectedTurnoAuditoria = data;
+            } catch (err) {
+                console.error('Error cargando auditoría de turno:', err);
+                this.notify('Error al consultar auditoría', err.message || 'No se pudieron recuperar las métricas del turno.', 'error');
+                this.showTurnoAuditoriaModal = false;
+            } finally {
+                this.loadingTurnoAuditoria = false;
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }
+        },
+
+        printTurnoAuditoria() {
+            const originalTitle = document.title;
+            const turnoId = this.selectedTurnoAuditoria?.caja_operacion_id || 'Turno';
+            document.title = `Auditoria-Turno-${turnoId}`;
+            window.print();
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+            window.addEventListener('afterprint', () => {
+                document.title = originalTitle;
+            }, { once: true });
         },
 
         async refreshAll() {

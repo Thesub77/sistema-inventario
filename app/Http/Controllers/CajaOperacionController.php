@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Exceptions\CajaException;
 use App\Models\Bitacora;
 use App\Models\Caja;
+use App\Models\Caja_movimiento_venta;
 use App\Models\Caja_operacion;
+use App\Models\Movimiento_inventario;
+use App\Models\Venta;
 use App\Models\Venta_espera;
 use App\Services\CajaService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +45,16 @@ class CajaOperacionController extends Controller
     public function index(Request $request)
     {
         $this->cajas->autorizar($request->user());
-        $query = Caja_operacion::with(['caja', 'usuario']);
+        $query = Caja_operacion::with(['caja', 'usuario', 'usuarioCierre']);
         if (! $request->user()->esAdmin()) {
             $query->where('id_usuario', $request->user()->usuario_id);
+        }
+
+        if ($request->filled('id_caja')) {
+            $query->where('id_caja', $request->input('id_caja'));
+        }
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->input('estado'));
         }
 
         return response()->json($query->orderByDesc('caja_operacion_id')->get());
@@ -125,10 +136,72 @@ class CajaOperacionController extends Controller
     {
         return DB::transaction(function () use ($request, $id) {
             $referencia = Caja_operacion::findOrFail($id);
-            Caja::lockForUpdate()->findOrFail($referencia->id_caja);
-            $turno = Caja_operacion::with(['caja', 'usuario'])->lockForUpdate()->findOrFail($id);
+            if ((int) $referencia->estado === 1 && $referencia->fecha_hora_cierre === null) {
+                Caja::lockForUpdate()->findOrFail($referencia->id_caja);
+            }
+            $turno = Caja_operacion::with(['caja', 'usuario', 'usuarioCierre'])->findOrFail($id);
             $this->cajas->autorizar($request->user(), $turno);
             $turno->setAttribute('arqueo', $this->cajas->arqueo($turno));
+
+            // 1. Obtener todos los movimientos financieros del turno (entradas, salidas, ventas y devoluciones)
+            $movimientos = Caja_movimiento_venta::with(['caja', 'venta.usuario'])
+                ->where('id_caja_operacion', $turno->caja_operacion_id)
+                ->where('estado', 1)
+                ->orderByDesc('caja_movimiento_venta_id')
+                ->get();
+            $turno->setAttribute('movimientos', $movimientos);
+
+            // 2. Facturas únicas emitidas en este turno
+            $ventasIds = $movimientos->pluck('id_venta')->filter()->unique();
+            $ventas = Venta::with(['usuario', 'venta_detalles.producto'])
+                ->whereIn('venta_id', $ventasIds)
+                ->orderByDesc('venta_id')
+                ->get();
+            $turno->setAttribute('ventas', $ventas);
+
+            // 3. Cuantificación de mermas y pérdidas de inventario en el período del turno
+            $fechaInicio = $turno->fecha_hora_apertura;
+            $fechaFin = $turno->fecha_hora_cierre ?? now();
+            $mermas = Movimiento_inventario::with(['producto', 'usuario'])
+                ->where('tipo_movimiento', 'Salida por Merma')
+                ->whereBetween('fecha_movimiento', [$fechaInicio, $fechaFin])
+                ->orderByDesc('movimiento_inventario_id')
+                ->get();
+            $turno->setAttribute('mermas', $mermas);
+
+            // 4. Métricas consolidadas del turno para auditoría y toma de decisiones
+            $ventasActivas = $ventas->where('estado', 1);
+            $ventasAnuladas = $ventas->where('estado', 0);
+            $totalVentasMonto = (float) $ventasActivas->sum('total_venta');
+            $totalTickets = $ventasActivas->count();
+            $ticketPromedio = $totalTickets > 0 ? round($totalVentasMonto / $totalTickets, 2) : 0.00;
+            $totalDevolucionesMonto = (float) $ventasAnuladas->sum('total_venta');
+            $totalMermasCosto = (float) $mermas->sum('costo_total_perdida');
+            $totalMermasCantidad = (int) $mermas->sum('cantidad_movimimiento');
+
+            $duracionMinutos = 0;
+            if ($turno->fecha_hora_apertura) {
+                $inicio = Carbon::parse($turno->fecha_hora_apertura);
+                $fin = $turno->fecha_hora_cierre ? Carbon::parse($turno->fecha_hora_cierre) : now();
+                $duracionMinutos = max(0, $inicio->diffInMinutes($fin));
+            }
+            $duracionHoras = floor($duracionMinutos / 60);
+            $duracionRestoMin = $duracionMinutos % 60;
+            $duracionTexto = $turno->fecha_hora_cierre
+                ? "{$duracionHoras}h {$duracionRestoMin}m"
+                : "En curso ({$duracionHoras}h {$duracionRestoMin}m)";
+
+            $turno->setAttribute('estadisticas', [
+                'total_ventas_brutas' => round($totalVentasMonto, 2),
+                'total_tickets' => $totalTickets,
+                'total_tickets_anulados' => $ventasAnuladas->count(),
+                'ticket_promedio' => $ticketPromedio,
+                'total_devoluciones_monto' => round($totalDevolucionesMonto, 2),
+                'total_mermas_costo' => round($totalMermasCosto, 2),
+                'total_mermas_cantidad' => $totalMermasCantidad,
+                'duracion_minutos' => $duracionMinutos,
+                'duracion_texto' => $duracionTexto,
+            ]);
 
             return response()->json($turno);
         });

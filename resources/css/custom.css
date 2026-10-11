@@ -391,10 +391,13 @@ html:not(.dark) .swal2-html-container {
     }
 
     /* Mostrar exclusivamente el área activa de impresión (Ticket Térmico o Libro Diario Fiscal) */
+    /* Mostrar exclusivamente el área activa de impresión (Ticket Térmico, Libro Diario Fiscal o Acta de Auditoría) */
     #printableReceiptArea,
     #printableReceiptArea *,
     #printableLibroDiarioArea,
-    #printableLibroDiarioArea * {
+    #printableLibroDiarioArea *,
+    #printableTurnoAuditoriaArea,
+    #printableTurnoAuditoriaArea * {
         visibility: visible !important;
     }
 
@@ -453,6 +456,45 @@ html:not(.dark) .swal2-html-container {
     }
 
     #printableLibroDiarioArea th {
+        background-color: #f1f5f9 !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        font-size: 8.5pt !important;
+    }
+
+    /* Formato Oficial de Acta de Auditoría y Arqueo de Turno (Carta / A4 Formal) */
+    #printableTurnoAuditoriaArea {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm 15mm !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+        font-size: 10pt !important;
+        line-height: 1.35 !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    #printableTurnoAuditoriaArea table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    #printableTurnoAuditoriaArea th,
+    #printableTurnoAuditoriaArea td {
+        border: 1px solid #000000 !important;
+        padding: 5px 8px !important;
+        color: #000000 !important;
+    }
+
+    #printableTurnoAuditoriaArea th {
         background-color: #f1f5f9 !important;
         font-weight: 800 !important;
         text-transform: uppercase !important;

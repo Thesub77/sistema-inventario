@@ -252,6 +252,9 @@
                 <!-- MODAL: ARQUEO Y CIERRE DE TURNO DE CAJA -->
                 @include('cajas.cajaCierreModal')
 
+                <!-- MODAL: AUDITORÍA INTEGRAL Y HISTORIAL DE TURNO DE CAJA -->
+                @include('cajas.turnoAuditoriaModal')
+
                 <!-- MODAL: CREAR / EDITAR CAJA FÍSICA -->
                 @include('cajas.cajaFormModal')
 
