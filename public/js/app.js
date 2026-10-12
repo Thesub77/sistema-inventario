@@ -4341,6 +4341,7 @@ function app() {
 
         // Estado de Historial de Turnos y Auditoría
         cajaActiveSubTab: 'cajas',
+        cajaViewMode: 'auto',
         showTurnoAuditoriaModal: false,
         loadingTurnoAuditoria: false,
         selectedTurnoAuditoria: null,
