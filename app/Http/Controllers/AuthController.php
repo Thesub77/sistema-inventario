@@ -22,6 +22,7 @@ class AuthController extends Controller
 
         $usuario = Usuario::with('rol')
             ->where('nombre_usuario', $validated['nombre_usuario'])
+            ->orderByDesc('estado')
             ->first();
 
         // Si el usuario existe pero está eliminado lógicamente del sistema
@@ -53,6 +54,22 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Su cuenta se encuentra inactiva o bloqueada por seguridad. Contacte al administrador del sistema.',
+            ], 403);
+        }
+
+        // Si el rol asignado está bloqueado o dado de baja
+        if ($usuario && $usuario->rol && ((int) ($usuario->rol->bloqueado ?? 0) === 1 || (int) ($usuario->rol->estado ?? 1) === 0)) {
+            Bitacora::create([
+                'id_usuario' => $usuario->usuario_id,
+                'accion_bitacora' => 'LOGIN_BLOQUEADO',
+                'descripcion_bitacora' => "Intento de inicio de sesión con rol inactivo o bloqueado: {$usuario->nombre_usuario} (Rol: {$usuario->rol->nombre_rol})",
+                'fecha_hora_bitacora' => now(),
+                'estado' => 1,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'El rol asignado a su cuenta se encuentra bloqueado o inactivo. Contacte al administrador del sistema.',
             ], 403);
         }
 

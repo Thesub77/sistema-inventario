@@ -2535,7 +2535,8 @@ function usuariosModule() {
             nombre_rol: '',
             descripcion_rol: '',
             permisos: [],
-            estado: 1
+            estado: 1,
+            bloqueado: 0
         },
 
         // Definición de grupos de permisos para la matriz dinámica
@@ -2789,13 +2790,7 @@ function usuariosModule() {
         // --- MÉTODOS DE USUARIOS ---
         openUserModal(user = null) {
             if (user && !this.canEditUser(user)) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'El Administrador Principal del sistema solo puede ser editado por sí mismo.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'El Administrador Principal del sistema solo puede ser editado por sí mismo.', 'warning');
                 return;
             }
             if (user) {
@@ -2857,6 +2852,8 @@ function usuariosModule() {
             // Solo enviar id_rol si está permitido modificarlo
             if (this.canChangeUserRole) {
                 payload.id_rol = Number(this.userForm.id_rol);
+            } else {
+                payload.id_rol = Number(this.userForm.id_rol);
             }
 
             // Solo enviar bloqueado si está permitido modificarlo; si está protegido, se mantiene en 0 (desbloqueado)
@@ -2864,6 +2861,15 @@ function usuariosModule() {
                 payload.bloqueado = Number(this.userForm.bloqueado);
             } else {
                 payload.bloqueado = 0;
+            }
+
+            // Validar que no se intente desbloquear o crear usuario activo con un rol desactivado o bloqueado
+            if (Number(payload.bloqueado) === 0) {
+                const targetRol = Array.isArray(this.roles) ? this.roles.find(r => Number(r.rol_id) === Number(payload.id_rol)) : null;
+                if (targetRol && (Number(targetRol.bloqueado) === 1 || Number(targetRol.estado) === 0)) {
+                    this.notify('Rol Inactivo', 'Antes de poder desbloquear a este usuario debe activar su rol o cambiárselo.', 'warning', 4000);
+                    return;
+                }
             }
 
             if (this.userForm.fecha_registro) {
@@ -2890,23 +2896,13 @@ function usuariosModule() {
                 this.showUserModal = false;
                 await this.fetchUsuarios();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: this.isEditingUser ? '¡Usuario Actualizado!' : '¡Usuario Creado!',
-                    text: `El usuario "${payload.nombre_usuario}" ha sido guardado exitosamente.`,
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify(
+                    this.isEditingUser ? '¡Usuario Actualizado!' : '¡Usuario Creado!',
+                    `El usuario "${payload.nombre_usuario}" ha sido guardado exitosamente.`,
+                    'success'
+                );
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo guardar',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo guardar', error.message, 'error');
             } finally {
                 this.isSavingUser = false;
             }
@@ -2915,36 +2911,18 @@ function usuariosModule() {
         // Bloquear / Desbloquear usuario con confirmación rápida
         async toggleUserStatus(u) {
             if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Acción No Permitida',
-                    text: 'No puedes bloquear o desactivar tu propia cuenta en sesión.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No puedes bloquear o desactivar tu propia cuenta en sesión.', 'info');
                 return;
             }
 
             if (this.isUserPrincipal(u)) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'No se puede desactivar o bloquear al Administrador Principal del sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No se puede desactivar o bloquear al Administrador Principal del sistema.', 'warning');
                 return;
             }
 
             const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
             if (esAdmin && Number(u.bloqueado) === 0 && this.activeAdminsCount <= 1) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'No se puede desactivar o bloquear al único Administrador activo del sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No se puede desactivar o bloquear al único Administrador activo del sistema.', 'warning');
                 return;
             }
 
@@ -2964,6 +2942,15 @@ function usuariosModule() {
             });
 
             if (!confirm.isConfirmed) return;
+
+            // Validación al dar "Sí" en el modal de desbloqueo: si el rol está inactivo o bloqueado, lanzar toast y no proceder
+            if (nuevoBloqueado === 0) {
+                const userRol = (Array.isArray(this.roles) ? this.roles.find(r => Number(r.rol_id) === Number(u.id_rol)) : null) || u.rol;
+                if (userRol && (Number(userRol.bloqueado) === 1 || Number(userRol.estado) === 0)) {
+                    this.notify('Rol Inactivo', 'Antes de poder desbloquear a este usuario debe activar su rol o cambiárselo.', 'warning', 4000);
+                    return;
+                }
+            }
 
             try {
                 const res = await this.apiFetch(`/api/usuarios/${u.usuario_id}`, {
@@ -2986,26 +2973,14 @@ function usuariosModule() {
                     2500
                 );
             } catch (err) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al cambiar estado',
-                    text: err.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cambiar estado', err.message, 'error');
             }
         },
 
         // --- MÉTODOS DE RESTABLECIMIENTO DE CONTRASEÑA ---
         openPasswordModal(u) {
             if (u && !this.canResetPassword(u)) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'No puedes restablecer la contraseña del Administrador Principal del sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No puedes restablecer la contraseña del Administrador Principal del sistema.', 'warning');
                 return;
             }
             this.passwordUser = u;
@@ -3040,13 +3015,7 @@ function usuariosModule() {
             if (this.isSavingPassword || !this.passwordUser) return;
 
             if (!this.newPasswordValue || this.newPasswordValue.length < 6) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Contraseña Muy Corta',
-                    text: 'La contraseña debe tener al menos 6 caracteres.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Contraseña Muy Corta', 'La contraseña debe tener al menos 6 caracteres.', 'warning');
                 return;
             }
 
@@ -3066,21 +3035,14 @@ function usuariosModule() {
 
                 this.showPasswordModal = false;
 
-                await Swal.fire({
-                    icon: 'success',
-                    title: '¡Contraseña Restablecida!',
-                    html: `Se ha asignado la nueva contraseña para <b>@${this.passwordUser.nombre_usuario}</b>.<br><br>Asegúrate de entregársela al usuario para que pueda acceder.`,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify(
+                    '¡Contraseña Restablecida!',
+                    `Se ha asignado la nueva contraseña para @${this.passwordUser.nombre_usuario}.`,
+                    'success',
+                    3500
+                );
             } catch (err) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al cambiar contraseña',
-                    text: err.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Error al cambiar contraseña', err.message, 'error');
             } finally {
                 this.isSavingPassword = false;
             }
@@ -3088,36 +3050,18 @@ function usuariosModule() {
 
         async deleteUser(u) {
             if (this.currentUser && Number(this.currentUser.usuario_id) === Number(u.usuario_id)) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Acción No Permitida',
-                    text: 'No puedes eliminar tu propia cuenta en sesión.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No puedes eliminar tu propia cuenta en sesión.', 'info');
                 return;
             }
 
             if (this.isUserPrincipal(u)) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'No se puede eliminar o desactivar al Administrador Principal del sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No se puede eliminar o desactivar al Administrador Principal del sistema.', 'warning');
                 return;
             }
 
             const esAdmin = u.rol && (u.rol.nombre_rol === 'Administrador' || (Array.isArray(u.rol.permisos) && u.rol.permisos.includes('*')));
             if (esAdmin && Number(u.estado) === 1 && this.activeAdminsCount <= 1) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Acción No Permitida',
-                    text: 'No se puede eliminar o desactivar al único Administrador activo del sistema.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Acción No Permitida', 'No se puede eliminar o desactivar al único Administrador activo del sistema.', 'warning');
                 return;
             }
 
@@ -3145,27 +3089,21 @@ function usuariosModule() {
                     this.notify('Usuario Eliminado', `"${u.nombre_usuario}" fue eliminado con éxito.`, 'success');
                     await this.fetchUsuarios();
                 } catch (err) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'No se pudo eliminar',
-                        text: err.message,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('No se pudo eliminar', err.message, 'error');
                 }
             }
         },
 
         // --- MÉTODOS DE ROLES & PERMISOS DINÁMICOS (JSON) ---
         openRolModal(rol = null) {
+            const esAdminEnSesion = this.currentUser && (this.currentUser.rol === 'Administrador' || (Array.isArray(this.currentUser.permisos) && this.currentUser.permisos.includes('*')));
+            if (!esAdminEnSesion) {
+                this.notify('Operación Denegada', 'Solo los administradores tienen autorización para gestionar roles.', 'warning');
+                return;
+            }
+
             if (rol && (rol.nombre_rol === 'Administrador' || (Array.isArray(rol.permisos) && rol.permisos.includes('*')))) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Rol Protegido',
-                    text: 'El rol Administrador es fundamental para el sistema y no puede ser modificado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Rol Protegido', 'El rol Administrador es fundamental para el sistema y no puede ser modificado.', 'info');
                 return;
             }
 
@@ -3176,7 +3114,8 @@ function usuariosModule() {
                     nombre_rol: rol.nombre_rol || '',
                     descripcion_rol: rol.descripcion_rol || '',
                     permisos: Array.isArray(rol.permisos) ? [...rol.permisos] : [],
-                    estado: rol.estado !== undefined ? Number(rol.estado) : 1
+                    estado: rol.estado !== undefined ? Number(rol.estado) : 1,
+                    bloqueado: rol.bloqueado !== undefined ? Number(rol.bloqueado) : 0
                 };
             } else {
                 this.isEditingRol = false;
@@ -3185,7 +3124,8 @@ function usuariosModule() {
                     nombre_rol: '',
                     descripcion_rol: '',
                     permisos: ['pos.acceso', 'ventas.crear'],
-                    estado: 1
+                    estado: 1,
+                    bloqueado: 0
                 };
             }
             this.showRolModal = true;
@@ -3242,26 +3182,20 @@ function usuariosModule() {
         async saveRol() {
             if (this.isSavingRol) return;
 
+            const esAdminEnSesion = this.currentUser && (this.currentUser.rol === 'Administrador' || (Array.isArray(this.currentUser.permisos) && this.currentUser.permisos.includes('*')));
+            if (!esAdminEnSesion) {
+                this.notify('Operación Denegada', 'Solo los administradores tienen autorización para crear o modificar roles.', 'warning');
+                return;
+            }
+
             if (this.isEditingRol && (this.rolForm.nombre_rol === 'Administrador' || (this.roles.find(r => r.rol_id === this.rolForm.rol_id)?.nombre_rol === 'Administrador'))) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Operación No Permitida',
-                    text: 'El rol Administrador es inmutable y no puede ser modificado.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Operación Denegada', 'El rol Administrador es inmutable y no puede ser modificado.', 'warning');
                 return;
             }
 
             const nombre = (this.rolForm.nombre_rol || '').trim();
             if (!nombre) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Nombre Requerido',
-                    text: 'Debe ingresar un nombre identificador para el rol.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Nombre Requerido', 'Debe ingresar un nombre identificador para el rol.', 'warning');
                 return;
             }
 
@@ -3274,7 +3208,8 @@ function usuariosModule() {
                 nombre_rol: nombre,
                 descripcion_rol: (this.rolForm.descripcion_rol || '').trim(),
                 permisos: Array.isArray(this.rolForm.permisos) ? this.rolForm.permisos : [],
-                estado: Number(this.rolForm.estado)
+                estado: Number(this.rolForm.estado ?? 1),
+                bloqueado: Number(this.rolForm.bloqueado ?? 0)
             };
 
             this.isSavingRol = true;
@@ -3293,37 +3228,27 @@ function usuariosModule() {
                 this.showRolModal = false;
                 await this.fetchUsuarios();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: this.isEditingRol ? '¡Rol Actualizado!' : '¡Rol Creado!',
-                    text: `El rol "${payload.nombre_rol}" ha sido configurado con éxito.`,
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify(
+                    this.isEditingRol ? '¡Rol Actualizado!' : '¡Rol Creado!',
+                    `El rol "${payload.nombre_rol}" ha sido configurado con éxito.`,
+                    'success'
+                );
             } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo guardar el rol',
-                    html: error.message,
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('No se pudo guardar el rol', error.message, 'error');
             } finally {
                 this.isSavingRol = false;
             }
         },
 
         async deleteRol(rol) {
+            const esAdminEnSesion = this.currentUser && (this.currentUser.rol === 'Administrador' || (Array.isArray(this.currentUser.permisos) && this.currentUser.permisos.includes('*')));
+            if (!esAdminEnSesion) {
+                this.notify('Operación Denegada', 'Solo los administradores tienen autorización para eliminar roles.', 'warning');
+                return;
+            }
+
             if (rol.nombre_rol === 'Administrador') {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Operación Denegada',
-                    text: 'El rol Administrador es fundamental para el sistema y no puede eliminarse.',
-                    background: this.darkMode ? '#1e293b' : '#ffffff',
-                    color: this.darkMode ? '#fff' : '#0f172a'
-                });
+                this.notify('Operación Denegada', 'El rol Administrador es fundamental para el sistema y no puede eliminarse.', 'warning');
                 return;
             }
 
@@ -3352,18 +3277,13 @@ function usuariosModule() {
                     this.notify('Rol Eliminado', `"${rol.nombre_rol}" fue eliminado.`, 'success');
                     await this.fetchUsuarios();
                 } catch (err) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'No se pudo eliminar el rol',
-                        text: err.message,
-                        background: this.darkMode ? '#1e293b' : '#ffffff',
-                        color: this.darkMode ? '#fff' : '#0f172a'
-                    });
+                    this.notify('No se pudo eliminar el rol', err.message, 'error');
                 }
             }
         }
     };
 }
+
 
 // 10. Módulo de Punto de Venta (POS)
 function posModule() {

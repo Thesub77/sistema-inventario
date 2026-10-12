@@ -64,16 +64,16 @@
                 </div>
             </div>
 
-            <!-- Estado Activo / Inactivo -->
+            <!-- Estado Activo / Bloqueado -->
             <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
                 <div>
                     <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Estado del Rol</span>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Los roles inactivos no pueden asignarse a nuevos usuarios</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Desactivar o bloquear este rol inhabilitará el acceso a sus usuarios asignados</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" :checked="Number(rolForm.estado) === 1"
+                    <input type="checkbox" :checked="Number(rolForm.bloqueado) === 0"
                         :disabled="isEditingRol && rolForm.nombre_rol === 'Administrador'"
-                        @change="rolForm.estado = $event.target.checked ? 1 : 0"
+                        @change="rolForm.bloqueado = $event.target.checked ? 0 : 1"
                         class="sr-only peer">
                     <div class="w-10 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                 </label>

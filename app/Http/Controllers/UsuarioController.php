@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
+use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,13 @@ class UsuarioController extends Controller
         $validated = $request->validate([
             'id_rol' => 'required|integer|exists:rol,rol_id',
             'nombre_apellido' => 'required|string|min:3|max:128',
-            'nombre_usuario' => 'required|string|min:3|max:24|unique:usuario,nombre_usuario',
+            'nombre_usuario' => [
+                'required',
+                'string',
+                'min:3',
+                'max:24',
+                Rule::unique('usuario', 'nombre_usuario')->where(fn ($query) => $query->where('estado', 1)),
+            ],
             'contrasenia_usuario' => 'required|string|min:6|max:256',
             'fecha_registro' => 'nullable|date',
             'estado' => 'sometimes|integer|in:0,1',
@@ -56,6 +63,18 @@ class UsuarioController extends Controller
 
         $validated['estado'] = $validated['estado'] ?? 1;
         $validated['bloqueado'] = $validated['bloqueado'] ?? 0;
+
+        // Blindaje: No permitir usuario activo/desbloqueado con un rol inactivo o bloqueado
+        if ((int) $validated['bloqueado'] === 0) {
+            $rolAsignado = Rol::find($validated['id_rol']);
+            if ($rolAsignado && ((int) ($rolAsignado->bloqueado ?? 0) === 1 || (int) $rolAsignado->estado === 0)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Antes de poder desbloquear a este usuario debe activar su rol o cambiárselo.',
+                ], 422);
+            }
+        }
+
         $validated['contrasenia_usuario'] = Hash::make($validated['contrasenia_usuario']);
 
         $usuario = Usuario::create($validated);
@@ -83,7 +102,9 @@ class UsuarioController extends Controller
                 'string',
                 'min:3',
                 'max:24',
-                Rule::unique('usuario', 'nombre_usuario')->ignore($usuario->usuario_id, 'usuario_id'),
+                Rule::unique('usuario', 'nombre_usuario')
+                    ->ignore($usuario->usuario_id, 'usuario_id')
+                    ->where(fn ($query) => $query->where('estado', 1)),
             ],
             'contrasenia_usuario' => 'nullable|string|min:6|max:256',
             'fecha_registro' => 'sometimes|date',
@@ -150,6 +171,15 @@ class UsuarioController extends Controller
                     ], 403);
                 }
             }
+
+            $nuevoRol = Rol::find($validated['id_rol']);
+            $finalBloqueado = array_key_exists('bloqueado', $validated) ? (int) $validated['bloqueado'] : (int) $usuario->bloqueado;
+            if ($nuevoRol && ((int) ($nuevoRol->bloqueado ?? 0) === 1 || (int) $nuevoRol->estado === 0) && $finalBloqueado === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Antes de poder desbloquear a este usuario debe activar su rol o cambiárselo.',
+                ], 422);
+            }
         }
 
         // 3. Blindaje Bloqueo (bloqueado = 0 / 1):
@@ -193,6 +223,16 @@ class UsuarioController extends Controller
                     'estado' => 1,
                 ]);
             } else {
+                // Desbloqueo: Verificar que el rol no esté bloqueado ni inactivo (bloqueado = 1 o estado = 0)
+                $targetRolId = $validated['id_rol'] ?? $usuario->id_rol;
+                $rolActual = Rol::find($targetRolId);
+                if ($rolActual && ((int) ($rolActual->bloqueado ?? 0) === 1 || (int) $rolActual->estado === 0)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Antes de poder desbloquear a este usuario debe activar su rol o cambiárselo.',
+                    ], 422);
+                }
+
                 Bitacora::create([
                     'id_usuario' => $usuario->usuario_id,
                     'accion_bitacora' => 'USUARIO_DESBLOQUEADO',
