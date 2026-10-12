@@ -2780,10 +2780,10 @@ function usuariosModule() {
             return '';
         },
 
-        // Contador auxiliar de usuarios por rol
+        // Contador auxiliar de usuarios por rol (usuarios activos en el sistema)
         countUsersInRole(rolId) {
             if (!Array.isArray(this.usuarios)) return 0;
-            return this.usuarios.filter(u => Number(u.id_rol) === Number(rolId)).length;
+            return this.usuarios.filter(u => Number(u.id_rol) === Number(rolId) && Number(u.estado ?? 1) === 1).length;
         },
 
         // --- MÉTODOS DE USUARIOS ---

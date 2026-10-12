@@ -61,10 +61,6 @@
             </div>
             <div class="text-2xl font-display font-black text-slate-900 dark:text-white"
                 x-text="usuarios.length"></div>
-            <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Cuentas creadas:</span>
-                <span class="font-bold text-slate-700 dark:text-slate-200" x-text="usuarios.length + ' usuarios'"></span>
-            </div>
         </div>
 
         <!-- Usuarios Activos -->
@@ -77,10 +73,6 @@
             </div>
             <div class="text-2xl font-display font-black text-emerald-600 dark:text-emerald-400"
                 x-text="usuarios.filter(u => Number(u.bloqueado) === 0).length"></div>
-            <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Con acceso al sistema:</span>
-                <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="usuarios.filter(u => Number(u.bloqueado) === 0).length + ' activos'"></span>
-            </div>
         </div>
 
         <!-- Usuarios Inactivos / Bloqueados -->
@@ -93,10 +85,6 @@
             </div>
             <div class="text-2xl font-display font-black text-rose-600 dark:text-rose-400"
                 x-text="usuarios.filter(u => Number(u.bloqueado) === 1).length"></div>
-            <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Sin acceso:</span>
-                <span class="font-bold text-rose-600 dark:text-rose-400" x-text="usuarios.filter(u => Number(u.bloqueado) === 1).length + ' bloqueados'"></span>
-            </div>
         </div>
 
         <!-- Roles Configurados -->
@@ -109,10 +97,6 @@
             </div>
             <div class="text-2xl font-display font-black text-indigo-600 dark:text-indigo-400"
                 x-text="roles.length"></div>
-            <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Perfiles de seguridad:</span>
-                <span class="font-bold text-slate-700 dark:text-slate-200" x-text="roles.length + ' roles'"></span>
-            </div>
         </div>
     </div>
 
@@ -124,7 +108,7 @@
                 : 'bg-slate-100 dark:bg-dark-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
             class="px-4 py-2 rounded-xl text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer">
             <i data-lucide="users" class="w-4 h-4"></i>
-            <span>Cuentas de Usuarios</span>
+            <span>Cuentas de Usuario</span>
             <span class="px-1.5 py-0.2 rounded-md text-[10px] bg-white/20" x-text="usuarios.length"></span>
         </button>
 
@@ -134,7 +118,7 @@
                 : 'bg-slate-100 dark:bg-dark-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
             class="px-4 py-2 rounded-xl text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer">
             <i data-lucide="shield" class="w-4 h-4"></i>
-            <span>Roles & Privilegios Dinámicos</span>
+            <span>Roles & Privilegios</span>
             <span class="px-1.5 py-0.2 rounded-md text-[10px] bg-white/20" x-text="roles.length"></span>
         </button>
     </div>
@@ -167,14 +151,10 @@
                     <select x-model="userStatusFilter"
                         class="bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-brand-500 transition-colors cursor-pointer">
                         <option value="">Todos los Estados</option>
-                        <option value="activos">Activos (Desbloqueados)</option>
+                        <option value="activos">Activos</option>
                         <option value="bloqueados">Bloqueados</option>
                     </select>
                 </div>
-            </div>
-
-            <div class="text-xs text-slate-500 dark:text-slate-400">
-                Mostrando <span class="font-bold text-slate-800 dark:text-slate-200" x-text="filteredUsersList.length"></span> de <span x-text="usuarios.length"></span> usuarios
             </div>
         </div>
 
@@ -316,15 +296,7 @@
                     <i data-lucide="shield-check" class="w-4 h-4 text-indigo-500"></i>
                     <span>Catálogo de Roles y Privilegios en el Sistema</span>
                 </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Cada rol define los módulos y acciones autorizadas en la base de datos (campo JSON).
-                </p>
             </div>
-            <button type="button" @click="openRolModal()"
-                class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                <span>Nuevo Rol</span>
-            </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -385,7 +357,7 @@
 
                     <!-- Pie de la tarjeta -->
                     <div class="pt-3 mt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                        <span x-text="(r.usuarios_count !== undefined ? r.usuarios_count : countUsersInRole(r.rol_id)) + ' usuarios asignados'"></span>
+                        <span x-text="countUsersInRole(r.rol_id) + ' usuarios asignados'"></span>
                         <div class="flex items-center gap-1">
                             <template x-if="r.nombre_rol !== 'Administrador'">
                                 <div class="flex items-center gap-1">

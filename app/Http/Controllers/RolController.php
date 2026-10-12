@@ -11,7 +11,9 @@ class RolController extends Controller
 {
     public function index()
     {
-        $roles = Rol::withCount('usuarios')->get();
+        $roles = Rol::withCount(['usuarios' => function ($query) {
+            $query->where('estado', 1);
+        }])->get();
 
         return response()->json($roles);
     }
@@ -37,7 +39,9 @@ class RolController extends Controller
 
     public function show($id)
     {
-        $rol = Rol::with('usuarios')->findOrFail($id);
+        $rol = Rol::with(['usuarios' => function ($query) {
+            $query->where('estado', 1);
+        }])->findOrFail($id);
 
         return response()->json($rol);
     }
@@ -101,7 +105,7 @@ class RolController extends Controller
             ], 403);
         }
 
-        if ($rol->usuarios()->exists()) {
+        if ($rol->usuarios()->where('estado', 1)->exists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'No se puede eliminar el rol porque tiene usuarios asignados. Reasigne los usuarios antes de eliminarlo.',
