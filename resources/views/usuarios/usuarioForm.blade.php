@@ -47,19 +47,21 @@
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                             Rol & Perfil de Acceso <span class="text-rose-500">*</span>
                         </label>
-                        <button type="button" @click="openRolModal()"
-                            class="text-xs text-brand-500 hover:text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                            <span>Crear Nuevo Rol</span>
-                        </button>
+                        <template x-if="currentUser?.rol === 'Administrador' || (Array.isArray(currentUser?.permisos) && currentUser?.permisos.includes('*'))">
+                            <button type="button" @click="openRolModal()"
+                                class="text-xs text-brand-500 hover:text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                <span>Crear Nuevo Rol</span>
+                            </button>
+                        </template>
                     </div>
                     <select x-model.number="userForm.id_rol" required
                         class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer">
                         <option value="" disabled>Selecciona un rol</option>
                         <template x-for="r in roles" :key="r.rol_id">
                             <option :value="r.rol_id"
-                                :disabled="Number(r.estado) === 0"
-                                x-text="r.nombre_rol + (Number(r.estado) === 0 ? ' (Inactivo)' : '')"></option>
+                                :disabled="Number(r.bloqueado) === 1 || Number(r.estado) === 0"
+                                x-text="r.nombre_rol + (Number(r.bloqueado) === 1 ? ' (Bloqueado)' : (Number(r.estado) === 0 ? ' (Inactivo)' : ''))"></option>
                         </template>
                     </select>
                     <!-- Resumen de permisos del rol seleccionado -->

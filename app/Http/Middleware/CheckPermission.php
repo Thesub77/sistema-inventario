@@ -24,10 +24,10 @@ class CheckPermission
             ], 401);
         }
 
-        if ((int) $usuario->estado !== 1 || (int) ($usuario->bloqueado ?? 0) === 1) {
+        if ((int) $usuario->estado !== 1 || (int) ($usuario->bloqueado ?? 0) === 1 || ($usuario->rol && ((int) ($usuario->rol->bloqueado ?? 0) === 1 || (int) ($usuario->rol->estado ?? 1) === 0))) {
             return response()->json([
                 'success' => false,
-                'message' => 'Su cuenta se encuentra inactiva o bloqueada. Comuníquese con el administrador.',
+                'message' => 'Su cuenta o rol se encuentra inactivo o bloqueado. Comuníquese con el administrador.',
             ], 403);
         }
 

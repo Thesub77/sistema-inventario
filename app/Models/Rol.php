@@ -17,10 +17,13 @@ class Rol extends Model
         'descripcion_rol',
         'permisos',
         'estado',
+        'bloqueado',
     ];
 
     protected $casts = [
         'permisos' => 'array',
+        'estado' => 'integer',
+        'bloqueado' => 'integer',
     ];
 
     public function usuarios()

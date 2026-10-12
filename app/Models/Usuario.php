@@ -67,7 +67,7 @@ class Usuario extends Authenticatable
 
     public function esAdmin(): bool
     {
-        return $this->rol && $this->rol->nombre_rol === 'Administrador';
+        return $this->rol && ($this->rol->nombre_rol === 'Administrador' || in_array('*', $this->rol->permisos ?? [], true));
     }
 
     public function esAdminPrincipal(): bool
