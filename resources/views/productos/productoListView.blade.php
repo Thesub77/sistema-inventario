@@ -27,9 +27,16 @@
                     <option :value="cat.categoria_id" x-text="cat.nombre_categoria"></option>
                 </template>
             </select>
+
+            <!-- Product Type Filter (Estándar / Combo) -->
+            <select x-model="filterTipoProducto" class="bg-dark-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+                <option value="">Todos los tipos</option>
+                <option value="estandar">Individuales / Estándar</option>
+                <option value="combo">Combos / Compuestos</option>
+            </select>
         </div>
 
-        <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all">
+        <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>Agregar Producto</span>
         </button>
@@ -56,7 +63,12 @@
                         <tr class="hover:bg-slate-800/40 transition-colors">
                             <td class="py-3.5 px-4 font-mono text-xs font-semibold text-brand-600 dark:text-indigo-400" x-text="p.codigo_producto"></td>
                             <td class="py-3.5 px-4">
-                                <div class="font-semibold text-slate-100" x-text="p.nombre_producto"></div>
+                                <div class="flex items-center gap-2">
+                                    <div class="font-semibold text-slate-100" x-text="p.nombre_producto"></div>
+                                    <span x-show="p.tipo_producto === 'combo'" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                                        Combo
+                                    </span>
+                                </div>
                                 <div class="text-xs text-slate-400 truncate max-w-xs" x-text="p.descripcion_producto"></div>
                             </td>
                             <td class="py-3.5 px-4">
@@ -66,13 +78,20 @@
                             <td class="py-3.5 px-4 text-right text-slate-400 font-medium" x-text="formatCurrency(p.costo_compra)"></td>
                             <td class="py-3.5 px-4 text-right font-bold text-emerald-400" x-text="formatCurrency(p.precio_venta)"></td>
                             <td class="py-3.5 px-4 text-center">
-                                <span class="px-2.5 py-1 text-xs font-bold rounded-lg inline-flex items-center gap-1"
-                                    :class="p.existencia_bodega <= p.existencia_minima 
-                                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                                                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'">
-                                    <span x-text="p.existencia_bodega + ' uds.'"></span>
-                                    <i x-show="p.existencia_bodega <= p.existencia_minima" data-lucide="alert-circle" class="w-3 h-3"></i>
-                                </span>
+                                <template x-if="p.tipo_producto === 'combo'">
+                                    <span class="px-2.5 py-1 text-xs font-bold rounded-lg inline-flex items-center gap-1 bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                                        <span x-text="p.existencia_bodega + ' combos'"></span>
+                                    </span>
+                                </template>
+                                <template x-if="p.tipo_producto !== 'combo'">
+                                    <span class="px-2.5 py-1 text-xs font-bold rounded-lg inline-flex items-center gap-1"
+                                        :class="p.existencia_bodega <= p.existencia_minima 
+                                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'">
+                                        <span x-text="p.existencia_bodega + ' uds.'"></span>
+                                        <i x-show="p.existencia_bodega <= p.existencia_minima" data-lucide="alert-circle" class="w-3 h-3"></i>
+                                    </span>
+                                </template>
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <span class="px-2 py-0.5 text-xs rounded-full font-medium"
@@ -82,15 +101,18 @@
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <!-- Edit Button -->
-                                    <button @click="openProductModal(p)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors" title="Editar Producto">
+                                    <button @click="openProductModal(p)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Editar Producto">
                                         <i data-lucide="edit-3" class="w-4 h-4"></i>
                                     </button>
-                                    <!-- Quick Stock Adjustment -->
-                                    <button @click="openStockModal(p)" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors" title="Ajustar Inventario">
+                                    <!-- Quick Stock Adjustment (Solo para productos estándar) -->
+                                    <button x-show="p.tipo_producto !== 'combo'" @click="openStockModal(p)" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ajustar Inventario">
                                         <i data-lucide="package-plus" class="w-4 h-4"></i>
                                     </button>
+                                    <span x-show="p.tipo_producto === 'combo'" class="p-1.5 text-slate-600 cursor-not-allowed" title="Los combos se componen de productos individuales; ajuste el stock de sus componentes">
+                                        <i data-lucide="layers" class="w-4 h-4"></i>
+                                    </span>
                                     <!-- Delete Button -->
-                                    <button @click="deleteProduct(p)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors" title="Eliminar Producto">
+                                    <button @click="deleteProduct(p)" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Eliminar Producto">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                     </button>
                                 </div>

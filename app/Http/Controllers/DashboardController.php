@@ -109,9 +109,10 @@ class DashboardController extends Controller
             'utilidadBrutaMes' => round($utilidadBrutaMes, 2),
         ];
 
-        // 3. Alertas de Stock Bajo - RF-13
+        // 3. Alertas de Stock Bajo - RF-13 (Excluye combos ya que dependen de componentes)
         $productosAlerta = Producto::with('categoria:categoria_id,nombre_categoria')
             ->where('estado', 1)
+            ->where('tipo_producto', '!=', 'combo')
             ->whereColumn('existencia_bodega', '<=', 'existencia_minima')
             ->orderBy('existencia_bodega', 'asc')
             ->get();

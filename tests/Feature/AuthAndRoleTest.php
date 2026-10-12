@@ -253,18 +253,21 @@ class AuthAndRoleTest extends TestCase
     {
         Sanctum::actingAs($this->admin);
 
-        // Cajero tiene token activo y estado 1
+        // Cajero tiene token activo y estado 1, bloqueado 0
         $tokenCajero = $this->cajero->createToken('cajero-token')->plainTextToken;
         $this->assertEquals(1, (int) $this->cajero->estado);
+        $this->assertEquals(0, (int) $this->cajero->bloqueado);
         $this->assertDatabaseHas('personal_access_tokens', [
             'tokenable_id' => $this->cajero->usuario_id,
         ]);
 
-        // Desactivamos el rol Cajero
+        // Bloqueamos/desactivamos el rol Cajero usando bloqueado = 1
         $res = $this->putJson('/api/roles/'.$this->rolCajero->rol_id, [
-            'estado' => 0,
+            'bloqueado' => 1,
         ]);
         $res->assertStatus(200);
+        $this->assertEquals(1, (int) $this->rolCajero->fresh()->bloqueado);
+        $this->assertEquals(1, (int) $this->rolCajero->fresh()->estado);
 
         // Verificar que el cajero quedó bloqueado (bloqueado = 1) sin ser eliminado (estado = 1)
         $this->cajero->refresh();
@@ -289,5 +292,252 @@ class AuthAndRoleTest extends TestCase
         ]);
         $resLogin->assertStatus(403);
         $this->assertStringContainsString('inactiva o bloqueada', $resLogin->json('message'));
+    }
+
+    public function test_roles_conteo_usuarios_ignora_eliminados_logicos_y_cuenta_activos_bloqueados(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Crear otro admin activo (total 2 admins activos)
+        Usuario::create([
+            'id_rol' => $this->rolAdmin->rol_id,
+            'nombre_apellido' => 'Admin Dos',
+            'nombre_usuario' => 'admin2',
+            'contrasenia_usuario' => Hash::make('admin123'),
+            'fecha_registro' => now(),
+            'estado' => 1,
+            'bloqueado' => 0,
+        ]);
+
+        // Crear un admin eliminado lógicamente (estado = 0) -> NO debe contarse
+        Usuario::create([
+            'id_rol' => $this->rolAdmin->rol_id,
+            'nombre_apellido' => 'Admin Eliminado',
+            'nombre_usuario' => 'admin_del',
+            'contrasenia_usuario' => Hash::make('admin123'),
+            'fecha_registro' => now(),
+            'estado' => 0,
+            'bloqueado' => 0,
+        ]);
+
+        // Crear un cajero bloqueado (estado = 1, bloqueado = 1) -> debe contarse como usuario asignado
+        Usuario::create([
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Cajero Bloqueado',
+            'nombre_usuario' => 'cajero_bloq',
+            'contrasenia_usuario' => Hash::make('cajero123'),
+            'fecha_registro' => now(),
+            'estado' => 1,
+            'bloqueado' => 1,
+        ]);
+
+        $res = $this->getJson('/api/roles');
+        $res->assertStatus(200);
+
+        $adminRol = collect($res->json())->firstWhere('nombre_rol', 'Administrador');
+        $cajeroRol = collect($res->json())->firstWhere('nombre_rol', 'Cajero');
+
+        // Admin debe tener exactamente 2 usuarios asignados (ignora al eliminado con estado = 0)
+        $this->assertEquals(2, $adminRol['usuarios_count']);
+
+        // Cajero debe tener 2 usuarios asignados ($this->cajero activo + cajero_bloq)
+        $this->assertEquals(2, $cajeroRol['usuarios_count']);
+    }
+
+    public function test_desbloquear_usuario_con_rol_bloqueado_es_rechazado(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Bloqueamos el rol Cajero
+        $this->rolCajero->update(['bloqueado' => 1]);
+        $this->cajero->update(['bloqueado' => 1]);
+
+        // Intentar desbloquear al cajero con su rol bloqueado debe ser rechazado con 422
+        $res = $this->putJson("/api/usuarios/{$this->cajero->usuario_id}", [
+            'bloqueado' => 0,
+        ]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('debe activar su rol o cambiárselo', $res->json('message'));
+        $this->assertEquals(1, (int) $this->cajero->fresh()->bloqueado);
+
+        // Si se desbloquea el rol Cajero (bloqueado = 0), ahora sí se puede desbloquear al usuario
+        $this->rolCajero->update(['bloqueado' => 0]);
+
+        $res2 = $this->putJson("/api/usuarios/{$this->cajero->usuario_id}", [
+            'bloqueado' => 0,
+        ]);
+
+        $res2->assertStatus(200);
+        $this->assertEquals(0, (int) $this->cajero->fresh()->bloqueado);
+    }
+
+    public function test_eliminacion_logica_de_rol_utiliza_estado_cero_y_no_se_lista(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $rolTemporal = Rol::create([
+            'nombre_rol' => 'Temporal',
+            'descripcion_rol' => 'Rol para probar eliminación',
+            'permisos' => ['pos.acceso'],
+            'estado' => 1,
+            'bloqueado' => 0,
+        ]);
+
+        // Eliminar el rol
+        $resDelete = $this->deleteJson("/api/roles/{$rolTemporal->rol_id}");
+        $resDelete->assertStatus(200);
+        $resDelete->assertJsonPath('success', true);
+
+        // En BD sigue existiendo, pero con estado = 0
+        $this->assertDatabaseHas('rol', [
+            'rol_id' => $rolTemporal->rol_id,
+            'estado' => 0,
+        ]);
+
+        // En /api/roles no aparece
+        $resIndex = $this->getJson('/api/roles');
+        $resIndex->assertStatus(200);
+        $this->assertNull(collect($resIndex->json())->firstWhere('rol_id', $rolTemporal->rol_id));
+    }
+
+    public function test_crear_rol_con_mismo_nombre_que_un_rol_eliminado_logicamente_es_permitido(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Crear un rol y luego eliminarlo lógicamente
+        $rolViejo = Rol::create([
+            'nombre_rol' => 'Supervisor',
+            'descripcion_rol' => 'Supervisor anterior',
+            'permisos' => ['pos.acceso'],
+            'estado' => 0,
+            'bloqueado' => 0,
+        ]);
+
+        // Crear un nuevo rol con el mismo nombre debe ser exitoso
+        $res = $this->postJson('/api/roles', [
+            'nombre_rol' => 'Supervisor',
+            'descripcion_rol' => 'Supervisor nuevo',
+            'permisos' => ['pos.acceso', 'ventas.ver'],
+        ]);
+        $res->assertStatus(201);
+        $this->assertDatabaseCount('rol', 4); // rolAdmin, rolCajero, rolViejo, rolNuevo
+
+        // Intentar crearlo de nuevo con el mismo nombre mientras hay uno activo (estado = 1) debe fallar con 422
+        $resDuplicado = $this->postJson('/api/roles', [
+            'nombre_rol' => 'Supervisor',
+            'descripcion_rol' => 'Otro supervisor duplicado',
+            'permisos' => ['pos.acceso'],
+        ]);
+        $resDuplicado->assertStatus(422);
+        $resDuplicado->assertJsonValidationErrors('nombre_rol');
+    }
+
+    public function test_crear_usuario_con_mismo_nombre_usuario_que_uno_eliminado_logicamente_es_permitido(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Crear un usuario y darlo de baja lógica
+        $usuarioViejo = Usuario::create([
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Antiguo Cajero',
+            'nombre_usuario' => 'antiguo_cajero',
+            'contrasenia_usuario' => Hash::make('claveVieja123'),
+            'fecha_registro' => now(),
+            'estado' => 0,
+            'bloqueado' => 0,
+        ]);
+
+        // Crear un nuevo usuario activo con el mismo nombre_usuario debe ser exitoso
+        $res = $this->postJson('/api/usuarios', [
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Nuevo Cajero',
+            'nombre_usuario' => 'antiguo_cajero',
+            'contrasenia_usuario' => 'claveNueva123',
+            'bloqueado' => 0,
+        ]);
+        $res->assertStatus(201);
+
+        // Iniciar sesión con la nueva cuenta debe ser exitoso
+        $this->app['auth']->forgetGuards();
+        $resLogin = $this->postJson('/api/auth/login', [
+            'nombre_usuario' => 'antiguo_cajero',
+            'contrasenia_usuario' => 'claveNueva123',
+        ]);
+        $resLogin->assertStatus(200);
+        $resLogin->assertJsonPath('success', true);
+
+        // Intentar registrar otro con el mismo nombre_usuario mientras hay uno activo debe fallar con 422
+        Sanctum::actingAs($this->admin);
+        $resDuplicado = $this->postJson('/api/usuarios', [
+            'id_rol' => $this->rolCajero->rol_id,
+            'nombre_apellido' => 'Tercer Cajero',
+            'nombre_usuario' => 'antiguo_cajero',
+            'contrasenia_usuario' => 'claveOtra123',
+        ]);
+        $resDuplicado->assertStatus(422);
+        $resDuplicado->assertJsonValidationErrors('nombre_usuario');
+    }
+
+    public function test_usuario_no_admin_no_puede_crear_editar_ni_eliminar_roles(): void
+    {
+        // 1. Caso Cajero básico (sin permiso usuarios.gestionar)
+        Sanctum::actingAs($this->cajero);
+
+        $resPostCajero = $this->postJson('/api/roles', [
+            'nombre_rol' => 'Rol Ilegal 1',
+            'permisos' => ['pos.acceso'],
+        ]);
+        $resPostCajero->assertStatus(403);
+
+        $resPutCajero = $this->putJson('/api/roles/'.$this->rolCajero->rol_id, [
+            'descripcion_rol' => 'Intento de edicion',
+        ]);
+        $resPutCajero->assertStatus(403);
+
+        $resDeleteCajero = $this->deleteJson('/api/roles/'.$this->rolCajero->rol_id);
+        $resDeleteCajero->assertStatus(403);
+
+        // 2. Caso Usuario con permiso 'usuarios.gestionar' pero rol NO Administrador (ej. RRHH / Supervisor)
+        $rolRRHH = Rol::create([
+            'nombre_rol' => 'Recursos Humanos',
+            'descripcion_rol' => 'Solo gestión de usuarios',
+            'permisos' => ['usuarios.gestionar'],
+            'estado' => 1,
+            'bloqueado' => 0,
+        ]);
+
+        $usuarioRRHH = Usuario::create([
+            'id_rol' => $rolRRHH->rol_id,
+            'nombre_apellido' => 'Gestor Usuarios',
+            'nombre_usuario' => 'rrhh_user',
+            'contrasenia_usuario' => Hash::make('rrhh123'),
+            'fecha_registro' => now(),
+            'estado' => 1,
+            'bloqueado' => 0,
+        ]);
+
+        Sanctum::actingAs($usuarioRRHH);
+
+        // Puede listar roles para asignarlos en formulario de usuario
+        $resGetRRHH = $this->getJson('/api/roles');
+        $resGetRRHH->assertStatus(200);
+
+        // Pero NO puede crear roles
+        $resPostRRHH = $this->postJson('/api/roles', [
+            'nombre_rol' => 'Rol Ilegal 2',
+            'permisos' => ['*'],
+        ]);
+        $resPostRRHH->assertStatus(403);
+
+        // Tampoco puede editar roles
+        $resPutRRHH = $this->putJson('/api/roles/'.$this->rolCajero->rol_id, [
+            'descripcion_rol' => 'Modificacion ilegal',
+        ]);
+        $resPutRRHH->assertStatus(403);
+
+        // Tampoco puede eliminar roles
+        $resDeleteRRHH = $this->deleteJson('/api/roles/'.$this->rolCajero->rol_id);
+        $resDeleteRRHH->assertStatus(403);
     }
 }

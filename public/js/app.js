@@ -1740,19 +1740,24 @@ function productosModule() {
     return {
         searchProduct: '',
         filterCategory: '',
+        filterTipoProducto: '',
         showProductModal: false,
         isEditingProduct: false,
+        comboNuevoComponenteId: '',
+        comboNuevaCantidad: 1,
         productForm: {
             producto_id: null,
             id_categoria: '',
             codigo_producto: '',
             nombre_producto: '',
+            tipo_producto: 'estandar',
             descripcion_producto: '',
             costo_compra: 0,
             precio_venta: 0,
             existencia_bodega: 10,
             existencia_minima: 5,
             estado: 1,
+            componentes: [],
         },
 
         showStockModal: false,
@@ -1769,10 +1774,108 @@ function productosModule() {
             numero_factura_recibo: '',
         },
 
+        // Helper methods for combo management
+        setProductTipo(tipo) {
+            this.productForm.tipo_producto = tipo;
+            if (tipo === 'combo') {
+                this.productForm.existencia_bodega = 0;
+                if (!Array.isArray(this.productForm.componentes)) {
+                    this.productForm.componentes = [];
+                }
+            }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        get productosDisponiblesParaCombo() {
+            return (this.productos || []).filter(p => {
+                if (p.tipo_producto === 'combo') return false;
+                if (this.isEditingProduct && p.producto_id === this.productForm.producto_id) return false;
+                if (this.productForm.componentes && this.productForm.componentes.some(c => c.id_producto_componente === p.producto_id)) return false;
+                return p.estado == 1;
+            });
+        },
+
+        get costoTotalComboCalculado() {
+            if (!this.productForm.componentes || this.productForm.componentes.length === 0) return 0;
+            return this.productForm.componentes.reduce((acc, c) => {
+                const prod = (this.productos || []).find(p => p.producto_id === c.id_producto_componente);
+                const costo = prod ? Number(prod.costo_compra || 0) : 0;
+                return acc + (costo * Number(c.cantidad || 1));
+            }, 0);
+        },
+
+        getProductoNombre(id) {
+            const prod = (this.productos || []).find(p => p.producto_id === id);
+            return prod ? prod.nombre_producto : 'Producto #' + id;
+        },
+
+        getProductoCosto(id) {
+            const prod = (this.productos || []).find(p => p.producto_id === id);
+            return prod ? Number(prod.costo_compra || 0).toFixed(2) : '0.00';
+        },
+
+        agregarComponenteCombo() {
+            if (!this.comboNuevoComponenteId) {
+                this.notify('Seleccione un producto', 'Debe seleccionar un producto componente.', 'warning');
+                return;
+            }
+            const cant = Math.max(1, parseInt(this.comboNuevaCantidad || 1));
+            const prod = (this.productos || []).find(p => p.producto_id == this.comboNuevoComponenteId);
+            if (!prod) return;
+
+            if (!Array.isArray(this.productForm.componentes)) {
+                this.productForm.componentes = [];
+            }
+
+            this.productForm.componentes.push({
+                id_producto_componente: prod.producto_id,
+                nombre_producto: prod.nombre_producto,
+                cantidad: cant,
+            });
+
+            this.comboNuevoComponenteId = '';
+            this.comboNuevaCantidad = 1;
+
+            if (!this.productForm.costo_compra || Number(this.productForm.costo_compra) === 0) {
+                this.productForm.costo_compra = Math.round(this.costoTotalComboCalculado * 100) / 100;
+            }
+
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        removerComponenteCombo(index) {
+            this.productForm.componentes.splice(index, 1);
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        aplicarCostoSugeridoCombo() {
+            this.productForm.costo_compra = Math.round(this.costoTotalComboCalculado * 100) / 100;
+            if (Number(this.productForm.precio_venta) < Number(this.productForm.costo_compra)) {
+                this.productForm.precio_venta = this.productForm.costo_compra;
+            }
+        },
+
         openProductModal(product = null) {
+            this.comboNuevoComponenteId = '';
+            this.comboNuevaCantidad = 1;
             if (product) {
                 this.isEditingProduct = true;
-                this.productForm = { ...product };
+                const items = product.combo_items || product.comboItems || [];
+                this.productForm = {
+                    ...product,
+                    tipo_producto: product.tipo_producto || 'estandar',
+                    componentes: items.map(ci => ({
+                        id_producto_componente: ci.id_producto_componente,
+                        nombre_producto: ci.componente ? ci.componente.nombre_producto : this.getProductoNombre(ci.id_producto_componente),
+                        cantidad: ci.cantidad,
+                    })),
+                };
             } else {
                 this.isEditingProduct = false;
                 this.productForm = {
@@ -1780,18 +1883,31 @@ function productosModule() {
                     id_categoria: this.categorias[0] ? this.categorias[0].categoria_id : '',
                     codigo_producto: `PROD-${String(this.productos.length + 1).padStart(3, '0')}`,
                     nombre_producto: '',
+                    tipo_producto: 'estandar',
                     descripcion_producto: '',
                     costo_compra: 0,
                     precio_venta: 0,
                     existencia_bodega: 10,
                     existencia_minima: 5,
                     estado: 1,
+                    componentes: [],
                 };
             }
             this.showProductModal = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
         },
 
         async saveProduct() {
+            if (this.productForm.tipo_producto === 'combo') {
+                if (!this.productForm.componentes || this.productForm.componentes.length === 0) {
+                    this.notify('Componentes Requeridos', 'Debe agregar al menos un producto componente para el combo.', 'warning');
+                    return;
+                }
+                this.productForm.existencia_bodega = 0;
+            }
+
             const url = this.isEditingProduct ?
                 `/api/productos/${this.productForm.producto_id}` :
                 '/api/productos';
@@ -1803,7 +1919,10 @@ function productosModule() {
                     body: JSON.stringify(this.productForm)
                 });
 
-                if (!res.ok) throw new Error('Error al guardar el producto');
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || 'Error al guardar el producto');
+                }
                 this.showProductModal = false;
                 this.notify('¡Producto Guardado!', `El producto "${this.productForm.nombre_producto}" se guardó correctamente.`, 'success');
                 await this.fetchProductos();
@@ -4414,7 +4533,7 @@ function app() {
         },
 
         get lowStockProducts() {
-            return this.productos.filter(p => Number(p.existencia_bodega) <= Number(p.existencia_minima));
+            return this.productos.filter(p => (p.tipo_producto || 'estandar') !== 'combo' && Number(p.existencia_bodega) <= Number(p.existencia_minima));
         },
 
         get stats() {
@@ -4435,7 +4554,8 @@ function app() {
                     p.nombre_producto.toLowerCase().includes(this.searchProduct.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.searchProduct.toLowerCase());
                 const matchesCat = !this.filterCategory || p.id_categoria == this.filterCategory;
-                return matchesSearch && matchesCat;
+                const matchesTipo = !this.filterTipoProducto || (p.tipo_producto || 'estandar') === this.filterTipoProducto;
+                return matchesSearch && matchesCat && matchesTipo;
             });
         },
 

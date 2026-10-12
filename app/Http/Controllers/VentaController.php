@@ -179,7 +179,7 @@ class VentaController extends Controller
             // Primero se validan todas las líneas y se calculan sus importes en centavos.
             foreach (collect($validated['detalles'])->sortBy('id_producto') as $index => $item) {
 
-                $producto = Producto::where(
+                $producto = Producto::with('comboItems')->where(
                     'producto_id',
                     $item['id_producto']
                 )
@@ -190,17 +190,6 @@ class VentaController extends Controller
                 if (! $producto) {
                     throw ValidationException::withMessages([
                         "detalles.{$index}.id_producto" => 'El producto no existe o se encuentra inactivo.',
-                    ]);
-                }
-
-                if (
-                    $item['cantidad']
-                    >
-                    $producto->existencia_bodega
-                ) {
-                    throw ValidationException::withMessages([
-                        "detalles.{$index}.cantidad" => "Stock insuficiente para {$producto->nombre_producto}. ".
-                            "Existencia disponible: {$producto->existencia_bodega}.",
                     ]);
                 }
 
@@ -227,7 +216,76 @@ class VentaController extends Controller
                     'precio_unitario' => $this->importe($precioUnitario),
 
                     'subtotal_venta_detalle' => $this->importe($subtotalDetalle),
+
+                    'original_index' => $index,
                 ];
+            }
+
+            // Consolidar requerimientos de existencias físicas para evitar sobreventa o carreras
+            $requerimientosFisicos = [];
+            foreach ($detallesProcesados as $dp) {
+                $p = $dp['producto'];
+                $cant = $dp['cantidad'];
+                $idx = $dp['original_index'];
+
+                if ($p->esCombo()) {
+                    if ($p->comboItems->isEmpty()) {
+                        throw ValidationException::withMessages([
+                            "detalles.{$idx}.id_producto" => "El combo {$p->nombre_producto} no tiene componentes asociados.",
+                        ]);
+                    }
+                    foreach ($p->comboItems as $comboItem) {
+                        $idComp = $comboItem->id_producto_componente;
+                        if (! isset($requerimientosFisicos[$idComp])) {
+                            $componente = Producto::where('producto_id', $idComp)
+                                ->where('estado', 1)
+                                ->lockForUpdate()
+                                ->first();
+                            if (! $componente) {
+                                throw ValidationException::withMessages([
+                                    "detalles.{$idx}.id_producto" => "Un componente del combo {$p->nombre_producto} no existe o está inactivo.",
+                                ]);
+                            }
+                            $requerimientosFisicos[$idComp] = [
+                                'modelo' => $componente,
+                                'cantidad_necesaria' => 0,
+                                'primer_index' => $idx,
+                                'combo_nombre' => $p->nombre_producto,
+                            ];
+                        }
+                        $requerimientosFisicos[$idComp]['cantidad_necesaria'] += ($cant * $comboItem->cantidad);
+                    }
+                } else {
+                    $idProd = $p->producto_id;
+                    if (! isset($requerimientosFisicos[$idProd])) {
+                        $requerimientosFisicos[$idProd] = [
+                            'modelo' => $p,
+                            'cantidad_necesaria' => 0,
+                            'primer_index' => $idx,
+                            'combo_nombre' => null,
+                        ];
+                    }
+                    $requerimientosFisicos[$idProd]['cantidad_necesaria'] += $cant;
+                }
+            }
+
+            // Validar disponibilidad de stock físico
+            foreach ($requerimientosFisicos as $req) {
+                $modeloFisico = $req['modelo'];
+                $necesaria = $req['cantidad_necesaria'];
+                $idx = $req['primer_index'];
+
+                if ($necesaria > $modeloFisico->existencia_bodega) {
+                    if ($req['combo_nombre']) {
+                        throw ValidationException::withMessages([
+                            "detalles.{$idx}.cantidad" => "Stock insuficiente para el componente '{$modeloFisico->nombre_producto}' (usado en {$req['combo_nombre']}). Existencia disponible: {$modeloFisico->existencia_bodega}.",
+                        ]);
+                    } else {
+                        throw ValidationException::withMessages([
+                            "detalles.{$idx}.cantidad" => "Stock insuficiente para {$modeloFisico->nombre_producto}. Existencia disponible: {$modeloFisico->existencia_bodega}.",
+                        ]);
+                    }
+                }
             }
 
             $descuentoVenta =
@@ -289,35 +347,63 @@ class VentaController extends Controller
                     'estado' => 1,
                 ]);
 
-                $stockAnterior =
-                    $producto->existencia_bodega;
+                if ($producto->esCombo()) {
+                    foreach ($producto->comboItems as $comboItem) {
+                        $idComp = $comboItem->id_producto_componente;
+                        $compModelo = $requerimientosFisicos[$idComp]['modelo'];
+                        $deduccion = $detalle['cantidad'] * $comboItem->cantidad;
 
-                $stockNuevo =
-                    $stockAnterior
-                    -
-                    $detalle['cantidad'];
+                        $stockAnterior = $compModelo->existencia_bodega;
+                        $stockNuevo = $stockAnterior - $deduccion;
 
-                $producto->update([
-                    'existencia_bodega' => $stockNuevo,
-                ]);
+                        $compModelo->update([
+                            'existencia_bodega' => $stockNuevo,
+                        ]);
+                        $compModelo->existencia_bodega = $stockNuevo;
 
-                Movimiento_inventario::create([
-                    'id_producto' => $producto->producto_id,
+                        Movimiento_inventario::create([
+                            'id_producto' => $compModelo->producto_id,
+                            'id_usuario' => $validated['id_usuario'],
+                            'tipo_movimiento' => 'Salida por Venta',
+                            'cantidad_movimimiento' => $deduccion,
+                            'stock_anterior_producto' => $stockAnterior,
+                            'stock_resultante_producto' => $stockNuevo,
+                            'fecha_movimiento' => $validated['fecha_hora_venta'],
+                            'estado' => 1,
+                        ]);
+                    }
+                } else {
+                    $stockAnterior =
+                        $producto->existencia_bodega;
 
-                    'id_usuario' => $validated['id_usuario'],
+                    $stockNuevo =
+                        $stockAnterior
+                        -
+                        $detalle['cantidad'];
 
-                    'tipo_movimiento' => 'Salida por Venta',
+                    $producto->update([
+                        'existencia_bodega' => $stockNuevo,
+                    ]);
+                    $producto->existencia_bodega = $stockNuevo;
 
-                    'cantidad_movimimiento' => $detalle['cantidad'],
+                    Movimiento_inventario::create([
+                        'id_producto' => $producto->producto_id,
 
-                    'stock_anterior_producto' => $stockAnterior,
+                        'id_usuario' => $validated['id_usuario'],
 
-                    'stock_resultante_producto' => $stockNuevo,
+                        'tipo_movimiento' => 'Salida por Venta',
 
-                    'fecha_movimiento' => $validated['fecha_hora_venta'],
+                        'cantidad_movimimiento' => $detalle['cantidad'],
 
-                    'estado' => 1,
-                ]);
+                        'stock_anterior_producto' => $stockAnterior,
+
+                        'stock_resultante_producto' => $stockNuevo,
+
+                        'fecha_movimiento' => $validated['fecha_hora_venta'],
+
+                        'estado' => 1,
+                    ]);
+                }
             }
 
             // Ambas referencias provienen del mismo turno validado, nunca del formulario.
@@ -440,7 +526,7 @@ class VentaController extends Controller
             // inactivo; se exige que exista y que la existencia no desborde su columna.
             foreach ($venta->venta_detalles->sortBy('id_producto') as $detalle) {
 
-                $producto = Producto::where(
+                $producto = Producto::with('comboItems')->where(
                     'producto_id',
                     $detalle->id_producto
                 )
@@ -454,39 +540,72 @@ class VentaController extends Controller
                     ]);
                 }
 
-                $stockAnterior =
-                    $producto->existencia_bodega;
+                if ($producto->esCombo()) {
+                    foreach ($producto->comboItems as $comboItem) {
+                        $comp = Producto::where('producto_id', $comboItem->id_producto_componente)
+                            ->lockForUpdate()
+                            ->first();
 
-                $stockNuevo =
-                    $stockAnterior
-                    +
-                    $detalle->cantidad;
+                        if ($comp) {
+                            $cantRestaurar = $detalle->cantidad * $comboItem->cantidad;
+                            $stockAnterior = $comp->existencia_bodega;
+                            $stockNuevo = $stockAnterior + $cantRestaurar;
 
-                if ($stockNuevo > 2147483647) {
-                    throw ValidationException::withMessages(['producto' => 'La devolución supera el límite de existencias del producto.']);
+                            if ($stockNuevo > 2147483647) {
+                                throw ValidationException::withMessages(['producto' => 'La devolución supera el límite de existencias del producto.']);
+                            }
+
+                            $comp->update([
+                                'existencia_bodega' => $stockNuevo,
+                            ]);
+
+                            Movimiento_inventario::create([
+                                'id_producto' => $comp->producto_id,
+                                'id_usuario' => $validated['id_usuario'],
+                                'tipo_movimiento' => 'Anulación de Venta',
+                                'cantidad_movimimiento' => $cantRestaurar,
+                                'stock_anterior_producto' => $stockAnterior,
+                                'stock_resultante_producto' => $stockNuevo,
+                                'fecha_movimiento' => now(),
+                                'estado' => 1,
+                            ]);
+                        }
+                    }
+                } else {
+                    $stockAnterior =
+                        $producto->existencia_bodega;
+
+                    $stockNuevo =
+                        $stockAnterior
+                        +
+                        $detalle->cantidad;
+
+                    if ($stockNuevo > 2147483647) {
+                        throw ValidationException::withMessages(['producto' => 'La devolución supera el límite de existencias del producto.']);
+                    }
+
+                    $producto->update([
+                        'existencia_bodega' => $stockNuevo,
+                    ]);
+
+                    Movimiento_inventario::create([
+                        'id_producto' => $producto->producto_id,
+
+                        'id_usuario' => $validated['id_usuario'],
+
+                        'tipo_movimiento' => 'Anulación de Venta',
+
+                        'cantidad_movimimiento' => $detalle->cantidad,
+
+                        'stock_anterior_producto' => $stockAnterior,
+
+                        'stock_resultante_producto' => $stockNuevo,
+
+                        'fecha_movimiento' => now(),
+
+                        'estado' => 1,
+                    ]);
                 }
-
-                $producto->update([
-                    'existencia_bodega' => $stockNuevo,
-                ]);
-
-                Movimiento_inventario::create([
-                    'id_producto' => $producto->producto_id,
-
-                    'id_usuario' => $validated['id_usuario'],
-
-                    'tipo_movimiento' => 'Anulación de Venta',
-
-                    'cantidad_movimimiento' => $detalle->cantidad,
-
-                    'stock_anterior_producto' => $stockAnterior,
-
-                    'stock_resultante_producto' => $stockNuevo,
-
-                    'fecha_movimiento' => now(),
-
-                    'estado' => 1,
-                ]);
             }
 
             Venta_detalle::where(
