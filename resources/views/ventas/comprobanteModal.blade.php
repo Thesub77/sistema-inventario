@@ -27,6 +27,12 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <button type="button" @click="downloadReceiptPDF()"
+                    class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Descargar comprobante en formato PDF">
+                    <i data-lucide="file-down" class="w-4 h-4 text-emerald-500"></i>
+                    <span class="hidden sm:inline">Descargar PDF</span>
+                </button>
                 <button type="button" @click="printReceipt()"
                     class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer">
                     <i data-lucide="printer" class="w-4 h-4"></i>
@@ -202,6 +208,12 @@
             <button type="button" @click="showReceiptModal = false"
                 class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-950 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs font-semibold transition-all cursor-pointer">
                 Cerrar
+            </button>
+            <button type="button" @click="downloadReceiptPDF()"
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-950 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Descargar comprobante en formato PDF">
+                <i data-lucide="file-down" class="w-4 h-4 text-emerald-500"></i>
+                <span>Descargar PDF</span>
             </button>
             <button type="button" @click="printReceipt()"
                 class="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 transition-all cursor-pointer">

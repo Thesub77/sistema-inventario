@@ -8,7 +8,9 @@
     =============================================================================
 --}}
 
-<div x-show="currentTab === 'dashboard'" x-cloak class="space-y-6">
+<div x-show="currentTab === 'dashboard'" x-cloak
+    x-init="$watch('currentTab', v => { if (v === 'dashboard') { if (fetchDashboardData) fetchDashboardData(); $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); } }); $watch('techoFiscalData', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }))"
+    class="space-y-6">
 
     <!-- 1. ENCABEZADO DE BIENVENIDA & ACCIONES RÁPIDAS -->
     <div class="glass-panel p-5 sm:p-6 rounded-3xl relative overflow-hidden border border-slate-800">
@@ -27,6 +29,32 @@
                 <p class="text-xs sm:text-sm text-slate-400">
                     Visión global del negocio: ventas del turno, rotación de inventario y estado operativo.
                 </p>
+            </div>
+
+            <!-- TARJETA DE KPI SUPERIOR: Utilidad Bruta del Período (C$) -->
+            <div class="p-4 rounded-2xl bg-dark-900/90 border border-emerald-500/30 flex items-center gap-3.5 shadow-lg shadow-emerald-950/20 sm:min-w-[280px]">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+                    <i data-lucide="trending-up" class="w-6 h-6"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 truncate">
+                            Utilidad Bruta del Período
+                        </span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex-shrink-0"
+                            x-text="empresa?.moneda_simbolo || 'C$'"></span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-display font-black text-white font-mono tracking-tight mt-0.5"
+                        x-text="formatCurrency(utilidadBrutaPeriodo)"></div>
+                    <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
+                        <span class="font-bold text-emerald-400 flex items-center gap-0.5">
+                            <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            <span x-text="margenUtilidadBruta + '% margen'"></span>
+                        </span>
+                        <span class="text-slate-500">•</span>
+                        <span class="truncate">Ganancia líquida real</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -166,6 +194,292 @@
         </div>
     </div>
 
+    <!-- 3. MONITOR DE INGRESOS BRUTOS Y SEMÁFORO DE ALERTA PREVENTIVA DEL TECHO DE CUOTA FIJA (LEY 822) -->
+    <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 relative overflow-hidden space-y-5 shadow-sm">
+        
+        <!-- Efecto de resplandor ambiental adaptativo según el semáforo -->
+        <div class="absolute -right-20 -top-20 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-all duration-700"
+            :class="{
+                'bg-emerald-500/10 dark:bg-emerald-500/15': techoFiscal.estado_semaforo === 'normal',
+                'bg-amber-500/15 dark:bg-amber-500/20': techoFiscal.estado_semaforo === 'alerta',
+                'bg-rose-500/15 dark:bg-rose-500/20': techoFiscal.estado_semaforo === 'excedido'
+            }"></div>
+
+        <!-- Encabezado de la Sección con Semáforo Visual de 3 Focos y Acciones -->
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800/80 pb-4">
+            
+            <!-- Título y Descripción -->
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center border shadow-xs flex-shrink-0 transition-colors"
+                    :class="{
+                        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30': techoFiscal.estado_semaforo === 'normal',
+                        'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30': techoFiscal.estado_semaforo === 'alerta',
+                        'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30': techoFiscal.estado_semaforo === 'excedido'
+                    }">
+                    <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white">
+                            Monitor Fiscal & Semáforo Preventivo
+                        </h3>
+                        <!-- Insignia de Régimen -->
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+                            <span x-text="techoFiscal.regimen + ' • Ley 822'"></span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Control preventivo de ingresos brutos mensuales frente al techo fiscal del régimen simplificado de Cuota Fija.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Foco del Semáforo Analítico (3 luces) + Acciones Rápidas -->
+            <div class="flex flex-wrap items-center gap-3 self-start lg:self-center">
+                
+                <!-- Cápsula Visual del Semáforo (Verde, Amarillo, Rojo) -->
+                <div class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-slate-50 dark:bg-dark-950/80 border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-1">Semáforo:</span>
+                    
+                    <!-- Foco Verde: Seguro (< 75%) -->
+                    <div class="flex items-center gap-1.5 group cursor-default" title="Normal: Ventas menores al 75% del techo mensual">
+                        <span class="w-3.5 h-3.5 rounded-full transition-all duration-300"
+                            :class="techoFiscal.estado_semaforo === 'normal' 
+                                ? 'bg-emerald-500 shadow-md shadow-emerald-500/50 ring-2 ring-emerald-400/40 animate-pulse' 
+                                : 'bg-slate-300 dark:bg-slate-700 opacity-30'"></span>
+                        <span class="text-xs font-bold"
+                            :class="techoFiscal.estado_semaforo === 'normal' ? 'text-emerald-600 dark:text-emerald-400' : 'hidden sm:inline text-slate-400 opacity-40'">
+                            Seguro
+                        </span>
+                    </div>
+
+                    <!-- Foco Amarillo: Alerta (75% - 99.99%) -->
+                    <div class="flex items-center gap-1.5 group cursor-default" title="Alerta preventiva: 75% a 99.99% del techo mensual">
+                        <span class="w-3.5 h-3.5 rounded-full transition-all duration-300"
+                            :class="techoFiscal.estado_semaforo === 'alerta' 
+                                ? 'bg-amber-500 shadow-md shadow-amber-500/50 ring-2 ring-amber-400/40 animate-pulse' 
+                                : 'bg-slate-300 dark:bg-slate-700 opacity-30'"></span>
+                        <span class="text-xs font-bold"
+                            :class="techoFiscal.estado_semaforo === 'alerta' ? 'text-amber-600 dark:text-amber-400' : 'hidden sm:inline text-slate-400 opacity-40'">
+                            Alerta
+                        </span>
+                    </div>
+
+                    <!-- Foco Rojo: Excedido (>= 100%) -->
+                    <div class="flex items-center gap-1.5 group cursor-default" title="Excedido: 100% o más del techo mensual">
+                        <span class="w-3.5 h-3.5 rounded-full transition-all duration-300"
+                            :class="techoFiscal.estado_semaforo === 'excedido' 
+                                ? 'bg-rose-500 shadow-md shadow-rose-500/50 ring-2 ring-rose-400/40 animate-pulse' 
+                                : 'bg-slate-300 dark:bg-slate-700 opacity-30'"></span>
+                        <span class="text-xs font-bold"
+                            :class="techoFiscal.estado_semaforo === 'excedido' ? 'text-rose-600 dark:text-rose-400' : 'hidden sm:inline text-slate-400 opacity-40'">
+                            Excedido
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Botón: Ir al Libro Diario Fiscal -->
+                <button type="button" @click="currentTab = 'libro-diario'"
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-400 border border-brand-500/30 flex items-center gap-1.5 transition-all cursor-pointer">
+                    <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                    <span>Libro Fiscal</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Banner Contextual Reactivo según Estado del Semáforo -->
+        <div class="relative z-10 p-4 rounded-2xl border transition-all duration-300"
+            :class="{
+                'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-200': techoFiscal.estado_semaforo === 'normal',
+                'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200': techoFiscal.estado_semaforo === 'alerta',
+                'bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-500/30 text-rose-900 dark:text-rose-200': techoFiscal.estado_semaforo === 'excedido'
+            }">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                <div class="flex items-start sm:items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        :class="{
+                            'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'bg-amber-500/20 text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'bg-rose-500/20 text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }">
+                        <template x-if="techoFiscal.estado_semaforo === 'normal'">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        </template>
+                        <template x-if="techoFiscal.estado_semaforo === 'alerta'">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                        </template>
+                        <template x-if="techoFiscal.estado_semaforo === 'excedido'">
+                            <i data-lucide="alert-octagon" class="w-4 h-4"></i>
+                        </template>
+                    </div>
+                    <div>
+                        <div class="font-bold text-xs sm:text-sm flex items-center gap-2">
+                            <span x-show="techoFiscal.estado_semaforo === 'normal'">Nivel Seguro: Margen fiscal disponible</span>
+                            <span x-show="techoFiscal.estado_semaforo === 'alerta'">Alerta Preventiva: Consumo superior al 75% del techo mensual</span>
+                            <span x-show="techoFiscal.estado_semaforo === 'excedido'">Límite Fiscal Superado: Se ha superado el 100% de la cuota fija mensual</span>
+                        </div>
+                        <p class="text-[11px] opacity-90 mt-0.5"
+                            x-text="techoFiscal.estado_semaforo === 'normal' 
+                                ? 'Sus ventas brutas acumuladas del mes están dentro del límite legal establecido por Ley 822. Continúe facturando normalmente.'
+                                : (techoFiscal.estado_semaforo === 'alerta'
+                                    ? 'Ha alcanzado el ' + techoFiscal.porcentaje_consumido + '% del techo mensual (' + formatCurrency(techoFiscal.techo_mensual) + '). Planifique sus operaciones antes del cierre del mes.'
+                                    : 'Ha facturado un ' + techoFiscal.porcentaje_consumido + '% del límite mensual. Consulte con su contador sobre la transición ordenada al Régimen General.')"></p>
+                    </div>
+                </div>
+
+                <!-- Insignia de NO BLOQUEO DEL POS (Garantía operativa fundamental) -->
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-dark-950/70 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 self-start md:self-center shadow-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>POS 100% Operativo (Informativo, sin bloqueos)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Progreso Analítica con Marcadores de Umbrales (75% y 100%) -->
+        <div class="relative z-10 p-4 rounded-2xl bg-slate-50/60 dark:bg-dark-900/60 border border-slate-200 dark:border-slate-800/90 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-slate-700 dark:text-slate-300">Consumo Acumulado del Mes:</span>
+                    <span class="font-mono font-black text-sm"
+                        :class="{
+                            'text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }"
+                        x-text="techoFiscal.porcentaje_consumido + '%'"></span>
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    <span>Base legal: Ley 822 de Concertación Tributaria (Nicaragua)</span>
+                </div>
+            </div>
+
+            <!-- Contenedor de la Barra de Progreso y Marcadores -->
+            <div class="relative pt-1 pb-4">
+                <!-- Barra de Fondo -->
+                <div class="w-full h-3.5 bg-slate-200 dark:bg-dark-950 rounded-full overflow-hidden relative shadow-inner">
+                    <!-- Relleno Dinámico -->
+                    <div class="h-full rounded-full transition-all duration-700 ease-out"
+                        :class="{
+                            'bg-gradient-to-r from-emerald-500 to-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'bg-gradient-to-r from-amber-500 to-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'bg-gradient-to-r from-rose-600 to-rose-500': techoFiscal.estado_semaforo === 'excedido'
+                        }"
+                        :style="`width: ${Math.min(100, techoFiscal.porcentaje_consumido)}%`">
+                    </div>
+                </div>
+
+                <!-- Línea Marcador 75% (Umbral Preventivo) -->
+                <div class="absolute top-0 bottom-0 left-[75%] -translate-x-1/2 flex flex-col items-center pointer-events-none">
+                    <div class="w-0.5 h-5 bg-amber-500 dark:bg-amber-400 z-10 shadow-xs"></div>
+                    <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400 mt-0.5 tracking-tight whitespace-nowrap">
+                        75% Alerta
+                    </span>
+                </div>
+
+                <!-- Línea Marcador 100% (Límite Máximo) -->
+                <div class="absolute top-0 bottom-0 left-[100%] -translate-x-full flex flex-col items-end pointer-events-none pr-0.5">
+                    <div class="w-0.5 h-5 bg-rose-500 dark:bg-rose-400 z-10 shadow-xs"></div>
+                    <span class="text-[9px] font-bold text-rose-600 dark:text-rose-400 mt-0.5 tracking-tight whitespace-nowrap">
+                        100% Techo
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 Tarjetas KPI: Ventas Mes, Techo Mensual, Saldo Disponible, Acumulado Anual -->
+        <div class="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <!-- KPI 1: Ventas Facturadas del Mes -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-brand-500/30 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ventas del Mes</span>
+                    <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+                        <i data-lucide="receipt" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-display font-black text-slate-900 dark:text-white font-mono tracking-tight"
+                    x-text="formatCurrency(techoFiscal.ventas_mes)"></div>
+                <div class="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Acumulado del mes actual</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-300" x-text="techoFiscal.porcentaje_consumido + '%'"></span>
+                </div>
+            </div>
+
+            <!-- KPI 2: Techo Mensual Autorizado -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-400/30 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Techo Mensual</span>
+                    <div class="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-400 flex items-center justify-center">
+                        <i data-lucide="scale" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-display font-black text-slate-900 dark:text-white font-mono tracking-tight"
+                    x-text="formatCurrency(techoFiscal.techo_mensual)"></div>
+                <div class="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Límite Cuota Fija</span>
+                    <span class="font-bold text-brand-600 dark:text-brand-400">Ley 822</span>
+                </div>
+            </div>
+
+            <!-- KPI 3: Saldo / Margen Disponible -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border shadow-xs transition-all"
+                :class="{
+                    'border-emerald-200 dark:border-emerald-500/30 hover:border-emerald-500/50': techoFiscal.estado_semaforo === 'normal',
+                    'border-amber-200 dark:border-amber-500/30 hover:border-amber-500/50': techoFiscal.estado_semaforo === 'alerta',
+                    'border-rose-200 dark:border-rose-500/30 hover:border-rose-500/50': techoFiscal.estado_semaforo === 'excedido'
+                }">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider"
+                        :class="{
+                            'text-emerald-700 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'text-amber-700 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'text-rose-700 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }">
+                        <span x-text="techoFiscal.estado_semaforo === 'excedido' ? 'Monto Excedido' : 'Margen Disponible'"></span>
+                    </span>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+                        :class="{
+                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'bg-amber-500/10 text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'bg-rose-500/10 text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }">
+                        <i data-lucide="wallet" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-display font-black font-mono tracking-tight"
+                    :class="{
+                        'text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                        'text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                        'text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                    }"
+                    x-text="formatCurrency(techoFiscal.saldo_disponible)"></div>
+                <div class="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span x-text="techoFiscal.estado_semaforo === 'excedido' ? 'Superó el techo' : 'Capacidad restante'"></span>
+                    <span class="font-bold text-slate-700 dark:text-slate-300"
+                        x-text="techoFiscal.techo_mensual > 0 ? (100 - Math.min(100, techoFiscal.porcentaje_consumido)).toFixed(1) + '% libre' : '0% libre'"></span>
+                </div>
+            </div>
+
+            <!-- KPI 4: Acumulado Anual -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500/30 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Acumulado Anual</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-display font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight"
+                    x-text="formatCurrency(techoFiscal.ventas_anual_acumulado)"></div>
+                <div class="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Techo Anual (x12):</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-300 font-mono" x-text="formatCurrency(techoFiscal.techo_anual)"></span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <!-- 4. SECCIÓN DE GRÁFICOS INTERACTIVOS (INDICADOR DE VENTAS & TOP 5 ROTACIÓN) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -222,19 +536,37 @@
             </div>
         </div>
 
-        <!-- GRÁFICO 2: Top 5 Productos de Mayor Rotación (Más Vendidos) -->
+        <!-- GRÁFICO 2: Top 5 Productos (Toggle: Unidades Vendidas vs Mayor Utilidad) -->
         <div class="lg:col-span-4 glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 flex flex-col justify-between space-y-4">
             <div>
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-                            <i data-lucide="flame" class="w-4 h-4"></i>
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center border"
+                            :class="topProductosFiltro === 'utilidad' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'">
+                            <i x-show="topProductosFiltro === 'unidades'" data-lucide="flame" class="w-4 h-4"></i>
+                            <i x-show="topProductosFiltro === 'utilidad'" data-lucide="trending-up" class="w-4 h-4"></i>
                         </div>
                         <div>
-                            <h3 class="font-display font-bold text-base sm:text-lg text-white">Top 5 Rotación</h3>
-                            <p class="text-xs text-slate-400">Productos con mayor volumen vendido</p>
+                            <h3 class="font-display font-bold text-base sm:text-lg text-white"
+                                x-text="topProductosFiltro === 'utilidad' ? 'Top 5 Rentabilidad' : 'Top 5 Rotación'"></h3>
+                            <p class="text-xs text-slate-400"
+                                x-text="topProductosFiltro === 'utilidad' ? 'Por mayor utilidad / ganancia neta' : 'Por volumen de unidades vendidas'"></p>
                         </div>
                     </div>
+                </div>
+
+                <!-- Selector / Toggle: Por Unidades Vendidas vs Por Mayor Utilidad / Ganancia (C$) -->
+                <div class="inline-flex p-1 rounded-xl bg-dark-900 border border-slate-800 text-xs w-full mb-3 shadow-xs">
+                    <button type="button" @click="setTopProductosFiltro('unidades')"
+                        :class="topProductosFiltro === 'unidades' ? 'bg-brand-600 text-white font-bold shadow-md shadow-brand-600/30' : 'text-slate-400 hover:text-white'"
+                        class="flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center text-[11px] sm:text-xs">
+                        Por Unidades Vendidas
+                    </button>
+                    <button type="button" @click="setTopProductosFiltro('utilidad')"
+                        :class="topProductosFiltro === 'utilidad' ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30' : 'text-slate-400 hover:text-white'"
+                        class="flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center text-[11px] sm:text-xs">
+                        <span>Por Mayor Utilidad (<span x-text="empresa?.moneda_simbolo || 'C$'"></span>)</span>
+                    </button>
                 </div>
 
                 <!-- Canvas Gráfico Doughnut -->
@@ -242,36 +574,79 @@
                     <canvas id="chartTopProductos"></canvas>
                 </div>
 
-                <!-- Lista Visual del Ranking Top 5 -->
+                <!-- Lista Visual del Ranking Top 5 (Alterna según selector) -->
                 <div class="space-y-2.5">
-                    <template x-for="p in topProductosVendidos" :key="p.producto_id">
-                        <div class="p-2.5 rounded-xl bg-dark-900/60 border border-slate-800 flex items-center justify-between gap-2 text-xs">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <!-- Medalla de Posición -->
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
-                                    :class="{
-                                        'bg-amber-400 text-slate-900': p.posicion === 1,
-                                        'bg-slate-300 text-slate-900': p.posicion === 2,
-                                        'bg-amber-600 text-white': p.posicion === 3,
-                                        'bg-slate-800 text-slate-300': p.posicion > 3
-                                    }"
-                                    x-text="p.posicion"></span>
-                                <div class="truncate">
-                                    <p class="font-semibold text-slate-200 truncate" x-text="p.nombre || p.nombre_producto"></p>
-                                    <p class="text-[10px] text-slate-400 font-mono" x-text="p.codigo || p.codigo_producto"></p>
+                    <!-- 1. Vista por Unidades Vendidas -->
+                    <template x-if="topProductosFiltro === 'unidades'">
+                        <div class="space-y-2.5">
+                            <template x-for="p in topProductosVendidos" :key="'vol-' + p.producto_id">
+                                <div class="p-2.5 rounded-xl bg-dark-900/60 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <!-- Medalla de Posición -->
+                                        <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                                            :class="{
+                                                'bg-amber-400 text-slate-900': p.posicion === 1,
+                                                'bg-slate-300 text-slate-900': p.posicion === 2,
+                                                'bg-amber-600 text-white': p.posicion === 3,
+                                                'bg-slate-800 text-slate-300': p.posicion > 3
+                                            }"
+                                            x-text="p.posicion"></span>
+                                        <div class="truncate">
+                                            <p class="font-semibold text-slate-200 truncate" x-text="p.nombre || p.nombre_producto"></p>
+                                            <p class="text-[10px] text-slate-400 font-mono" x-text="p.codigo || p.codigo_producto"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <span class="font-bold text-emerald-400" x-text="p.cantidadVendida + ' uds.'"></span>
+                                        <p class="text-[10px] text-slate-400" x-text="formatCurrency(p.totalRecaudado)"></p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="text-right flex-shrink-0">
-                                <span class="font-bold text-emerald-400" x-text="p.cantidadVendida + ' uds.'"></span>
-                                <p class="text-[10px] text-slate-400" x-text="formatCurrency(p.totalRecaudado)"></p>
+                            </template>
+
+                            <div x-show="topProductosVendidos.length === 0" class="text-center py-6 text-xs text-slate-500">
+                                <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-1 text-slate-600"></i>
+                                Aún no se registran ventas para generar el ranking
                             </div>
                         </div>
                     </template>
 
-                    <div x-show="topProductosVendidos.length === 0" class="text-center py-6 text-xs text-slate-500">
-                        <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-1 text-slate-600"></i>
-                        Aún no se registran ventas para generar el ranking
-                    </div>
+                    <!-- 2. Vista por Mayor Utilidad / Ganancia -->
+                    <template x-if="topProductosFiltro === 'utilidad'">
+                        <div class="space-y-2.5">
+                            <template x-for="p in topRentabilidad" :key="'rent-' + p.producto_id">
+                                <div class="p-2.5 rounded-xl bg-dark-900/60 border border-emerald-500/20 flex items-center justify-between gap-2 text-xs">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <!-- Medalla de Posición -->
+                                        <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                                            :class="{
+                                                'bg-emerald-400 text-slate-900 font-black': p.posicion === 1,
+                                                'bg-teal-300 text-slate-900 font-bold': p.posicion === 2,
+                                                'bg-cyan-600 text-white font-bold': p.posicion === 3,
+                                                'bg-slate-800 text-slate-300': p.posicion > 3
+                                            }"
+                                            x-text="p.posicion"></span>
+                                        <div class="truncate">
+                                            <p class="font-semibold text-slate-200 truncate" x-text="p.nombre || p.nombre_producto"></p>
+                                            <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                                <span class="font-mono" x-text="p.codigo || p.codigo_producto"></span>
+                                                <span>•</span>
+                                                <span class="text-emerald-400 font-semibold" x-text="(p.margenPct || p.margen_pct) + '% margen'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <span class="font-bold text-emerald-400 font-mono" x-text="'+ ' + formatCurrency(p.utilidadTotal || p.utilidad_total)"></span>
+                                        <p class="text-[10px] text-slate-400" x-text="(p.cantidadVendida || 0) + ' uds. vendidas'"></p>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div x-show="topRentabilidad.length === 0" class="text-center py-6 text-xs text-slate-500">
+                                <i data-lucide="trending-up" class="w-8 h-8 mx-auto mb-1 text-slate-600"></i>
+                                Aún no se registran utilidades para generar el ranking
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>

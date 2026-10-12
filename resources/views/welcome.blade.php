@@ -24,6 +24,9 @@
     <!-- Chart.js (Gráficos interactivos y responsivos para Dashboard) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- html2pdf.js (Generación y descarga de comprobantes y reportes en PDF del lado del cliente) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <!-- Capa de Presentación: Estilos Personalizados del Sistema -->
     <link rel="stylesheet" href="/css/custom.css?v={{ file_exists(public_path('css/custom.css')) ? filemtime(public_path('css/custom.css')) : time() }}">
 
@@ -199,6 +202,9 @@
                 <!-- 10. TAB: BITÁCORA DE AUDITORÍA -->
                 @include('sistema.bitacoraView')
 
+                <!-- 11. TAB: LIBRO DIARIO FISCAL (DGI CUOTA FIJA) -->
+                @include('ventas.libroDiarioView')
+
 
 
                 <!-- MODAL: PRODUCTO (CREAR / EDITAR) -->
@@ -245,6 +251,9 @@
 
                 <!-- MODAL: ARQUEO Y CIERRE DE TURNO DE CAJA -->
                 @include('cajas.cajaCierreModal')
+
+                <!-- MODAL: AUDITORÍA INTEGRAL Y HISTORIAL DE TURNO DE CAJA -->
+                @include('cajas.turnoAuditoriaModal')
 
                 <!-- MODAL: CREAR / EDITAR CAJA FÍSICA -->
                 @include('cajas.cajaFormModal')

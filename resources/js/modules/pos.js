@@ -437,9 +437,160 @@ export function posModule() {
             return 'COMPROBANTE DE VENTA';
         },
 
-        // Disparador de impresión nativa del sistema
+        // Disparador de impresión nativa del sistema con nombre sugerido para PDF
         printReceipt() {
+            const originalTitle = document.title;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+
+            // Configurar el título para que "Guardar como PDF" use el código de la factura
+            document.title = safeCodigo;
+
             window.print();
+
+            // Restaurar título original
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+            window.addEventListener('afterprint', () => {
+                document.title = originalTitle;
+            }, { once: true });
+        },
+
+        // Descargar el comprobante directamente en formato PDF (.pdf) con el código de factura como nombre
+        async downloadReceiptPDF() {
+            if (!this.receiptData) return;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+            const fileName = `${safeCodigo}.pdf`;
+
+            const element = document.getElementById('printableReceiptArea');
+            if (!element) {
+                this.notify('Error', 'No se encontró el contenedor del comprobante.', 'error');
+                return;
+            }
+
+            // Asegurar que la librería html2pdf esté cargada
+            if (typeof window.html2pdf !== 'function') {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                } catch (e) {
+                    console.warn('No se pudo cargar html2pdf CDN, utilizando asistente de impresión:', e);
+                }
+            }
+
+            if (typeof window.html2pdf === 'function') {
+                this.notify('Generando PDF', `Preparando ${fileName}...`, 'info', 1500);
+
+                // Calcular dimensiones exactas para formato ticket térmico continuo (80mm) sin cortes de página
+                const clientWidth = element.offsetWidth || 340;
+                const clientHeight = element.scrollHeight || 600;
+                const pdfWidth = 80;
+                const margin = 2; // mm
+                const printableWidth = pdfWidth - (margin * 2); // 76mm
+                const pdfHeight = Math.max(120, Math.ceil((clientHeight / clientWidth) * printableWidth) + (margin * 2) + 6);
+
+                const opt = {
+                    margin: [margin, margin, margin, margin],
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2, 
+                        useCORS: true, 
+                        backgroundColor: '#ffffff',
+                        logging: false
+                    },
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: [pdfWidth, pdfHeight], 
+                        orientation: 'portrait' 
+                    },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                try {
+                    await window.html2pdf().set(opt).from(element).save();
+                    this.notify('Factura Descargada', `Se descargó "${fileName}".`, 'success');
+                    return;
+                } catch (e) {
+                    console.error('Error generando PDF con html2pdf:', e);
+                }
+            }
+
+            // Fallback: Disparar la impresión nativa (configurada para sugerir el código como nombre de PDF)
+            this.printReceipt();
+        },
+
+        // Descarga rápida de PDF directamente desde tablas y listados
+        async downloadReceiptDirectPDF(ventaId, ventaObj = null) {
+            await this.openReceiptModal(ventaId, ventaObj);
+            const start = Date.now();
+            while (Date.now() - start < 3000) {
+                if (!this.loadingReceipt && this.receiptData && document.getElementById('printableReceiptArea')) {
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 80));
+            }
+            await new Promise(r => setTimeout(r, 200));
+            await this.downloadReceiptPDF();
+        },
+
+        // Descargar copia del comprobante de venta (descarga en PDF por defecto)
+        async downloadReceipt() {
+            await this.downloadReceiptPDF();
+        },
+
+        // Descargar copia del comprobante de venta en formato texto (.txt)
+        downloadReceiptTXT() {
+            if (!this.receiptData) return;
+            const codigo = this.receiptData?.codigo_venta || (this.selectedSale?.codigo_venta || 'Factura');
+            const safeCodigo = String(codigo).replace(/[/\\?%*:|"<>]/g, '-').trim();
+            const comercio = this.receiptEmpresa?.nombre_comercial || (this.receiptData?.empresa?.nombre_comercial || 'SISTEMA COMERCIAL');
+            const ruc = (this.receiptEmpresa?.numero_ruc || this.receiptData?.empresa?.numero_ruc) ? `RUC: ${this.receiptEmpresa?.numero_ruc || this.receiptData?.empresa?.numero_ruc}` : '';
+            const fecha = this.formatDate(this.receiptData?.fecha_hora_venta);
+            const cliente = this.receiptData?.cliente_nombre || 'Consumidor Final';
+            const metodo = this.receiptData?.metodo_pago || 'Efectivo';
+            const total = Number(this.receiptData?.total_venta || 0).toFixed(2);
+
+            let txt = `========================================\r\n`;
+            txt += `           ${comercio.toUpperCase()}\r\n`;
+            if (ruc) txt += `             ${ruc}\r\n`;
+            txt += `========================================\r\n`;
+            txt += `FACTURA N°: ${codigo}\r\n`;
+            txt += `FECHA:     ${fecha}\r\n`;
+            txt += `CLIENTE:   ${cliente}\r\n`;
+            txt += `PAGO:      ${metodo.toUpperCase()}\r\n`;
+            txt += `----------------------------------------\r\n`;
+            txt += `CANT  DESCRIPCIÓN              TOTAL\r\n`;
+            txt += `----------------------------------------\r\n`;
+            (this.receiptData?.venta_detalles || []).forEach(d => {
+                const prod = (d.producto?.nombre_producto || `Item #${d.id_producto}`).padEnd(22).substring(0, 22);
+                const cant = String(d.cantidad).padStart(4);
+                const sub = Number(d.subtotal || (d.cantidad * d.precio_unitario)).toFixed(2).padStart(8);
+                txt += `${cant}  ${prod} ${sub}\r\n`;
+            });
+            txt += `----------------------------------------\r\n`;
+            txt += `TOTAL:                   C$ ${total}\r\n`;
+            txt += `========================================\r\n`;
+            txt += `      ¡GRACIAS POR SU COMPRA!\r\n`;
+            txt += `========================================\r\n`;
+
+            const blob = new Blob([txt], { type: 'text/plain;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${safeCodigo}.txt`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            this.notify('Factura Descargada', `Se descargó el comprobante "${safeCodigo}".`, 'success');
         },
 
         viewSaleDetails(sale) {

@@ -55,4 +55,14 @@ class Caja_operacion extends Model
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'usuario_id');
     }
+
+    public function usuarioCierre()
+    {
+        return $this->belongsTo(Usuario::class, 'id_usuario_cierre', 'usuario_id');
+    }
+
+    public function movimientos()
+    {
+        return $this->hasMany(Caja_movimiento_venta::class, 'id_caja_operacion', 'caja_operacion_id');
+    }
 }

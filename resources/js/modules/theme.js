@@ -28,6 +28,9 @@ export function themeModule() {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
+                if (this.currentTab === 'dashboard' && typeof this.renderDashboardCharts === 'function') {
+                    this.renderDashboardCharts();
+                }
             });
         }
     };
