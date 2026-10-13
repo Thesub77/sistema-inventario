@@ -12,7 +12,7 @@
 --}}
 
 <div x-show="currentTab === 'libro-diario'" x-cloak
-    x-init="$watch('currentTab', v => { if (v === 'libro-diario') { fetchLibroDiario(); $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); } }); $watch('libroDiarioData', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }))"
+    x-init="if (currentTab === 'libro-diario') { fetchLibroDiario(); if (typeof fetchTechoFiscal === 'function') fetchTechoFiscal(); $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); } $watch('currentTab', v => { if (v === 'libro-diario') { fetchLibroDiario(); if (typeof fetchTechoFiscal === 'function') fetchTechoFiscal(); $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }); } }); $watch('libroDiarioData', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); })); $watch('techoFiscalData', () => $nextTick(() => { if (window.lucide) window.lucide.createIcons(); }))"
     class="space-y-6">
 
     <!-- 1. PANEL PRINCIPAL DE CABECERA Y FILTROS -->
@@ -117,54 +117,195 @@
         </div>
     </div>
 
-    <!-- 2. TARJETAS DE MÉTRICAS / KPIS FISCALES -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 no-print">
+    <!-- 2. PANEL EJECUTIVO DE CONTROL FISCAL Y SEMÁFORO (CUOTA FIJA - LEY 822) -->
+    <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 relative overflow-hidden space-y-4 shadow-sm no-print">
+        
+        <!-- Efecto de resplandor sutil adaptativo -->
+        <div class="absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-700"
+            :class="{
+                'bg-emerald-500/10': techoFiscal.estado_semaforo === 'normal',
+                'bg-amber-500/10': techoFiscal.estado_semaforo === 'alerta',
+                'bg-rose-500/10': techoFiscal.estado_semaforo === 'excedido'
+            }"></div>
 
-        <!-- KPI 1: Total Acumulado del Mes -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
-            <div class="space-y-1">
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Acumulado del Mes</p>
-                <div class="text-2xl sm:text-3xl font-display font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight"
-                    x-text="formatCurrency(libroDiarioData?.total_acumulado_mes || 0)"></div>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400"
-                    x-text="'Período: ' + nombreMesSeleccionado + ' ' + libroDiarioAnio"></p>
+        <!-- Encabezado Limpio: Título + Badge de Semáforo -->
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3.5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center border shadow-xs flex-shrink-0 transition-colors"
+                    :class="{
+                        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30': techoFiscal.estado_semaforo === 'normal',
+                        'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30': techoFiscal.estado_semaforo === 'alerta',
+                        'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30': techoFiscal.estado_semaforo === 'excedido'
+                    }">
+                    <i data-lucide="shield-check" x-show="techoFiscal.estado_semaforo === 'normal'" class="w-5 h-5"></i>
+                    <i data-lucide="alert-triangle" x-show="techoFiscal.estado_semaforo === 'alerta'" class="w-5 h-5"></i>
+                    <i data-lucide="alert-octagon" x-show="techoFiscal.estado_semaforo === 'excedido'" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-display font-bold text-base sm:text-lg text-slate-900 dark:text-white">
+                            Límite Fiscal (Cuota Fija)
+                        </h3>
+                        <!-- Semáforo Status Pill Simple -->
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors"
+                            :class="{
+                                'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60': techoFiscal.estado_semaforo === 'normal',
+                                'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60': techoFiscal.estado_semaforo === 'alerta',
+                                'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60': techoFiscal.estado_semaforo === 'excedido'
+                            }">
+                            <span class="w-2 h-2 rounded-full"
+                                :class="{
+                                    'bg-emerald-500': techoFiscal.estado_semaforo === 'normal',
+                                    'bg-amber-500 animate-pulse': techoFiscal.estado_semaforo === 'alerta',
+                                    'bg-rose-500 animate-pulse': techoFiscal.estado_semaforo === 'excedido'
+                                }"></span>
+                            <span x-text="techoFiscal.estado_semaforo === 'normal' ? 'En Rango Seguro' : (techoFiscal.estado_semaforo === 'alerta' ? 'Alerta Preventiva' : 'Límite Superado')"></span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Monitoreo de facturación frente al límite autorizado (Ley 822).
+                    </p>
+                </div>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 flex-shrink-0">
-                <i data-lucide="banknote" class="w-6 h-6"></i>
+
+            <!-- Insignia informativa -->
+            <div class="flex items-center gap-2 self-start sm:self-center">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <span class="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+                    <span x-text="(techoFiscal.regimen || 'Cuota Fija') + ' • Control Oficial'"></span>
+                </span>
             </div>
         </div>
 
-        <!-- KPI 2: Total de Tickets Emitidos -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
-            <div class="space-y-1">
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tickets / Facturas</p>
-                <div class="text-2xl sm:text-3xl font-display font-black text-brand-600 dark:text-brand-400 font-mono tracking-tight"
-                    x-text="(libroDiarioData?.total_transacciones_mes || 0) + ' transacciones'"></div>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                    Comprobantes válidos del régimen simplificado
-                </p>
+        <!-- Barra de Progreso Elegante y Directa -->
+        <div class="relative z-10 space-y-1.5 pt-1">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                <span class="font-medium text-slate-600 dark:text-slate-400">
+                    Consumo mensual: <strong class="font-mono text-sm"
+                        :class="{
+                            'text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }"
+                        x-text="techoFiscal.porcentaje_consumido + '%'"></strong> del tope
+                </span>
+                <span class="text-slate-500 dark:text-slate-400">
+                    Tope mensual: <strong class="text-slate-700 dark:text-slate-300 font-mono" x-text="formatCurrency(techoFiscal.techo_mensual)"></strong>
+                </span>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center border border-brand-500/20 flex-shrink-0">
-                <i data-lucide="receipt" class="w-6 h-6"></i>
+            
+            <div class="w-full h-3 bg-slate-100 dark:bg-dark-950 rounded-full overflow-hidden p-0.5 border border-slate-200/80 dark:border-slate-800">
+                <div class="h-full rounded-full transition-all duration-700 ease-out"
+                    :class="{
+                        'bg-gradient-to-r from-emerald-500 to-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                        'bg-gradient-to-r from-amber-500 to-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                        'bg-gradient-to-r from-rose-600 to-rose-500': techoFiscal.estado_semaforo === 'excedido'
+                    }"
+                    :style="`width: ${Math.min(100, techoFiscal.porcentaje_consumido)}%`">
+                </div>
             </div>
         </div>
 
-        <!-- KPI 3: Días con Actividad y Promedio Diario -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs sm:col-span-2 lg:col-span-1">
-            <div class="space-y-1">
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Días Operados</p>
-                <div class="text-2xl sm:text-3xl font-display font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight"
-                    x-text="(libroDiarioData?.dias?.length || 0) + ' días con ventas'"></div>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400"
-                    x-text="(libroDiarioData?.dias?.length || 0) > 0 ? 'Promedio diario: ' + formatCurrency((Number(libroDiarioData?.total_acumulado_mes || 0) / (libroDiarioData?.dias?.length || 1))) : 'Sin movimientos registrados'"></p>
+        <!-- Única Fila de 4 Tarjetas de Métricas Ejecutivas Consolidadas -->
+        <div class="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+
+            <!-- 1. Total Facturado del Período -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-emerald-500/30 transition-all flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Facturado</span>
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <i data-lucide="receipt" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xl sm:text-2xl font-display font-black text-slate-900 dark:text-white font-mono tracking-tight"
+                        x-text="formatCurrency(Number(libroDiarioData?.total_acumulado_mes || 0) > 0 ? libroDiarioData.total_acumulado_mes : (techoFiscal.ventas_mes || 0))"></div>
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span x-text="nombreMesSeleccionado + ' ' + libroDiarioAnio"></span>
+                        <span class="text-slate-400 font-mono" x-show="techoFiscal.porcentaje_consumido > 0" x-text="'(' + techoFiscal.porcentaje_consumido + '%)'"></span>
+                    </div>
+                </div>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 flex-shrink-0">
-                <i data-lucide="calendar-check" class="w-6 h-6"></i>
+
+            <!-- 2. Margen Disponible -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border shadow-2xs transition-all flex flex-col justify-between"
+                :class="{
+                    'border-emerald-300 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20': techoFiscal.estado_semaforo === 'normal',
+                    'border-amber-300 dark:border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/20': techoFiscal.estado_semaforo === 'alerta',
+                    'border-rose-300 dark:border-rose-500/30 bg-rose-50/20 dark:bg-rose-950/20': techoFiscal.estado_semaforo === 'excedido'
+                }">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider"
+                        :class="{
+                            'text-emerald-700 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'text-amber-700 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'text-rose-700 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }"
+                        x-text="techoFiscal.estado_semaforo === 'excedido' ? 'Monto Excedido' : 'Margen Disponible'"></span>
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center"
+                        :class="{
+                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'bg-amber-500/10 text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'bg-rose-500/10 text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }">
+                        <i data-lucide="wallet" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xl sm:text-2xl font-display font-black font-mono tracking-tight"
+                        :class="{
+                            'text-emerald-600 dark:text-emerald-400': techoFiscal.estado_semaforo === 'normal',
+                            'text-amber-600 dark:text-amber-400': techoFiscal.estado_semaforo === 'alerta',
+                            'text-rose-600 dark:text-rose-400': techoFiscal.estado_semaforo === 'excedido'
+                        }"
+                        x-text="formatCurrency(techoFiscal.saldo_disponible)"></div>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block"
+                        x-text="techoFiscal.techo_mensual > 0 ? (100 - Math.min(100, techoFiscal.porcentaje_consumido)).toFixed(1) + '% margen libre' : '0% libre'"></span>
+                </div>
             </div>
+
+            <!-- 3. Comprobantes y Actividad (Consolidado: Tickets + Días operados) -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-brand-500/30 transition-all flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Comprobantes</span>
+                    <div class="w-8 h-8 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xl sm:text-2xl font-display font-black text-brand-600 dark:text-brand-400 font-mono tracking-tight flex items-baseline gap-1.5">
+                        <span x-text="libroDiarioData?.total_transacciones_mes || 0"></span>
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 font-sans">facturas</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                        <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-slate-400"></i>
+                        <span><strong class="font-bold text-slate-700 dark:text-slate-300" x-text="libroDiarioData?.dias?.length || 0"></strong> días operados</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Acumulado Anual -->
+            <div class="p-4 rounded-2xl bg-white dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-indigo-500/30 transition-all flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Acumulado Anual</span>
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xl sm:text-2xl font-display font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight"
+                        x-text="formatCurrency(techoFiscal.ventas_anual_acumulado)"></div>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block truncate">
+                        Tope: <span class="font-mono text-slate-700 dark:text-slate-300 font-bold" x-text="formatCurrency(techoFiscal.techo_anual)"></span>
+                    </span>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <!-- 3. TABLA PRINCIPAL DEL LIBRO DIARIO DE VENTAS (PANTALLA) -->
+    <!-- 4. TABLA PRINCIPAL DEL LIBRO DIARIO DE VENTAS (PANTALLA) -->
     <div class="glass-panel rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm no-print">
         <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-dark-900/50">
             <div>

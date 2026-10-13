@@ -158,34 +158,50 @@
                             </div>
                         </div>
 
-                        <!-- Régimen Tributario (Ley 822) -->
+                        <!-- Régimen Fiscal (Ley 822) - Fijo y Sin Editar (Exclusivo Frontend) -->
                         <div class="space-y-1">
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                                <span>Régimen Fiscal (Ley 822)</span>
-                                <span class="text-rose-500 font-bold">*</span>
+                            <label class="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <span class="flex items-center gap-1.5">
+                                    <span>Régimen Fiscal (Ley 822)</span>
+                                    <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+                                </span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                                    Fijo por Ley
+                                </span>
                             </label>
-                            <select x-model="empresaForm.regimen_tributario"
-                                required
-                                class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors">
-                                <option value="Cuota Fija">Cuota Fija (Régimen Simplificado)</option>
-                                <option value="Régimen General">Régimen General</option>
-                            </select>
+                            <div class="relative flex items-center">
+                                <input type="text"
+                                    value="Cuota Fija (Régimen Simplificado)"
+                                    readonly
+                                    disabled
+                                    class="w-full bg-slate-100/90 dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 rounded-xl pl-3 pr-8 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-semibold cursor-not-allowed select-none">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500 absolute right-2.5 pointer-events-none"></i>
+                            </div>
+                            <!-- Se envía fijo al backend -->
+                            <input type="hidden" x-model="empresaForm.regimen_tributario" value="Cuota Fija">
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400">Régimen tributario oficial exclusivo (No modificable).</p>
                         </div>
 
-                        <!-- Techo Mensual Cuota Fija (C$) -->
+                        <!-- Techo Mensual Cuota Fija (C$) - Fijo y Sin Editar (Exclusivo Frontend) -->
                         <div class="space-y-1 sm:col-span-2">
                             <label class="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                                <span>Techo Mensual Cuota Fija (Parámetro Fiscal)</span>
+                                <span class="flex items-center gap-1.5">
+                                    <span>Techo Mensual Cuota Fija (Parámetro Fiscal)</span>
+                                    <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+                                </span>
                                 <span class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" x-text="empresaForm.moneda_simbolo || 'C$'"></span>
                             </label>
-                            <input type="number"
-                                step="1000"
-                                min="0"
-                                x-model.number="empresaForm.techo_mensual_cuota_fija"
-                                required
-                                placeholder="100000.00"
-                                class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors font-mono">
-                            <p class="text-[10px] text-slate-400">Límite legal mensual Ley 822 (Por defecto C$ 100,000.00 / C$ 1,200,000 anual)</p>
+                            <div class="relative flex items-center">
+                                <input type="text"
+                                    :value="(empresaForm.moneda_simbolo || 'C$') + ' 100,000.00'"
+                                    readonly
+                                    disabled
+                                    class="w-full bg-slate-100/90 dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 rounded-xl pl-3 pr-8 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-mono font-bold cursor-not-allowed select-none">
+                                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute right-2.5 pointer-events-none"></i>
+                            </div>
+                            <!-- Se envía fijo al backend -->
+                            <input type="hidden" x-model.number="empresaForm.techo_mensual_cuota_fija" value="100000.00">
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400">Límite legal mensual fijo: C$ 100,000.00 / C$ 1,200,000.00 anual según Ley 822 (No editable).</p>
                         </div>
 
                         <!-- Mensaje Pie de Ticket -->
