@@ -1738,11 +1738,19 @@ function categoriasModule() {
             });
 
             if (result.isConfirmed) {
-                await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
-                    method: 'DELETE'
-                });
-                this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
-                await this.fetchCategorias();
+                try {
+                    const res = await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data.message || 'No se pudo eliminar la categoría.');
+                    }
+                    this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
+                    await this.fetchCategorias();
+                } catch (error) {
+                    this.notify('Error al eliminar categoría', error.message, 'error');
+                }
             }
         }
     };
@@ -1965,11 +1973,19 @@ function productosModule() {
             });
 
             if (result.isConfirmed) {
-                await this.apiFetch(`/api/productos/${product.producto_id}`, {
-                    method: 'DELETE'
-                });
-                this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
-                await this.fetchProductos();
+                try {
+                    const res = await this.apiFetch(`/api/productos/${product.producto_id}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data.message || 'No se pudo eliminar el producto.');
+                    }
+                    this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
+                    await this.fetchProductos();
+                } catch (error) {
+                    this.notify('Error al eliminar producto', error.message, 'error');
+                }
             }
         },
 
@@ -4677,6 +4693,7 @@ function app() {
 
         get filteredProducts() {
             return this.productos.filter(p => {
+                if (p.estado !== undefined && Number(p.estado) !== 1) return false;
                 const matchesSearch = !this.searchProduct ||
                     p.nombre_producto.toLowerCase().includes(this.searchProduct.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.searchProduct.toLowerCase());
@@ -4688,6 +4705,7 @@ function app() {
 
         get posFilteredProducts() {
             return this.productos.filter(p => {
+                if (p.estado !== undefined && Number(p.estado) !== 1) return false;
                 const matchesSearch = !this.posSearch ||
                     p.nombre_producto.toLowerCase().includes(this.posSearch.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.posSearch.toLowerCase());

@@ -28,6 +28,8 @@ class CategoriaController extends Controller
 
         if (array_key_exists('estado', $validated)) {
             $query->where('estado', $validated['estado']);
+        } else {
+            $query->where('estado', 1);
         }
 
         if (isset($validated['por_pagina'])) {
@@ -43,13 +45,15 @@ class CategoriaController extends Controller
             'codigo_categoria' => 'nullable|string|max:16|unique:categoria,codigo_categoria',
             'nombre_categoria' => 'required|string|max:24|unique:categoria,nombre_categoria',
             'descripcion_categoria' => 'nullable|string|max:64',
-            'estado' => 'required|integer|in:0,1',
+            'estado' => 'sometimes|integer|in:0,1',
         ], [
             'codigo_categoria.unique' => 'El código de categoría ya está en uso.',
             'nombre_categoria.required' => 'El nombre de la categoría es obligatorio.',
             'nombre_categoria.unique' => 'Ya existe una categoría con este nombre.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
         ]);
+
+        $validated['estado'] = $validated['estado'] ?? 1;
 
         $categoria = Categoria::create($validated);
 
@@ -100,7 +104,7 @@ class CategoriaController extends Controller
         if ($categoria->productos()->where('estado', 1)->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se puede desactivar la categoría porque tiene productos activos asociados. Reasigne o desactive primero sus productos.',
+                'message' => 'No se puede eliminar la categoría porque tiene productos activos asociados. Reasigne o elimine primero sus productos.',
             ], 409);
         }
 
@@ -108,7 +112,7 @@ class CategoriaController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Categoría desactivada correctamente',
+            'message' => 'Categoría eliminada correctamente',
             'categoria' => $categoria,
         ]);
     }

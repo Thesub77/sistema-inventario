@@ -34,10 +34,18 @@ class ProductoController extends Controller
             });
         }
 
-        foreach (['id_categoria', 'estado', 'tipo_producto'] as $campo) {
-            if (array_key_exists($campo, $validated)) {
-                $productos->where($campo, $validated[$campo]);
-            }
+        if (array_key_exists('id_categoria', $validated)) {
+            $productos->where('id_categoria', $validated['id_categoria']);
+        }
+
+        if (array_key_exists('tipo_producto', $validated)) {
+            $productos->where('tipo_producto', $validated['tipo_producto']);
+        }
+
+        if (array_key_exists('estado', $validated)) {
+            $productos->where('estado', $validated['estado']);
+        } else {
+            $productos->where('estado', 1);
         }
 
         if ($validated['stock_bajo'] ?? false) {
@@ -58,6 +66,7 @@ class ProductoController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateProducto($request);
+        $validated['estado'] = $validated['estado'] ?? 1;
 
         try {
             $producto = DB::transaction(function () use ($validated, $request) {
@@ -114,7 +123,7 @@ class ProductoController extends Controller
                     }
                     if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0 && (int) $producto->existencia_bodega > 0) {
                         throw ValidationException::withMessages([
-                            'estado' => "No se puede desactivar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de desactivarlo.",
+                            'estado' => "No se puede eliminar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de eliminarlo.",
                         ]);
                     }
                 } else {
@@ -124,7 +133,7 @@ class ProductoController extends Controller
                 if (array_key_exists('estado', $validated) && (int) $validated['estado'] === 0) {
                     if ($producto->combosDondeEsComponente()->whereHas('combo', fn ($q) => $q->where('estado', 1))->exists()) {
                         throw ValidationException::withMessages([
-                            'estado' => 'No se puede desactivar el producto porque forma parte de un combo activo.',
+                            'estado' => 'No se puede eliminar el producto porque forma parte de un combo activo.',
                         ]);
                     }
                 }
@@ -160,14 +169,14 @@ class ProductoController extends Controller
         if ($producto->combosDondeEsComponente()->whereHas('combo', fn ($q) => $q->where('estado', 1))->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se puede desactivar el producto porque forma parte de un combo activo.',
+                'message' => 'No se puede eliminar el producto porque forma parte de un combo activo.',
             ], 409);
         }
 
         if (! $producto->esCombo() && $producto->existencia_bodega > 0) {
             return response()->json([
                 'success' => false,
-                'message' => "No se puede desactivar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de desactivarlo.",
+                'message' => "No se puede eliminar el producto porque tiene stock físico disponible ({$producto->existencia_bodega} unidades). Ajuste o descargue el stock a 0 antes de eliminarlo.",
             ], 409);
         }
 
@@ -175,7 +184,7 @@ class ProductoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Producto desactivado correctamente',
+            'message' => 'Producto eliminado correctamente',
             'producto' => $producto,
         ]);
     }
@@ -226,7 +235,7 @@ class ProductoController extends Controller
             'precio_venta' => [...$presencia, 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
             'existencia_bodega' => $esCombo ? ['nullable', 'integer', 'min:0', 'max:2147483647'] : [...$presencia, 'integer', 'min:0', 'max:2147483647'],
             'existencia_minima' => [...$presencia, 'integer', 'min:0', 'max:2147483647'],
-            'estado' => [...$presencia, 'integer', 'in:0,1'],
+            'estado' => ['sometimes', 'integer', 'in:0,1'],
             'componentes' => [$esCombo && ! $producto ? 'required' : 'sometimes', 'array', 'min:1'],
             'componentes.*.id_producto_componente' => ['required', 'integer', 'exists:producto,producto_id'],
             'componentes.*.cantidad' => ['required', 'integer', 'min:1', 'max:10000'],

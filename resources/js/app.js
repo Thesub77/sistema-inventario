@@ -282,6 +282,7 @@ export function app() {
 
         get filteredProducts() {
             return this.productos.filter(p => {
+                if (p.estado !== undefined && Number(p.estado) !== 1) return false;
                 const matchesSearch = !this.searchProduct ||
                     p.nombre_producto.toLowerCase().includes(this.searchProduct.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.searchProduct.toLowerCase());
@@ -293,6 +294,7 @@ export function app() {
 
         get posFilteredProducts() {
             return this.productos.filter(p => {
+                if (p.estado !== undefined && Number(p.estado) !== 1) return false;
                 const matchesSearch = !this.posSearch ||
                     p.nombre_producto.toLowerCase().includes(this.posSearch.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.posSearch.toLowerCase());
