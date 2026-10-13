@@ -348,6 +348,13 @@ class CuentaPorPagarController extends Controller
 
             // Si se debita de caja (dinero en efectivo del turno)
             if ($validated['debitar_de_caja']) {
+                if ($validated['metodo_pago'] !== 'Efectivo') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Solo los pagos en Efectivo pueden debitarse directamente del cajón de una caja operativa.',
+                    ], 422);
+                }
+
                 $turno = null;
                 if (! empty($validated['id_caja_operacion'])) {
                     $turno = Caja_operacion::lockForUpdate()->findOrFail($validated['id_caja_operacion']);

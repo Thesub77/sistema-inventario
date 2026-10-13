@@ -227,6 +227,7 @@ class CajaService
 
         $esperado = $this->centavos($turno->monto_apertura) + $totales['Efectivo'] + $ingresosExtraordinarios - $devoluciones['Efectivo'] - $gastosMenores;
         CajaException::rechazarSi(abs($esperado) > 999999999999999999, 409, 'El efectivo excede la capacidad del arqueo.');
+        $esperadoFisico = max(0, $esperado);
 
         return [
             'monto_apertura' => $this->importe($this->centavos($turno->monto_apertura)),
@@ -238,7 +239,9 @@ class CajaService
             'devoluciones_efectivo' => $this->importe($devoluciones['Efectivo']),
             'devoluciones_tarjeta' => $this->importe($devoluciones['Tarjeta']),
             'devoluciones_transferencia' => $this->importe($devoluciones['Transferencia']),
-            'monto_esperado' => $turno->monto_esperado ?? $this->importe($esperado),
+            'monto_esperado' => $turno->monto_esperado !== null
+                ? $this->importe(max(0, $this->centavos($turno->monto_esperado)))
+                : $this->importe($esperadoFisico),
             'monto_cierre' => $turno->monto_cierre,
             'diferencia' => $turno->diferencia,
             // El saldo inicial real ya fue declarado al abrir. No se atribuyen ingresos
@@ -250,6 +253,34 @@ class CajaService
                 'url_consulta' => '/api/caja-movimientos-venta?id_caja='.$turno->id_caja.'&sin_turno=1',
             ],
         ];
+    }
+
+    /**
+     * Calcula en centavos el efectivo físico disponible actualmente en el turno.
+     */
+    public function efectivoDisponibleCentavos(Caja_operacion $turno): int
+    {
+        $arqueo = $this->arqueo($turno);
+
+        return $this->centavos($arqueo['monto_esperado']);
+    }
+
+    /**
+     * Exige que el turno disponga de efectivo físico suficiente antes de registrar una salida.
+     */
+    public function exigirEfectivoDisponible(Caja_operacion $turno, int $montoEgresoCentavos, string $concepto = 'el egreso solicitado'): void
+    {
+        $disponibleCentavos = $this->efectivoDisponibleCentavos($turno);
+        if ($montoEgresoCentavos > $disponibleCentavos) {
+            $disponibleTexto = number_format($disponibleCentavos / 100, 2);
+            $solicitadoTexto = number_format($montoEgresoCentavos / 100, 2);
+            $faltanteTexto = number_format(($montoEgresoCentavos - $disponibleCentavos) / 100, 2);
+
+            throw new CajaException(
+                422,
+                "Fondos insuficientes en la caja. El turno actual solo dispone de C$ {$disponibleTexto} en efectivo y no puede cubrir {$concepto} por C$ {$solicitadoTexto} (faltan C$ {$faltanteTexto})."
+            );
+        }
     }
 
     public function bitacora(Usuario $usuario, string $accion, Caja_operacion $turno): void
