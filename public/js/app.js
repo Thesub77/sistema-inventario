@@ -1053,7 +1053,7 @@ function dashboardModule() {
             const curYear = now.getFullYear();
             const curMonth = now.getMonth();
             const validVentas = (this.ventas || []).filter(v => Number(v.estado) === 1);
-            
+
             const ventasMes = validVentas
                 .filter(v => {
                     if (!v.fecha_hora_venta) return false;
@@ -1318,8 +1318,8 @@ function fiscalModule() {
 
             // Filas diarias
             (this.libroDiarioData?.dias || []).forEach(d => {
-                const rango = d.comprobante_inicial === d.comprobante_final 
-                    ? d.comprobante_inicial 
+                const rango = d.comprobante_inicial === d.comprobante_final
+                    ? d.comprobante_inicial
                     : `${d.comprobante_inicial} al ${d.comprobante_final}`;
                 csvContent += `"${d.fecha}","${d.cantidad_transacciones}","${d.comprobante_inicial}","${d.comprobante_final}","${rango}","${d.total_dia}"\r\n`;
             });
@@ -1516,11 +1516,10 @@ function utilsModule() {
             };
 
             const toast = document.createElement('div');
-            toast.className = `pointer-events-auto flex items-start gap-3 p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 transform translate-x-8 opacity-0 ${
-                isDark
+            toast.className = `pointer-events-auto flex items-start gap-3 p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 transform translate-x-8 opacity-0 ${isDark
                     ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-slate-950/50'
                     : 'bg-white/95 border-slate-200 text-slate-900 shadow-slate-200/80'
-            }`;
+                }`;
 
             toast.innerHTML = `
                 <div class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 border ${iconConfig.bg}">
@@ -1967,7 +1966,7 @@ function productosModule() {
                 numero_factura_recibo: '',
             };
             if (typeof this.fetchProveedores === 'function' && (!this.proveedores || this.proveedores.length === 0)) {
-                this.fetchProveedores().catch(() => {});
+                this.fetchProveedores().catch(() => { });
             }
             this.showStockModal = true;
             this.$nextTick(() => {
@@ -2062,8 +2061,8 @@ function productosModule() {
                 await Promise.all([
                     this.fetchProductos(),
                     this.fetchInventario(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
-                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => {}) : Promise.resolve()
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => { }) : Promise.resolve()
                 ]);
 
                 // Notificación no intrusiva con temporizador automático
@@ -3127,7 +3126,7 @@ function usuariosModule() {
                 .then(() => {
                     this.notify('Copiado', 'Contraseña copiada al portapapeles.', 'success', 2000);
                 })
-                .catch(() => {});
+                .catch(() => { });
         },
 
         async saveResetPassword() {
@@ -3664,7 +3663,7 @@ function posModule() {
                     const clonedRes = res.clone();
                     const errData = await clonedRes.json().catch(() => ({}));
                     const codeCollision = (errData.errors && errData.errors.codigo_venta) ||
-                                          (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
+                        (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
                     if (codeCollision) {
                         salePayload.codigo_venta = `FAC-2026-${Date.now().toString().slice(-6)}`;
                         res = await this.apiFetch('/api/ventas', {
@@ -3724,7 +3723,7 @@ function posModule() {
                         cashMap[newSale.venta_id] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         cashMap[newSale.codigo_venta] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         sessionStorage.setItem('pos_cash_records', JSON.stringify(cashMap));
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 // Sincronizaciones secundarias en background sin bloquear la interfaz
@@ -3773,7 +3772,7 @@ function posModule() {
                             this.receiptData.monto_recibido = rec.monto_recibido;
                             this.receiptData.cambio = rec.cambio;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 this.receiptAnulada = Boolean(preloadedData.estado === 0);
                 this.showReceiptModal = true;
@@ -3812,7 +3811,7 @@ function posModule() {
                         this.receiptData.monto_recibido = rec.monto_recibido;
                         this.receiptData.cambio = rec.cambio;
                     }
-                } catch (e) {}
+                } catch (e) { }
                 this.receiptAnulada = Boolean(data.anulada);
                 this.$nextTick(() => {
                     if (window.lucide) window.lucide.createIcons();
@@ -3903,16 +3902,16 @@ function posModule() {
                     margin: [margin, margin, margin, margin],
                     filename: fileName,
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { 
-                        scale: 2, 
-                        useCORS: true, 
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
                         backgroundColor: '#ffffff',
                         logging: false
                     },
-                    jsPDF: { 
-                        unit: 'mm', 
-                        format: [pdfWidth, pdfHeight], 
-                        orientation: 'portrait' 
+                    jsPDF: {
+                        unit: 'mm',
+                        format: [pdfWidth, pdfHeight],
+                        orientation: 'portrait'
                     },
                     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                 };
@@ -4780,14 +4779,14 @@ function app() {
                     case 'ventas':
                         await Promise.all([
                             this.fetchVentas(),
-                            this.fetchUsuarios().catch(() => {})
+                            this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
                     case 'libro-diario':
                         await Promise.all([
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
-                            this.fetchVentas().catch(() => {})
+                            this.fetchVentas().catch(() => { })
                         ]);
                         break;
                     case 'proveedores':
@@ -4801,7 +4800,7 @@ function app() {
                     case 'caja':
                         await Promise.all([
                             this.fetchVentas(),
-                            this.fetchBitacoras().catch(() => {})
+                            this.fetchBitacoras().catch(() => { })
                         ]);
                         break;
                     case 'inventario':
@@ -5434,7 +5433,7 @@ function app() {
 
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras().catch(() => {}),
+                    this.fetchBitacoras().catch(() => { }),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
@@ -5536,7 +5535,7 @@ function app() {
                 this.showCajaAperturaModal = false;
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
@@ -5679,11 +5678,11 @@ function app() {
 
                 this.showCajaCierreModal = false;
                 if (typeof this.fetchVentasEspera === 'function') {
-                    this.fetchVentasEspera().catch(() => {});
+                    this.fetchVentasEspera().catch(() => { });
                 }
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
