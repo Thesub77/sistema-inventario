@@ -522,6 +522,15 @@ class VentaController extends Controller
                 ], 409);
             }
 
+            if ($turnoDevolucion !== null && $venta->metodo_pago === 'Efectivo') {
+                $cajas = app(CajaService::class);
+                $cajas->exigirEfectivoDisponible(
+                    $turnoDevolucion,
+                    $cajas->centavos($venta->total_venta),
+                    'la devolución en efectivo de la venta'
+                );
+            }
+
             // Se restituyen las cantidades originales incluso si el producto está
             // inactivo; se exige que exista y que la existencia no desborde su columna.
             foreach ($venta->venta_detalles->sortBy('id_producto') as $detalle) {

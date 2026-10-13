@@ -133,6 +133,9 @@ class CajaMovimientoVentaController extends Controller
 
             $esIngreso = in_array($datos['tipo_movimiento'], ['Ingreso', 'Entrada'], true);
             $montoCentavos = $service->centavos($datos['monto']);
+            if (! $esIngreso) {
+                $service->exigirEfectivoDisponible($turno, $montoCentavos, 'el egreso de efectivo');
+            }
             $montoFinal = $esIngreso ? $service->importe($montoCentavos) : $service->importe(-$montoCentavos);
 
             $movimiento = Caja_movimiento_venta::create([

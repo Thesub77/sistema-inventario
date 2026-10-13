@@ -252,6 +252,34 @@ class CajaService
         ];
     }
 
+    /**
+     * Calcula en centavos el efectivo físico disponible actualmente en el turno.
+     */
+    public function efectivoDisponibleCentavos(Caja_operacion $turno): int
+    {
+        $arqueo = $this->arqueo($turno);
+
+        return max(0, $this->centavos($arqueo['monto_esperado']));
+    }
+
+    /**
+     * Exige que el turno disponga de efectivo físico suficiente antes de registrar una salida.
+     */
+    public function exigirEfectivoDisponible(Caja_operacion $turno, int $montoEgresoCentavos, string $concepto = 'el egreso solicitado'): void
+    {
+        $disponibleCentavos = $this->efectivoDisponibleCentavos($turno);
+        if ($montoEgresoCentavos > $disponibleCentavos) {
+            $disponibleTexto = number_format($disponibleCentavos / 100, 2);
+            $solicitadoTexto = number_format($montoEgresoCentavos / 100, 2);
+            $faltanteTexto = number_format(($montoEgresoCentavos - $disponibleCentavos) / 100, 2);
+
+            throw new CajaException(
+                422,
+                "Fondos insuficientes en la caja. El turno actual solo dispone de C$ {$disponibleTexto} en efectivo y no puede cubrir {$concepto} por C$ {$solicitadoTexto} (faltan C$ {$faltanteTexto})."
+            );
+        }
+    }
+
     public function bitacora(Usuario $usuario, string $accion, Caja_operacion $turno): void
     {
         Bitacora::create([

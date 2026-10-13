@@ -295,4 +295,51 @@ class VentaTest extends TestCase
             'estado' => 1,
         ]);
     }
+
+    public function test_rechaza_egreso_extraordinario_y_anulacion_en_efectivo_sin_fondos(): void
+    {
+        // 1. Registrar una venta en efectivo de 3 unidades x C$ 30 = C$ 90.00
+        $resVenta = $this->postJson('/api/ventas', [
+            'id_usuario' => $this->usuario->usuario_id,
+            'cliente_nombre' => 'Cliente Efectivo',
+            'codigo_venta' => 'FAC-EF-99',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => now()->toDateTimeString(),
+            'detalles' => [
+                [
+                    'id_producto' => $this->producto->producto_id,
+                    'cantidad' => 3,
+                ],
+            ],
+        ]);
+        $resVenta->assertStatus(201);
+        $ventaId = $resVenta->json('venta.venta_id');
+
+        // 2. Intentar sacar C$ 150.00 de la caja cuando solo hay C$ 90.00 -> Rechazado con 422
+        $resEgresoInvalido = $this->postJson('/api/caja-movimientos-venta', [
+            'id_caja' => $this->cajaAbierta->caja_id,
+            'tipo_movimiento' => 'Egreso',
+            'monto' => 150.00,
+            'justificacion' => 'Compra de insumos que supera el efectivo',
+        ]);
+        $resEgresoInvalido->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        // 3. Registrar un egreso permitido de C$ 70.00 -> Deja la caja con C$ 20.00 disponibles
+        $resEgresoValido = $this->postJson('/api/caja-movimientos-venta', [
+            'id_caja' => $this->cajaAbierta->caja_id,
+            'tipo_movimiento' => 'Egreso',
+            'monto' => 70.00,
+            'justificacion' => 'Gasto menor autorizado de bolsas',
+        ]);
+        $resEgresoValido->assertStatus(201);
+
+        // 4. Intentar anular la venta de C$ 90.00 en efectivo cuando solo quedan C$ 20.00 en la caja -> Rechazado con 422
+        $resAnular = $this->deleteJson("/api/ventas/{$ventaId}", [
+            'id_usuario' => $this->usuario->usuario_id,
+            'id_caja' => $this->cajaAbierta->caja_id,
+        ]);
+        $resAnular->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
 }

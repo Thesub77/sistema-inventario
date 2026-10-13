@@ -348,6 +348,13 @@ class CuentaPorPagarController extends Controller
 
             // Si se debita de caja (dinero en efectivo del turno)
             if ($validated['debitar_de_caja']) {
+                if ($validated['metodo_pago'] !== 'Efectivo') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Solo los pagos en Efectivo pueden debitarse directamente del cajón de una caja operativa.',
+                    ], 422);
+                }
+
                 $turno = null;
                 if (! empty($validated['id_caja_operacion'])) {
                     $turno = Caja_operacion::lockForUpdate()->findOrFail($validated['id_caja_operacion']);
@@ -368,6 +375,19 @@ class CuentaPorPagarController extends Controller
 
                 $cajaService = app(CajaService::class);
                 $montoCentavos = $cajaService->centavos($montoAbono);
+                $disponibleCentavos = $cajaService->efectivoDisponibleCentavos($turno);
+
+                if ($montoCentavos > $disponibleCentavos) {
+                    $disponibleTexto = number_format($disponibleCentavos / 100, 2);
+                    $solicitadoTexto = number_format($montoCentavos / 100, 2);
+                    $faltanteTexto = number_format(($montoCentavos - $disponibleCentavos) / 100, 2);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Fondos insuficientes en la caja. El turno actual solo dispone de C$ {$disponibleTexto} en efectivo y no puede cubrir un abono de C$ {$solicitadoTexto} (faltan C$ {$faltanteTexto}). Registre primero el ingreso de efectivo en caja o desmarque la opción de debitar de caja.",
+                    ], 422);
+                }
+
                 $montoNegativo = $cajaService->importe(-$montoCentavos);
 
                 $movimiento = Caja_movimiento_venta::create([
