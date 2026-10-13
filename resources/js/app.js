@@ -521,20 +521,20 @@ export function app() {
                     case 'ventas':
                         await Promise.all([
                             this.fetchVentas(),
-                            this.fetchUsuarios().catch(() => {})
+                            this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
                     case 'libro-diario':
                         await Promise.all([
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
-                            this.fetchVentas().catch(() => {})
+                            this.fetchVentas().catch(() => { })
                         ]);
                         break;
                     case 'caja':
                         await Promise.all([
                             this.fetchVentas(),
-                            this.fetchBitacoras().catch(() => {})
+                            this.fetchBitacoras().catch(() => { })
                         ]);
                         break;
                     case 'proveedores':
@@ -1186,7 +1186,7 @@ export function app() {
 
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras().catch(() => {}),
+                    this.fetchBitacoras().catch(() => { }),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
@@ -1288,7 +1288,7 @@ export function app() {
                 this.showCajaAperturaModal = false;
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
@@ -1431,11 +1431,11 @@ export function app() {
 
                 this.showCajaCierreModal = false;
                 if (typeof this.fetchVentasEspera === 'function') {
-                    this.fetchVentasEspera().catch(() => {});
+                    this.fetchVentasEspera().catch(() => { });
                 }
                 await Promise.all([
                     this.fetchVentas(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
                     this.fetchDashboardData ? this.fetchDashboardData() : Promise.resolve()
                 ]);
 
