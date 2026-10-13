@@ -275,7 +275,7 @@ export function app() {
         },
 
         get lowStockProducts() {
-            return this.productos.filter(p => Number(p.existencia_bodega) <= Number(p.existencia_minima));
+            return this.productos.filter(p => (p.tipo_producto || 'estandar') !== 'combo' && Number(p.existencia_bodega) <= Number(p.existencia_minima));
         },
 
         get stats() {
@@ -296,7 +296,8 @@ export function app() {
                     p.nombre_producto.toLowerCase().includes(this.searchProduct.toLowerCase()) ||
                     p.codigo_producto.toLowerCase().includes(this.searchProduct.toLowerCase());
                 const matchesCat = !this.filterCategory || p.id_categoria == this.filterCategory;
-                return matchesSearch && matchesCat;
+                const matchesTipo = !this.filterTipoProducto || (p.tipo_producto || 'estandar') === this.filterTipoProducto;
+                return matchesSearch && matchesCat && matchesTipo;
             });
         },
 

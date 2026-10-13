@@ -68,6 +68,11 @@ class MovimientoInventarioController extends Controller
 
         return DB::transaction(function () use ($datos, $ajuste, $esMerma) {
             $producto = Producto::lockForUpdate()->findOrFail($datos['id_producto']);
+            if ($producto->esCombo()) {
+                throw ValidationException::withMessages([
+                    'id_producto' => 'Los productos compuestos (combos) no manejan stock físico directo. Las existencias se gestionan a través de sus componentes individuales.',
+                ]);
+            }
             $anterior = (int) $producto->existencia_bodega;
             $entrada = in_array($datos['tipo_movimiento'], ['Entrada', 'Entrada por Compra'], true);
             $nuevo = $ajuste ? (int) $datos['stock_resultante_producto']

@@ -128,12 +128,17 @@
                 <div>
                     <!-- Header de la tarjeta: Código y Badge de Stock visible arriba -->
                     <div class="flex items-center justify-between gap-1.5 mb-1.5">
-                        <span class="text-[10px] font-mono text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider truncate" x-text="p.codigo_producto"></span>
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="text-[10px] font-mono text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider truncate" x-text="p.codigo_producto"></span>
+                            <span x-show="p.tipo_producto === 'combo'" class="text-[9px] px-1.5 py-0.5 rounded font-extrabold bg-purple-500/20 text-purple-400 border border-purple-500/30 uppercase tracking-wide">
+                                Combo
+                            </span>
+                        </div>
                         <span class="text-[11px] px-2 py-0.5 rounded-md font-bold shadow-xs whitespace-nowrap"
                             :class="p.existencia_bodega > 0 
-                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60' 
+                                ? (p.tipo_producto === 'combo' ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60') 
                                 : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'"
-                            x-text="'Stock: ' + p.existencia_bodega">
+                            x-text="(p.tipo_producto === 'combo' ? 'Combos: ' : 'Stock: ') + p.existencia_bodega">
                         </span>
                     </div>
                     <h5 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors" x-text="p.nombre_producto"></h5>
