@@ -227,7 +227,6 @@ class CajaService
 
         $esperado = $this->centavos($turno->monto_apertura) + $totales['Efectivo'] + $ingresosExtraordinarios - $devoluciones['Efectivo'] - $gastosMenores;
         CajaException::rechazarSi(abs($esperado) > 999999999999999999, 409, 'El efectivo excede la capacidad del arqueo.');
-        $esperadoFisico = max(0, $esperado);
 
         return [
             'monto_apertura' => $this->importe($this->centavos($turno->monto_apertura)),
@@ -239,9 +238,7 @@ class CajaService
             'devoluciones_efectivo' => $this->importe($devoluciones['Efectivo']),
             'devoluciones_tarjeta' => $this->importe($devoluciones['Tarjeta']),
             'devoluciones_transferencia' => $this->importe($devoluciones['Transferencia']),
-            'monto_esperado' => $turno->monto_esperado !== null
-                ? $this->importe(max(0, $this->centavos($turno->monto_esperado)))
-                : $this->importe($esperadoFisico),
+            'monto_esperado' => $turno->monto_esperado ?? $this->importe($esperado),
             'monto_cierre' => $turno->monto_cierre,
             'diferencia' => $turno->diferencia,
             // El saldo inicial real ya fue declarado al abrir. No se atribuyen ingresos
@@ -262,7 +259,7 @@ class CajaService
     {
         $arqueo = $this->arqueo($turno);
 
-        return $this->centavos($arqueo['monto_esperado']);
+        return max(0, $this->centavos($arqueo['monto_esperado']));
     }
 
     /**

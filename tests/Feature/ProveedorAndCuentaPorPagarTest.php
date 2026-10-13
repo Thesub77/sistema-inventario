@@ -71,7 +71,7 @@ class ProveedorAndCuentaPorPagarTest extends TestCase
         $this->turno = Caja_operacion::create([
             'id_caja' => $this->caja->caja_id,
             'id_usuario' => $this->adminUser->usuario_id,
-            'monto_apertura' => 500.00,
+            'monto_apertura' => 1000.00,
             'fecha_hora_apertura' => now(),
             'estado' => 1,
         ]);
@@ -389,5 +389,53 @@ class ProveedorAndCuentaPorPagarTest extends TestCase
 
         $res->assertStatus(422)
             ->assertJsonPath('success', false);
+    }
+
+    public function test_rechaza_abono_desde_caja_cuando_efectivo_disponible_es_insuficiente(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        // Turno con apertura de C$ 100 y ventas/ingresos en efectivo de C$ 270 = C$ 370 disponibles
+        $this->turno->update(['monto_apertura' => 100.00]);
+        Caja_movimiento_venta::create([
+            'id_caja' => $this->caja->caja_id,
+            'id_caja_operacion' => $this->turno->caja_operacion_id,
+            'id_venta' => null,
+            'monto_movimiento' => '270.00',
+            'fecha_hora_movimiento' => now(),
+            'estado' => 1,
+        ]);
+
+        $prov = Proveedor::create(['nombre_comercial' => 'Proveedor Mayorista', 'estado' => 1]);
+        $cuenta = Cuenta_por_pagar::create([
+            'id_proveedor' => $prov->proveedor_id,
+            'numero_factura' => 'FAC-94',
+            'fecha_emision' => now()->toDateString(),
+            'fecha_vencimiento' => now()->addDays(7)->toDateString(),
+            'monto_total' => 2500.00,
+            'monto_pagado' => 0.00,
+            'saldo_pendiente' => 2500.00,
+            'estado' => 'Pendiente',
+        ]);
+
+        // Intentar debitar C$ 2,100.00 cuando en caja solo hay C$ 370.00 -> Rechazado con 422
+        $resInvalido = $this->postJson("/api/cuentas-por-pagar/{$cuenta->cuenta_por_pagar_id}/pagos", [
+            'monto_pago' => 2100.00,
+            'metodo_pago' => 'Efectivo',
+            'debitar_de_caja' => true,
+            'id_caja_operacion' => $this->turno->caja_operacion_id,
+        ]);
+
+        $resInvalido->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        // Retirar un monto permitido (C$ 370.00) se procesa correctamente
+        $resValido = $this->postJson("/api/cuentas-por-pagar/{$cuenta->cuenta_por_pagar_id}/pagos", [
+            'monto_pago' => 370.00,
+            'metodo_pago' => 'Efectivo',
+            'debitar_de_caja' => true,
+            'id_caja_operacion' => $this->turno->caja_operacion_id,
+        ]);
+        $resValido->assertStatus(201);
     }
 }
