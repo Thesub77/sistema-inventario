@@ -653,6 +653,9 @@ export function posModule() {
                     this.fetchInventario(),
                     this.fetchBitacoras()
                 ]);
+                if (typeof this.fetchLibroDiario === 'function') {
+                    await this.fetchLibroDiario();
+                }
             } catch {
                 this.notify('Venta Anulada', 'La anulación se guardó, pero no se pudo actualizar la pantalla.', 'warning');
                 return;

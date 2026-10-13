@@ -38,6 +38,13 @@ export function productosModule() {
             numero_factura_recibo: '',
         },
 
+        // Kardex modal state
+        showKardexModal: false,
+        kardexSelectedProduct: null,
+        kardexSelectedProductId: '',
+        kardexFilterType: '',
+        kardexSearch: '',
+
         // Helper methods for combo management
         setProductTipo(tipo) {
             this.productForm.tipo_producto = tipo;
@@ -336,6 +343,108 @@ export function productosModule() {
             } catch (error) {
                 this.notify('Error de Inventario', error.message, 'error');
             }
+        },
+
+        // Kardex Modal Methods
+        async openKardexModal(product = null) {
+            this.kardexSelectedProduct = product || null;
+            this.kardexSelectedProductId = product ? String(product.producto_id) : '';
+            this.kardexFilterType = '';
+            this.kardexSearch = '';
+            this.showKardexModal = true;
+            if (typeof this.fetchInventario === 'function' && (!Array.isArray(this.movimientosInventario) || this.movimientosInventario.length === 0)) {
+                await this.fetchInventario();
+            }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        closeKardexModal() {
+            this.showKardexModal = false;
+            this.kardexSelectedProduct = null;
+            this.kardexSelectedProductId = '';
+            this.kardexFilterType = '';
+            this.kardexSearch = '';
+        },
+
+        onKardexProductChange() {
+            if (!this.kardexSelectedProductId) {
+                this.kardexSelectedProduct = null;
+            } else {
+                const found = (this.productos || []).find(p => String(p.producto_id) === String(this.kardexSelectedProductId));
+                this.kardexSelectedProduct = found || null;
+            }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        openStockFromKardex() {
+            if (this.kardexSelectedProduct && this.kardexSelectedProduct.tipo_producto !== 'combo') {
+                const prod = this.kardexSelectedProduct;
+                this.closeKardexModal();
+                this.openStockModal(prod);
+            }
+        },
+
+        get filteredKardexMovimientos() {
+            let list = Array.isArray(this.movimientosInventario) ? this.movimientosInventario : [];
+            if (this.kardexSelectedProduct) {
+                const prodId = Number(this.kardexSelectedProduct.producto_id);
+                list = list.filter(m => Number(m.id_producto) === prodId || (m.producto && Number(m.producto.producto_id) === prodId));
+            }
+            if (this.kardexFilterType) {
+                const filter = this.kardexFilterType.toLowerCase();
+                list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes(filter));
+            }
+            if (this.kardexSearch && this.kardexSearch.trim()) {
+                const q = this.kardexSearch.toLowerCase().trim();
+                list = list.filter(m => {
+                    const prodName = m.producto ? (m.producto.nombre_producto || '').toLowerCase() : '';
+                    const prodCod = m.producto ? (m.producto.codigo_producto || '').toLowerCase() : '';
+                    const provName = (m.proveedor_nombre || '').toLowerCase();
+                    const factura = (m.numero_factura_recibo || '').toLowerCase();
+                    const tipo = (m.tipo_movimiento || '').toLowerCase();
+                    const usuario = m.usuario ? (m.usuario.nombre_apellido || '').toLowerCase() : '';
+                    const merma = (m.tipo_merma || '').toLowerCase();
+                    return prodName.includes(q) || prodCod.includes(q) || provName.includes(q) || factura.includes(q) || tipo.includes(q) || usuario.includes(q) || merma.includes(q);
+                });
+            }
+            return list;
+        },
+
+        get kardexStats() {
+            const list = this.filteredKardexMovimientos;
+            let entradas = 0;
+            let mermas = 0;
+            let ventas = 0;
+            let ajustes = 0;
+            let costoMermas = 0;
+            for (const m of list) {
+                const tipo = (m.tipo_movimiento || '').toLowerCase();
+                const cant = Number(m.cantidad_movimimiento || m.cantidad_movimiento || 0);
+                if (tipo.includes('entrada') || tipo.includes('inicial')) {
+                    entradas += cant;
+                } else if (tipo.includes('merma')) {
+                    mermas += cant;
+                    if (m.costo_total_perdida) {
+                        costoMermas += Number(m.costo_total_perdida);
+                    }
+                } else if (tipo.includes('venta')) {
+                    ventas += cant;
+                } else if (tipo.includes('ajuste')) {
+                    ajustes += 1;
+                }
+            }
+            return {
+                totalRegistros: list.length,
+                entradas,
+                mermas,
+                ventas,
+                ajustes,
+                costoMermas
+            };
         }
     };
 }

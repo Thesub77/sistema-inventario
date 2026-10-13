@@ -110,7 +110,7 @@
                         </div>
                     </div>
                 </div>
-                <p class="text-[10px] text-slate-500 dark:text-slate-400">Campos opcionales para trazabilidad en Kardex sin frenar la captura rápida.</p>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400">Campos opcionales para trazabilidad en el historial de movimientos sin frenar la captura rápida.</p>
             </div>
 
             <!-- Tipificación y Costeo Financiero de Merma (RF-48) -->

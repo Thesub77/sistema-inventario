@@ -433,7 +433,7 @@
 
     <!-- 4. SECCIÓN DESPLEGABLE: FACTURAS INDIVIDUALES EMITIDAS EN EL MES -->
     <div x-show="showLibroComprobantesDetalle" x-transition.duration.300ms class="glass-panel p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4 no-print shadow-sm">
-        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-500 flex items-center justify-center">
                     <i data-lucide="list-checks" class="w-4 h-4"></i>
@@ -447,8 +447,29 @@
                     </p>
                 </div>
             </div>
-            <span class="text-xs font-mono font-bold text-slate-500 dark:text-slate-400"
-                x-text="libroDiarioVentasDetalle.length + ' comprobantes'"></span>
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <!-- Buscador de comprobante o cliente -->
+                <div class="relative flex-1 sm:w-56">
+                    <input type="text" x-model="searchLibroComprobante"
+                        placeholder="Buscar factura o cliente..."
+                        class="w-full bg-white dark:bg-dark-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                    <button type="button" x-show="searchLibroComprobante" @click="searchLibroComprobante = ''"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+
+                <!-- Toggle ver anuladas -->
+                <label class="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                    <input type="checkbox" x-model="incluirAnuladasLibro"
+                        class="rounded border-slate-300 dark:border-slate-700 text-brand-600 focus:ring-brand-500">
+                    <span>Ver anuladas</span>
+                </label>
+
+                <span class="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 ml-auto sm:ml-0"
+                    x-text="libroDiarioVentasDetalle.length + ' comprobantes'"></span>
+            </div>
         </div>
 
         <div class="overflow-x-auto max-h-80 overflow-y-auto">
@@ -458,6 +479,7 @@
                         <th class="py-2.5 px-3">N° Factura</th>
                         <th class="py-2.5 px-3">Fecha y Hora</th>
                         <th class="py-2.5 px-3">Cliente</th>
+                        <th class="py-2.5 px-3">Cajero / Vendedor</th>
                         <th class="py-2.5 px-3">Método de Pago</th>
                         <th class="py-2.5 px-3 text-right">Total Facturado</th>
                         <th class="py-2.5 px-3 text-center">Acción</th>
@@ -465,13 +487,28 @@
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
                     <template x-for="v in libroDiarioVentasDetalle" :key="v.venta_id">
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td class="py-2 px-3 font-bold text-brand-600 dark:text-brand-400" x-text="v.codigo_venta"></td>
-                            <td class="py-2 px-3 text-slate-600 dark:text-slate-300" x-text="formatDate(v.fecha_hora_venta)"></td>
-                            <td class="py-2 px-3 font-sans text-slate-800 dark:text-slate-200" x-text="v.cliente_nombre || 'Consumidor Final'"></td>
-                            <td class="py-2 px-3 capitalize font-sans text-slate-600 dark:text-slate-400" x-text="v.metodo_pago || 'Efectivo'"></td>
-                            <td class="py-2 px-3 text-right font-bold text-slate-900 dark:text-emerald-400" x-text="formatCurrency(v.total_venta)"></td>
-                            <td class="py-2 px-3 text-center">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                            :class="{'bg-rose-50/40 dark:bg-rose-950/20': Number(v.estado) === 0}">
+                            <td class="py-2.5 px-3 font-bold text-brand-600 dark:text-brand-400">
+                                <div class="flex items-center gap-1.5">
+                                    <span x-text="v.codigo_venta"></span>
+                                    <span x-show="Number(v.estado) === 0"
+                                        class="text-[9px] font-sans font-bold px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">Anulada</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-600 dark:text-slate-300" x-text="formatDate(v.fecha_hora_venta)"></td>
+                            <td class="py-2.5 px-3 font-sans text-slate-800 dark:text-slate-200" x-text="v.cliente_nombre || 'Consumidor Final'"></td>
+                            <td class="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-400" x-text="v.usuario?.nombre_apellido || 'N/A'"></td>
+                            <td class="py-2.5 px-3 capitalize font-sans">
+                                <span class="px-2 py-0.5 text-[11px] rounded-md font-medium"
+                                    :class="v.metodo_pago === 'Efectivo' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-brand-500/10 text-brand-600 dark:text-brand-400'"
+                                    x-text="v.metodo_pago || 'Efectivo'"></span>
+                                <span x-show="v.referencia_transferencia" class="block font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[130px]" :title="v.referencia_transferencia" x-text="v.referencia_transferencia"></span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-bold"
+                                :class="Number(v.estado) === 0 ? 'line-through text-rose-500' : 'text-slate-900 dark:text-emerald-400'"
+                                x-text="formatCurrency(v.total_venta)"></td>
+                            <td class="py-2.5 px-3 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <button type="button" @click="openReceiptModal(v.venta_id)"
                                         class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-sans font-semibold transition-all cursor-pointer flex items-center gap-1 border border-slate-200 dark:border-slate-700/60"
@@ -484,7 +521,7 @@
                         </tr>
                     </template>
                     <tr x-show="libroDiarioVentasDetalle.length === 0">
-                        <td colspan="6" class="py-6 text-center text-slate-500 font-sans">
+                        <td colspan="7" class="py-6 text-center text-slate-500 font-sans">
                             No hay facturas registradas en este mes.
                         </td>
                     </tr>
@@ -635,3 +672,4 @@
     </div>
 
 </div>
+

@@ -18,6 +18,8 @@ export function fiscalModule() {
         libroDiarioLoading: false,
         libroDiarioEmisionFecha: '',
         showLibroComprobantesDetalle: false,
+        searchLibroComprobante: '',
+        incluirAnuladasLibro: false,
         libroDiarioData: {
             success: true,
             anio: now.getFullYear(),
@@ -58,19 +60,31 @@ export function fiscalModule() {
             return m ? m.label : 'Mes ' + this.libroDiarioMes;
         },
 
-        // Facturas individuales pertenecientes al mes y año seleccionado (para auditoría y descarga detallada)
+        // Facturas individuales pertenecientes al mes y año seleccionado (para auditoría y consulta interactiva)
         get libroDiarioVentasDetalle() {
             const mesSel = Number(this.libroDiarioMes);
             const anioSel = Number(this.libroDiarioAnio);
+            const term = (this.searchLibroComprobante || '').toLowerCase().trim();
 
             return (this.ventas || [])
                 .filter(v => {
-                    if (Number(v.estado) === 0) return false; // Excluir ventas anuladas
+                    if (!this.incluirAnuladasLibro && Number(v.estado) === 0) return false;
                     if (!v.fecha_hora_venta) return false;
                     const d = new Date(v.fecha_hora_venta);
-                    return d.getFullYear() === anioSel && (d.getMonth() + 1) === mesSel;
+                    if (d.getFullYear() !== anioSel || (d.getMonth() + 1) !== mesSel) return false;
+
+                    if (term) {
+                        const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
+                        const clientMatch = (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term)) ||
+                            (v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term));
+                        const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
+                        const userMatch = v.usuario && v.usuario.nombre_apellido && v.usuario.nombre_apellido.toLowerCase().includes(term);
+                        if (!codeMatch && !clientMatch && !refMatch && !userMatch) return false;
+                    }
+
+                    return true;
                 })
-                .sort((a, b) => new Date(a.fecha_hora_venta) - new Date(b.fecha_hora_venta));
+                .sort((a, b) => new Date(b.fecha_hora_venta) - new Date(a.fecha_hora_venta));
         },
 
         // Helper para formatear fecha y hora completa
