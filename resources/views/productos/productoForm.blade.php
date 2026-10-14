@@ -43,8 +43,15 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Código</label>
-                    <input type="text" x-model="productForm.codigo_producto" required placeholder="PROD-001"
-                        class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                    <input type="text" x-model="productForm.codigo_producto" required
+                        @input="productForm.codigo_producto = $event.target.value.replace(/[^a-zA-Z0-9\-]/g, '')"
+                        :disabled="!isEditingProduct && (productForm.tipo_producto === 'combo' ? (empresa?.configuracion?.productos?.modo_codigo_combo === 'automatico') : (empresa?.configuracion?.productos?.modo_codigo === 'automatico'))"
+                        :placeholder="productForm.tipo_producto === 'combo'
+                            ? (empresa?.configuracion?.productos?.modo_codigo_combo === 'manual' ? 'Código manual para combo...' : 'Ej. ' + ((empresa?.configuracion?.productos?.prefijo_codigo_combo || 'COMBO').replace(/-+$/, '')) + '-001')
+                            : (empresa?.configuracion?.productos?.modo_codigo === 'manual' ? 'Código manual o de barras...' : 'Ej. ' + ((empresa?.configuracion?.productos?.prefijo_codigo || 'PROD').replace(/-+$/, '')) + '-001')"
+                        class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 font-mono disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-900/60">
+                    <span x-show="!isEditingProduct && (productForm.tipo_producto === 'combo' ? (empresa?.configuracion?.productos?.modo_codigo_combo === 'automatico') : (empresa?.configuracion?.productos?.modo_codigo === 'automatico'))"
+                        class="text-[10px] text-slate-400 mt-0.5 block">Autogenerado según configuración</span>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría</label>
