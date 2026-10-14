@@ -290,4 +290,3 @@ class EmpresaTest extends TestCase
             ->assertJsonValidationErrors(['configuracion.productos.prefijo_codigo']);
     }
 }
-
