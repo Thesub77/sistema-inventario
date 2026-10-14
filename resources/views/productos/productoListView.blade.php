@@ -101,9 +101,12 @@
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <!-- Movimientos de Stock Button -->
-                                    <button @click="openKardexModal(p)" class="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Movimientos de Stock">
+                                    <button x-show="p.tipo_producto !== 'combo'" @click="openKardexModal(p)" class="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Movimientos de Stock">
                                         <i data-lucide="history" class="w-4 h-4"></i>
                                     </button>
+                                    <span x-show="p.tipo_producto === 'combo'" class="p-1.5 text-slate-600 cursor-not-allowed" title="Los combos no manejan inventario propio; consulte el historial de sus componentes">
+                                        <i data-lucide="info" class="w-4 h-4"></i>
+                                    </span>
                                     <!-- Edit Button -->
                                     <button @click="openProductModal(p)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Editar Producto">
                                         <i data-lucide="edit-3" class="w-4 h-4"></i>
