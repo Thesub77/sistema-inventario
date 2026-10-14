@@ -137,8 +137,8 @@ export function app() {
             },
             {
                 id: 'libro-diario',
-                label: 'Libro Fiscal',
-                icon: 'book-open'
+                label: 'Balance Mensual',
+                icon: 'scale'
             },
             {
                 id: 'proveedores',
