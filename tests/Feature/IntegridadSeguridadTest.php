@@ -132,6 +132,120 @@ class IntegridadSeguridadTest extends TestCase
         $res2->assertJsonValidationErrors(['codigo_categoria']);
     }
 
+    public function test_categoria_permite_reutilizar_nombre_o_codigo_de_categoria_eliminada(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-DUP',
+            'nombre_categoria' => 'Categoria Temporal',
+            'estado' => 1,
+        ]);
+
+        // 1. Eliminar lógicamente la categoría
+        $this->deleteJson("/api/categorias/{$cat->categoria_id}")
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('categoria', [
+            'categoria_id' => $cat->categoria_id,
+            'estado' => 0,
+        ]);
+
+        // 2. Registrar una nueva categoría con el mismo nombre y código debe permitirse (201)
+        $resNueva = $this->postJson('/api/categorias', [
+            'codigo_categoria' => 'CAT-DUP',
+            'nombre_categoria' => 'Categoria Temporal',
+            'descripcion_categoria' => 'Nueva versión activa',
+            'estado' => 1,
+        ]);
+        $resNueva->assertStatus(201);
+        $nuevaId = $resNueva->json('categoria_id');
+
+        // 3. Un segundo registro activo con el mismo nombre o código debe rechazarse (422)
+        $resFallo = $this->postJson('/api/categorias', [
+            'codigo_categoria' => 'CAT-DUP',
+            'nombre_categoria' => 'Categoria Temporal',
+            'estado' => 1,
+        ]);
+        $resFallo->assertStatus(422);
+        $resFallo->assertJsonValidationErrors(['codigo_categoria', 'nombre_categoria']);
+
+        // 4. Actualizar otra categoría para tomar el nombre/código de una categoría eliminada debe ser válido
+        $otraCat = Categoria::create([
+            'codigo_categoria' => 'CAT-OTRA',
+            'nombre_categoria' => 'Otra Categoria',
+            'estado' => 1,
+        ]);
+
+        // Eliminar la segunda creada
+        $this->deleteJson("/api/categorias/{$nuevaId}")->assertStatus(200);
+
+        // Ahora otraCat puede renombrarse a Categoria Temporal y CAT-DUP
+        $resUpdate = $this->putJson("/api/categorias/{$otraCat->categoria_id}", [
+            'codigo_categoria' => 'CAT-DUP',
+            'nombre_categoria' => 'Categoria Temporal',
+        ]);
+        $resUpdate->assertStatus(200);
+    }
+
+    public function test_producto_permite_reutilizar_codigo_o_nombre_de_producto_eliminado(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-TEST-P',
+            'nombre_categoria' => 'Cat Para Prod',
+            'estado' => 1,
+        ]);
+
+        $prod = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'COD-REUSE',
+            'nombre_producto' => 'Producto Reusable',
+            'descripcion_producto' => 'Original',
+            'costo_compra' => 20,
+            'precio_venta' => 35,
+            'existencia_bodega' => 0,
+            'existencia_minima' => 2,
+            'estado' => 1,
+        ]);
+
+        // 1. Eliminar lógicamente el producto (stock en 0)
+        $this->deleteJson("/api/productos/{$prod->producto_id}")
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('producto', [
+            'producto_id' => $prod->producto_id,
+            'estado' => 0,
+        ]);
+
+        // 2. Crear un nuevo producto con el mismo código y nombre debe permitirse (201)
+        $resNuevo = $this->postJson('/api/productos', [
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'COD-REUSE',
+            'nombre_producto' => 'Producto Reusable',
+            'descripcion_producto' => 'Versión reemplazo',
+            'costo_compra' => 20,
+            'precio_venta' => 35,
+            'existencia_bodega' => 5,
+            'existencia_minima' => 1,
+            'estado' => 1,
+        ]);
+        $resNuevo->assertStatus(201);
+        $nuevoId = $resNuevo->json('producto_id');
+
+        // 3. Crear otro activo con el mismo código o nombre debe rechazarse (422)
+        $resFallo = $this->postJson('/api/productos', [
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'COD-REUSE',
+            'nombre_producto' => 'Producto Reusable',
+            'descripcion_producto' => 'Intento duplicado',
+            'costo_compra' => 20,
+            'precio_venta' => 35,
+            'existencia_bodega' => 1,
+            'existencia_minima' => 1,
+            'estado' => 1,
+        ]);
+        $resFallo->assertStatus(422);
+        $resFallo->assertJsonValidationErrors(['codigo_producto', 'nombre_producto']);
+    }
+
     public function test_proveedor_se_desactiva_logicamente(): void
     {
         $proveedor = Proveedor::create([

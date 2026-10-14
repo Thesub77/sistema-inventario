@@ -209,7 +209,8 @@ class ProductoController extends Controller
     private function rules(?Producto $producto = null, bool $esCombo = false): array
     {
         $presencia = $producto ? ['sometimes', 'required'] : ['required'];
-        $codigo = Rule::unique('producto', 'codigo_producto');
+        $codigo = Rule::unique('producto', 'codigo_producto')->where(fn ($query) => $query->where('estado', 1));
+        $nombre = Rule::unique('producto', 'nombre_producto')->where(fn ($query) => $query->where('estado', 1));
         $categoria = Rule::exists('categoria', 'categoria_id')->where(function ($query) use ($producto) {
             $query->where(function ($query) use ($producto) {
                 $query->where('estado', 1);
@@ -223,12 +224,13 @@ class ProductoController extends Controller
 
         if ($producto) {
             $codigo->ignore($producto->producto_id, 'producto_id');
+            $nombre->ignore($producto->producto_id, 'producto_id');
         }
 
         return [
             'id_categoria' => [...$presencia, 'integer', $categoria],
             'codigo_producto' => [...$presencia, 'string', 'max:32', $codigo],
-            'nombre_producto' => [...$presencia, 'string', 'max:128'],
+            'nombre_producto' => [...$presencia, 'string', 'max:128', $nombre],
             'tipo_producto' => ['sometimes', 'required', 'string', 'in:estandar,combo'],
             'descripcion_producto' => [...$presencia, 'string', 'max:128'],
             'costo_compra' => [...$presencia, 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
@@ -249,6 +251,7 @@ class ProductoController extends Controller
 
         $validator = Validator::make($request->all(), $this->rules($producto, $esCombo), [
             'codigo_producto.unique' => 'El código de producto ya está registrado.',
+            'nombre_producto.unique' => 'Ya existe un producto registrado con este nombre.',
             'id_categoria.exists' => 'La categoría seleccionada no es válida o está inactiva.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
             'componentes.required' => 'Un producto compuesto debe tener al menos un producto componente.',
