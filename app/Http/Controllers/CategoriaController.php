@@ -42,8 +42,18 @@ class CategoriaController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'codigo_categoria' => 'nullable|string|max:16|unique:categoria,codigo_categoria',
-            'nombre_categoria' => 'required|string|max:24|unique:categoria,nombre_categoria',
+            'codigo_categoria' => [
+                'nullable',
+                'string',
+                'max:16',
+                Rule::unique('categoria', 'codigo_categoria')->where(fn ($query) => $query->where('estado', 1)),
+            ],
+            'nombre_categoria' => [
+                'required',
+                'string',
+                'max:24',
+                Rule::unique('categoria', 'nombre_categoria')->where(fn ($query) => $query->where('estado', 1)),
+            ],
             'descripcion_categoria' => 'nullable|string|max:64',
             'estado' => 'sometimes|integer|in:0,1',
         ], [
@@ -75,14 +85,18 @@ class CategoriaController extends Controller
                 'nullable',
                 'string',
                 'max:16',
-                Rule::unique('categoria', 'codigo_categoria')->ignore($categoria->categoria_id, 'categoria_id'),
+                Rule::unique('categoria', 'codigo_categoria')
+                    ->ignore($categoria->categoria_id, 'categoria_id')
+                    ->where(fn ($query) => $query->where('estado', 1)),
             ],
             'nombre_categoria' => [
                 'sometimes',
                 'required',
                 'string',
                 'max:24',
-                Rule::unique('categoria', 'nombre_categoria')->ignore($categoria->categoria_id, 'categoria_id'),
+                Rule::unique('categoria', 'nombre_categoria')
+                    ->ignore($categoria->categoria_id, 'categoria_id')
+                    ->where(fn ($query) => $query->where('estado', 1)),
             ],
             'descripcion_categoria' => 'nullable|string|max:64',
             'estado' => 'sometimes|required|integer|in:0,1',
