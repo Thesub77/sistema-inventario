@@ -1098,6 +1098,8 @@ function fiscalModule() {
         libroDiarioLoading: false,
         libroDiarioEmisionFecha: '',
         showLibroComprobantesDetalle: false,
+        searchLibroComprobante: '',
+        incluirAnuladasLibro: false,
         libroDiarioData: {
             success: true,
             anio: now.getFullYear(),
@@ -1139,15 +1141,27 @@ function fiscalModule() {
         get libroDiarioVentasDetalle() {
             const mesSel = Number(this.libroDiarioMes);
             const anioSel = Number(this.libroDiarioAnio);
+            const term = (this.searchLibroComprobante || '').toLowerCase().trim();
 
             return (this.ventas || [])
                 .filter(v => {
-                    if (Number(v.estado) === 0) return false;
+                    if (!this.incluirAnuladasLibro && Number(v.estado) === 0) return false;
                     if (!v.fecha_hora_venta) return false;
                     const d = new Date(v.fecha_hora_venta);
-                    return d.getFullYear() === anioSel && (d.getMonth() + 1) === mesSel;
+                    if (d.getFullYear() !== anioSel || (d.getMonth() + 1) !== mesSel) return false;
+
+                    if (term) {
+                        const codeMatch = v.codigo_venta && v.codigo_venta.toLowerCase().includes(term);
+                        const clientMatch = (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term)) ||
+                            (v.cliente && v.cliente.nombre_apellido_cliente && v.cliente.nombre_apellido_cliente.toLowerCase().includes(term));
+                        const refMatch = v.referencia_transferencia && v.referencia_transferencia.toLowerCase().includes(term);
+                        const userMatch = v.usuario && v.usuario.nombre_apellido && v.usuario.nombre_apellido.toLowerCase().includes(term);
+                        if (!codeMatch && !clientMatch && !refMatch && !userMatch) return false;
+                    }
+
+                    return true;
                 })
-                .sort((a, b) => new Date(a.fecha_hora_venta) - new Date(b.fecha_hora_venta));
+                .sort((a, b) => new Date(b.fecha_hora_venta) - new Date(a.fecha_hora_venta));
         },
 
         formatDateTime(dateInput) {
@@ -1773,6 +1787,13 @@ function productosModule() {
             numero_factura_recibo: '',
         },
 
+        // Kardex modal state
+        showKardexModal: false,
+        kardexSelectedProduct: null,
+        kardexSelectedProductId: '',
+        kardexFilterType: '',
+        kardexSearch: '',
+
         // Helper methods for combo management
         setProductTipo(tipo) {
             this.productForm.tipo_producto = tipo;
@@ -2070,6 +2091,108 @@ function productosModule() {
             } catch (error) {
                 this.notify('Error de Inventario', error.message, 'error');
             }
+        },
+
+        // Kardex Modal Methods
+        async openKardexModal(product = null) {
+            this.kardexSelectedProduct = product || null;
+            this.kardexSelectedProductId = product ? String(product.producto_id) : '';
+            this.kardexFilterType = '';
+            this.kardexSearch = '';
+            this.showKardexModal = true;
+            if (typeof this.fetchInventario === 'function' && (!Array.isArray(this.movimientosInventario) || this.movimientosInventario.length === 0)) {
+                await this.fetchInventario();
+            }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        closeKardexModal() {
+            this.showKardexModal = false;
+            this.kardexSelectedProduct = null;
+            this.kardexSelectedProductId = '';
+            this.kardexFilterType = '';
+            this.kardexSearch = '';
+        },
+
+        onKardexProductChange() {
+            if (!this.kardexSelectedProductId) {
+                this.kardexSelectedProduct = null;
+            } else {
+                const found = (this.productos || []).find(p => String(p.producto_id) === String(this.kardexSelectedProductId));
+                this.kardexSelectedProduct = found || null;
+            }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        openStockFromKardex() {
+            if (this.kardexSelectedProduct && this.kardexSelectedProduct.tipo_producto !== 'combo') {
+                const prod = this.kardexSelectedProduct;
+                this.closeKardexModal();
+                this.openStockModal(prod);
+            }
+        },
+
+        get filteredKardexMovimientos() {
+            let list = Array.isArray(this.movimientosInventario) ? this.movimientosInventario : [];
+            if (this.kardexSelectedProduct) {
+                const prodId = Number(this.kardexSelectedProduct.producto_id);
+                list = list.filter(m => Number(m.id_producto) === prodId || (m.producto && Number(m.producto.producto_id) === prodId));
+            }
+            if (this.kardexFilterType) {
+                const filter = this.kardexFilterType.toLowerCase();
+                list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes(filter));
+            }
+            if (this.kardexSearch && this.kardexSearch.trim()) {
+                const q = this.kardexSearch.toLowerCase().trim();
+                list = list.filter(m => {
+                    const prodName = m.producto ? (m.producto.nombre_producto || '').toLowerCase() : '';
+                    const prodCod = m.producto ? (m.producto.codigo_producto || '').toLowerCase() : '';
+                    const provName = (m.proveedor_nombre || '').toLowerCase();
+                    const factura = (m.numero_factura_recibo || '').toLowerCase();
+                    const tipo = (m.tipo_movimiento || '').toLowerCase();
+                    const usuario = m.usuario ? (m.usuario.nombre_apellido || '').toLowerCase() : '';
+                    const merma = (m.tipo_merma || '').toLowerCase();
+                    return prodName.includes(q) || prodCod.includes(q) || provName.includes(q) || factura.includes(q) || tipo.includes(q) || usuario.includes(q) || merma.includes(q);
+                });
+            }
+            return list;
+        },
+
+        get kardexStats() {
+            const list = this.filteredKardexMovimientos;
+            let entradas = 0;
+            let mermas = 0;
+            let ventas = 0;
+            let ajustes = 0;
+            let costoMermas = 0;
+            for (const m of list) {
+                const tipo = (m.tipo_movimiento || '').toLowerCase();
+                const cant = Number(m.cantidad_movimimiento || m.cantidad_movimiento || 0);
+                if (tipo.includes('entrada') || tipo.includes('inicial')) {
+                    entradas += cant;
+                } else if (tipo.includes('merma')) {
+                    mermas += cant;
+                    if (m.costo_total_perdida) {
+                        costoMermas += Number(m.costo_total_perdida);
+                    }
+                } else if (tipo.includes('venta')) {
+                    ventas += cant;
+                } else if (tipo.includes('ajuste')) {
+                    ajustes += 1;
+                }
+            }
+            return {
+                totalRegistros: list.length,
+                entradas,
+                mermas,
+                ventas,
+                ajustes,
+                costoMermas
+            };
         }
     };
 }
@@ -4055,6 +4178,9 @@ function posModule() {
                     this.fetchInventario(),
                     this.fetchBitacoras()
                 ]);
+                if (typeof this.fetchLibroDiario === 'function') {
+                    await this.fetchLibroDiario();
+                }
             } catch {
                 this.notify('Venta Anulada', 'La anulación se guardó, pero no se pudo actualizar la pantalla.', 'warning');
                 return;
@@ -4403,6 +4529,7 @@ function app() {
         empresa: null,
         showEmpresaModal: false,
         isSavingEmpresa: false,
+        mostrarBitacora: localStorage.getItem('mostrar_bitacora') === '1',
         empresaForm: {
             nombre_comercial: '',
             razon_social: '',
@@ -4413,7 +4540,8 @@ function app() {
             mensaje_pie_ticket: '',
             moneda_simbolo: 'C$',
             regimen_tributario: 'Cuota Fija',
-            techo_mensual_cuota_fija: 100000.00
+            techo_mensual_cuota_fija: 100000.00,
+            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1'
         },
 
         // Navegación
@@ -4422,12 +4550,9 @@ function app() {
             { id: 'pos', label: 'Punto de Venta (POS)', icon: 'shopping-cart' },
             { id: 'productos', label: 'Productos & Stock', icon: 'package' },
             { id: 'categorias', label: 'Categorías', icon: 'tags' },
-            { id: 'ventas', label: 'Historial de Ventas', icon: 'receipt' },
             { id: 'libro-diario', label: 'Libro Fiscal', icon: 'book-open' },
             { id: 'proveedores', label: 'Proveedores', icon: 'truck' },
-            { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', icon: 'credit-card' },
             { id: 'caja', label: 'Cajas & Arqueos', icon: 'wallet' },
-            { id: 'inventario', label: 'Kardex / Movimientos', icon: 'arrow-left-right' },
             { id: 'usuarios', label: 'Usuarios & Roles', icon: 'user-cog' },
             { id: 'bitacora', label: 'Bitácora Auditoría', icon: 'shield-check' },
         ],
@@ -4494,6 +4619,9 @@ function app() {
 
         canAccessTab(tabId) {
             if (!this.currentUser) return false;
+            if (tabId === 'bitacora' && !this.mostrarBitacora) {
+                return false;
+            }
             if (this.isAdmin) return true;
             const rolRaw = this.currentUser.rol;
             const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
@@ -4521,7 +4649,7 @@ function app() {
                 case 'usuarios':
                     return this.hasPermission('usuarios.gestionar');
                 case 'bitacora':
-                    return this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver');
+                    return Boolean(this.mostrarBitacora) && (this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver'));
                 default:
                     return true;
             }
@@ -4770,23 +4898,20 @@ function app() {
                     case 'productos':
                         await Promise.all([
                             this.fetchProductos(),
-                            this.fetchCategorias()
+                            this.fetchCategorias(),
+                            this.fetchInventario()
                         ]);
                         break;
                     case 'categorias':
                         await this.fetchCategorias();
                         break;
                     case 'ventas':
-                        await Promise.all([
-                            this.fetchVentas(),
-                            this.fetchUsuarios().catch(() => { })
-                        ]);
-                        break;
                     case 'libro-diario':
                         await Promise.all([
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
-                            this.fetchVentas().catch(() => { })
+                            this.fetchVentas().catch(() => { }),
+                            this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
                     case 'proveedores':
@@ -5010,8 +5135,11 @@ function app() {
                     mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
                     moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
                     regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
-                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00
+                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
+                    mostrar_bitacora: Boolean(this.mostrarBitacora)
                 };
+            } else {
+                this.empresaForm.mostrar_bitacora = Boolean(this.mostrarBitacora);
             }
             this.showEmpresaModal = true;
             this.$nextTick(() => {
@@ -5038,7 +5166,17 @@ function app() {
 
             this.isSavingEmpresa = true;
             try {
+                this.mostrarBitacora = Boolean(this.empresaForm.mostrar_bitacora);
+                try {
+                    localStorage.setItem('mostrar_bitacora', this.mostrarBitacora ? '1' : '0');
+                } catch { }
+
+                if (!this.mostrarBitacora && this.currentTab === 'bitacora') {
+                    this.currentTab = 'dashboard';
+                }
+
                 const payload = { ...this.empresaForm };
+                delete payload.mostrar_bitacora;
                 if (!payload.numero_ruc || !payload.numero_ruc.trim()) {
                     delete payload.numero_ruc;
                 }

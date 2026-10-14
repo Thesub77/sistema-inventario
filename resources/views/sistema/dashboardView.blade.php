@@ -484,8 +484,8 @@
                         class="p-6 text-center rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-slate-600 dark:text-slate-300 space-y-2">
                         <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-rose-500"></i>
                         <p class="text-xs font-semibold text-rose-700 dark:text-rose-400">Pérdidas acumuladas registradas en el sistema este mes</p>
-                        <button type="button" @click="currentTab = 'inventario'" class="text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold cursor-pointer">
-                            Consultar detalle de movimientos en el Kardex &rarr;
+                        <button type="button" @click="currentTab = 'productos'; openKardexModal(null)" class="text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold cursor-pointer">
+                            Consultar historial de movimientos de stock &rarr;
                         </button>
                     </div>
                 </div>

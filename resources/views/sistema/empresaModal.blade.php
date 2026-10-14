@@ -215,6 +215,28 @@
                                 placeholder="Ej. ¡Gracias por su compra!"
                                 class="w-full bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors">
                         </div>
+
+                        <!-- Ajustes de Interfaz: Módulo de Bitácora Opcional -->
+                        <div class="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                            <div class="flex items-start justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800">
+                                <div class="space-y-0.5">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="shield-check" class="w-4 h-4 text-brand-500"></i>
+                                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Mostrar Módulo de Bitácora</span>
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">Opcional</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                                        Habilita la pestaña de auditoría en la barra lateral. Manténgalo desactivado si prefiere un menú más simple y despejado.
+                                    </p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+                                    <input type="checkbox" x-model="empresaForm.mostrar_bitacora"
+                                        @change="mostrarBitacora = Boolean(empresaForm.mostrar_bitacora); try { localStorage.setItem('mostrar_bitacora', mostrarBitacora ? '1' : '0'); } catch(e){}"
+                                        class="sr-only peer">
+                                    <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -181,10 +181,7 @@
                 <!-- 3. TAB: PUNTO DE VENTA (POS & FACTURACIÓN) -->
                 @include('ventas.ventaView')
 
-                <!-- 4. TAB: HISTORIAL DE VENTAS -->
-                @include('ventas.ventaHistorialView')
-
-                <!-- 5. TAB: CATEGORÍAS -->
+                <!-- 4. TAB: CATEGORÍAS -->
                 @include('categorias.categoriaView')
 
                 <!-- 6. TAB: PROVEEDORES Y CUENTAS POR PAGAR -->
@@ -193,8 +190,6 @@
                 <!-- 7. TAB: CAJA Y MOVIMIENTOS -->
                 @include('cajas.cajasView')
 
-                <!-- 8. TAB: MOVIMIENTOS DE INVENTARIO -->
-                @include('productos.inventarioView')
 
                 <!-- 9. TAB: USUARIOS Y ROLES -->
                 @include('usuarios.usuarioView')
@@ -212,6 +207,9 @@
 
                 <!-- MODAL: AJUSTE DE STOCK -->
                 @include('productos.ajusteStockView')
+
+                <!-- MODAL: KARDEX Y MOVIMIENTOS DE STOCK -->
+                @include('productos.kardexModal')
 
                 <!-- MODAL: CATEGORÍA (CREAR / EDITAR) -->
                 @include('categorias.categoriaForm')

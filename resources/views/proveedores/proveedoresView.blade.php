@@ -112,7 +112,7 @@
 
     <!-- 3. Selector de Subpestañas (Cuentas por Pagar vs Directorio de Proveedores) -->
     <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-        <button type="button" @click="cxpActiveSubTab = 'cuentas'; currentTab = 'cuentas-por-pagar'"
+        <button type="button" @click="cxpActiveSubTab = 'cuentas'"
             class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
             :class="cxpActiveSubTab === 'cuentas'
                 ? 'bg-amber-500 text-white shadow-sm'
@@ -124,7 +124,7 @@
                 x-text="cuentasPorPagar.length"></span>
         </button>
 
-        <button type="button" @click="cxpActiveSubTab = 'proveedores'; currentTab = 'proveedores'"
+        <button type="button" @click="cxpActiveSubTab = 'proveedores'"
             class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
             :class="cxpActiveSubTab === 'proveedores'
                 ? 'bg-amber-500 text-white shadow-sm'

@@ -98,6 +98,7 @@ export function app() {
         empresa: null,
         showEmpresaModal: false,
         isSavingEmpresa: false,
+        mostrarBitacora: localStorage.getItem('mostrar_bitacora') === '1',
         empresaForm: {
             nombre_comercial: '',
             razon_social: '',
@@ -108,7 +109,8 @@ export function app() {
             mensaje_pie_ticket: '',
             moneda_simbolo: 'C$',
             regimen_tributario: 'Cuota Fija',
-            techo_mensual_cuota_fija: 100000.00
+            techo_mensual_cuota_fija: 100000.00,
+            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1'
         },
 
         // Navigation Sidebar Configuration
@@ -134,11 +136,6 @@ export function app() {
                 icon: 'tags'
             },
             {
-                id: 'ventas',
-                label: 'Historial de Ventas',
-                icon: 'receipt'
-            },
-            {
                 id: 'libro-diario',
                 label: 'Libro Fiscal',
                 icon: 'book-open'
@@ -149,19 +146,9 @@ export function app() {
                 icon: 'truck'
             },
             {
-                id: 'cuentas-por-pagar',
-                label: 'Cuentas por Pagar',
-                icon: 'credit-card'
-            },
-            {
                 id: 'caja',
                 label: 'Cajas & Arqueos',
                 icon: 'wallet'
-            },
-            {
-                id: 'inventario',
-                label: 'Kardex / Movimientos',
-                icon: 'arrow-left-right'
             },
             {
                 id: 'usuarios',
@@ -237,6 +224,9 @@ export function app() {
 
         canAccessTab(tabId) {
             if (!this.currentUser) return false;
+            if (tabId === 'bitacora' && !this.mostrarBitacora) {
+                return false;
+            }
             if (this.isAdmin) return true;
             const rolRaw = this.currentUser.rol;
             const rolNombre = typeof rolRaw === 'object' && rolRaw !== null
@@ -264,7 +254,7 @@ export function app() {
                 case 'usuarios':
                     return this.hasPermission('usuarios.gestionar');
                 case 'bitacora':
-                    return this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver');
+                    return Boolean(this.mostrarBitacora) && (this.hasPermission('usuarios.gestionar') || this.hasPermission('bitacoras.ver'));
                 default:
                     return true;
             }
@@ -512,23 +502,20 @@ export function app() {
                     case 'productos':
                         await Promise.all([
                             this.fetchProductos(),
-                            this.fetchCategorias()
+                            this.fetchCategorias(),
+                            this.fetchInventario()
                         ]);
                         break;
                     case 'categorias':
                         await this.fetchCategorias();
                         break;
                     case 'ventas':
-                        await Promise.all([
-                            this.fetchVentas(),
-                            this.fetchUsuarios().catch(() => { })
-                        ]);
-                        break;
                     case 'libro-diario':
                         await Promise.all([
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
-                            this.fetchVentas().catch(() => { })
+                            this.fetchVentas().catch(() => { }),
+                            this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
                     case 'caja':
@@ -760,8 +747,11 @@ export function app() {
                     mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
                     moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
                     regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
-                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00
+                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
+                    mostrar_bitacora: Boolean(this.mostrarBitacora)
                 };
+            } else {
+                this.empresaForm.mostrar_bitacora = Boolean(this.mostrarBitacora);
             }
             this.showEmpresaModal = true;
             this.$nextTick(() => {
@@ -788,7 +778,17 @@ export function app() {
 
             this.isSavingEmpresa = true;
             try {
+                this.mostrarBitacora = Boolean(this.empresaForm.mostrar_bitacora);
+                try {
+                    localStorage.setItem('mostrar_bitacora', this.mostrarBitacora ? '1' : '0');
+                } catch { }
+
+                if (!this.mostrarBitacora && this.currentTab === 'bitacora') {
+                    this.currentTab = 'dashboard';
+                }
+
                 const payload = { ...this.empresaForm };
+                delete payload.mostrar_bitacora;
                 if (!payload.numero_ruc || !payload.numero_ruc.trim()) {
                     delete payload.numero_ruc;
                 }

@@ -36,10 +36,16 @@
             </select>
         </div>
 
-        <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all cursor-pointer">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>Agregar Producto</span>
-        </button>
+        <div class="flex items-center gap-2 w-full md:w-auto">
+            <button type="button" @click="openKardexModal(null)" class="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700/80 transition-all cursor-pointer" title="Ver historial de todos los movimientos de stock">
+                <i data-lucide="history" class="w-4 h-4 text-brand-500"></i>
+                <span>Movimientos de Stock</span>
+            </button>
+            <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all cursor-pointer">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Agregar Producto</span>
+            </button>
+        </div>
     </div>
 
     <!-- Products Table -->
@@ -100,6 +106,10 @@
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    <!-- Movimientos de Stock Button -->
+                                    <button @click="openKardexModal(p)" class="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Movimientos de Stock">
+                                        <i data-lucide="history" class="w-4 h-4"></i>
+                                    </button>
                                     <!-- Edit Button -->
                                     <button @click="openProductModal(p)" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Editar Producto">
                                         <i data-lucide="edit-3" class="w-4 h-4"></i>
