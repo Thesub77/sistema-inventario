@@ -80,11 +80,19 @@ export function categoriasModule() {
             });
 
             if (result.isConfirmed) {
-                await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
-                    method: 'DELETE'
-                });
-                this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
-                await this.fetchCategorias();
+                try {
+                    const res = await this.apiFetch(`/api/categorias/${cat.categoria_id}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data.message || 'No se pudo eliminar la categoría.');
+                    }
+                    this.notify('Categoría Eliminada', `"${cat.nombre_categoria}" fue eliminada.`, 'success');
+                    await this.fetchCategorias();
+                } catch (error) {
+                    this.notify('Error al eliminar categoría', error.message, 'error');
+                }
             }
         }
     };

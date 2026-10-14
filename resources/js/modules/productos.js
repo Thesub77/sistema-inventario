@@ -217,11 +217,19 @@ export function productosModule() {
             });
 
             if (result.isConfirmed) {
-                await this.apiFetch(`/api/productos/${product.producto_id}`, {
-                    method: 'DELETE'
-                });
-                this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
-                await this.fetchProductos();
+                try {
+                    const res = await this.apiFetch(`/api/productos/${product.producto_id}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data.message || 'No se pudo eliminar el producto.');
+                    }
+                    this.notify('Producto Eliminado', `"${product.nombre_producto}" fue eliminado.`, 'success');
+                    await this.fetchProductos();
+                } catch (error) {
+                    this.notify('Error al eliminar producto', error.message, 'error');
+                }
             }
         },
 

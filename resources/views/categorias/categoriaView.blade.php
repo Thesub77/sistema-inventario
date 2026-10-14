@@ -24,9 +24,6 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-mono font-bold text-brand-500 dark:text-brand-400" x-text="cat.codigo_categoria || 'SIN CÓDIGO'"></span>
-                        <span class="px-2 py-0.5 text-[10px] rounded-full font-medium"
-                            :class="cat.estado == 1 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
-                            x-text="cat.estado == 1 ? 'Activa' : 'Inactiva'"></span>
                     </div>
                     <h4 class="font-display font-bold text-lg text-slate-900 dark:text-white" x-text="cat.nombre_categoria"></h4>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1" x-text="cat.descripcion_categoria || 'Sin descripción'"></p>
@@ -34,7 +31,7 @@
 
                 <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
                     <span class="text-xs text-slate-500 dark:text-slate-400 font-medium"
-                        x-text="(productos.filter(p => p.id_categoria == cat.categoria_id).length) + ' productos'"></span>
+                        x-text="(productos.filter(p => p.id_categoria == cat.categoria_id && (p.estado === undefined || p.estado == 1)).length) + ' productos'"></span>
                     <div class="flex items-center gap-1">
                         <button @click="openCategoryModal(cat)" class="p-1.5 text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" title="Editar Categoría">
                             <i data-lucide="edit-3" class="w-4 h-4"></i>

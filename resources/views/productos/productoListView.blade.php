@@ -60,7 +60,6 @@
                         <th class="py-3 px-4 text-right">Costo</th>
                         <th class="py-3 px-4 text-right">Precio Venta</th>
                         <th class="py-3 px-4 text-center">Stock</th>
-                        <th class="py-3 px-4 text-center">Estado</th>
                         <th class="py-3 px-4 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -100,11 +99,6 @@
                                 </template>
                             </td>
                             <td class="py-3.5 px-4 text-center">
-                                <span class="px-2 py-0.5 text-xs rounded-full font-medium"
-                                    :class="p.estado == 1 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
-                                    x-text="p.estado == 1 ? 'Activo' : 'Inactivo'"></span>
-                            </td>
-                            <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <!-- Movimientos de Stock Button -->
                                     <button @click="openKardexModal(p)" class="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer" title="Ver Movimientos de Stock">
@@ -130,7 +124,7 @@
                         </tr>
                     </template>
                     <tr x-show="filteredProducts.length === 0">
-                        <td colspan="8" class="py-12 text-center text-slate-400">
+                        <td colspan="7" class="py-12 text-center text-slate-400">
                             <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-600"></i>
                             <p class="font-medium">No se encontraron productos coincidentes</p>
                         </td>

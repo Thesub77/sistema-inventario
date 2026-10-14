@@ -582,7 +582,8 @@ class IntegridadSeguridadTest extends TestCase
         // Setup categorías
         Categoria::create(['codigo_categoria' => 'CAT-PAG1', 'nombre_categoria' => 'Bebidas Frias', 'estado' => 1]);
         Categoria::create(['codigo_categoria' => 'CAT-PAG2', 'nombre_categoria' => 'Snacks Dulces', 'estado' => 1]);
-        Categoria::create(['codigo_categoria' => 'CAT-PAG3', 'nombre_categoria' => 'Bebidas Calientes', 'estado' => 0]);
+        Categoria::create(['codigo_categoria' => 'CAT-PAG3', 'nombre_categoria' => 'Bebidas Calientes', 'estado' => 1]);
+        Categoria::create(['codigo_categoria' => 'CAT-DEL', 'nombre_categoria' => 'Bebidas Inactivas', 'estado' => 0]);
 
         // Paginación de categorías
         $resCatPag = $this->getJson('/api/categorias?por_pagina=2&page=1');
@@ -590,10 +591,11 @@ class IntegridadSeguridadTest extends TestCase
         $resCatPag->assertJsonStructure(['data', 'current_page', 'per_page', 'total']);
         $this->assertCount(2, $resCatPag->json('data'));
 
-        // Búsqueda de categorías
+        // Búsqueda de categorías activas (la eliminada CAT-DEL no debe aparecer)
         $resCatSearch = $this->getJson('/api/categorias?buscar=Bebidas');
         $resCatSearch->assertStatus(200);
         $this->assertCount(2, $resCatSearch->json());
+        $this->assertFalse(collect($resCatSearch->json())->contains('codigo_categoria', 'CAT-DEL'));
 
         // Setup proveedores
         Proveedor::create(['nombre_comercial' => 'Carlos Mendoza Distribuidora', 'telefono' => '99001122', 'estado' => 1]);
@@ -905,5 +907,101 @@ class IntegridadSeguridadTest extends TestCase
         $data = $res->json();
         $this->assertEquals(50.00, (float) $data['totalPerdidasMermasMes']);
         $this->assertEquals(50.00, (float) $data['stats']['totalPerdidasMermasMes']);
+    }
+
+    public function test_categoria_eliminada_logicamente_desaparece_de_listado_activo(): void
+    {
+        // 1. Crear categoría sin enviar 'estado'; debe crearse con estado = 1
+        $resStore = $this->postJson('/api/categorias', [
+            'codigo_categoria' => 'CAT-LOGIC',
+            'nombre_categoria' => 'Limpieza',
+            'descripcion_categoria' => 'Artículos de aseo',
+        ]);
+        $resStore->assertStatus(201);
+        $catId = $resStore->json('categoria_id');
+        $this->assertEquals(1, $resStore->json('estado'));
+
+        // 2. Comprobar que aparece en el listado por defecto
+        $resList = $this->getJson('/api/categorias');
+        $this->assertTrue(collect($resList->json())->contains('categoria_id', $catId));
+
+        // 3. Eliminar la categoría lógicamente
+        $resDel = $this->deleteJson("/api/categorias/{$catId}");
+        $resDel->assertStatus(200);
+        $resDel->assertJsonPath('success', true);
+        $resDel->assertJsonPath('message', 'Categoría eliminada correctamente');
+
+        // 4. Comprobar que ya NO aparece en el listado activo por defecto
+        $resListAfter = $this->getJson('/api/categorias');
+        $this->assertFalse(collect($resListAfter->json())->contains('categoria_id', $catId));
+
+        // 5. Pero sigue persistida en BD con estado = 0
+        $this->assertDatabaseHas('categoria', [
+            'categoria_id' => $catId,
+            'estado' => 0,
+        ]);
+    }
+
+    public function test_producto_eliminacion_logica_rechaza_con_stock_y_desaparece_del_catalogo(): void
+    {
+        $cat = Categoria::create([
+            'codigo_categoria' => 'CAT-SNK',
+            'nombre_categoria' => 'Golosinas',
+            'estado' => 1,
+        ]);
+
+        // 1. Crear producto con stock > 0
+        $prodConStock = Producto::create([
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-STK',
+            'nombre_producto' => 'Chocolate Barra',
+            'descripcion_producto' => 'Con leche',
+            'costo_compra' => 15,
+            'precio_venta' => 25,
+            'existencia_bodega' => 10,
+            'existencia_minima' => 2,
+            'estado' => 1,
+        ]);
+
+        // Rechaza eliminación de producto con stock disponible
+        $resDelFail = $this->deleteJson("/api/productos/{$prodConStock->producto_id}");
+        $resDelFail->assertStatus(409);
+        $resDelFail->assertJsonPath('success', false);
+        $this->assertStringContainsString('stock físico disponible', $resDelFail->json('message'));
+
+        // 2. Crear producto con stock = 0 sin enviar 'estado' (debe asignarse estado = 1)
+        $resStore = $this->postJson('/api/productos', [
+            'id_categoria' => $cat->categoria_id,
+            'codigo_producto' => 'PROD-ZERO',
+            'nombre_producto' => 'Caramelo Fresa',
+            'tipo_producto' => 'estandar',
+            'descripcion_producto' => 'Relleno',
+            'costo_compra' => 5,
+            'precio_venta' => 10,
+            'existencia_bodega' => 0,
+            'existencia_minima' => 1,
+        ]);
+        $resStore->assertStatus(201);
+        $prodZeroId = $resStore->json('producto_id');
+
+        // Comprobar que aparece en listado activo
+        $resList = $this->getJson('/api/productos');
+        $this->assertTrue(collect($resList->json())->contains('producto_id', $prodZeroId));
+
+        // 3. Eliminar lógicamente el producto con stock = 0
+        $resDelOk = $this->deleteJson("/api/productos/{$prodZeroId}");
+        $resDelOk->assertStatus(200);
+        $resDelOk->assertJsonPath('success', true);
+        $resDelOk->assertJsonPath('message', 'Producto eliminado correctamente');
+
+        // 4. Comprobar que desaparece del catálogo activo por defecto
+        $resListAfter = $this->getJson('/api/productos');
+        $this->assertFalse(collect($resListAfter->json())->contains('producto_id', $prodZeroId));
+
+        // 5. Comprobar que en BD persiste con estado = 0
+        $this->assertDatabaseHas('producto', [
+            'producto_id' => $prodZeroId,
+            'estado' => 0,
+        ]);
     }
 }

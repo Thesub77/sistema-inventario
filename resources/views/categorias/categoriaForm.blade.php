@@ -57,16 +57,6 @@
                     class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
             </div>
 
-            {{-- Campo: Estado (BD: estado TINYINT NOT NULL - 1: Activa, 0: Inactiva) --}}
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Estado</label>
-                <select x-model.number="categoryForm.estado"
-                    class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-                    <option :value="1">Activa</option>
-                    <option :value="0">Inactiva</option>
-                </select>
-            </div>
-
             {{-- Botones de Acción del Formulario (con bloqueo anti-doble clic) --}}
             <div class="pt-4 flex justify-end gap-2 border-t border-slate-800">
                 <button type="button"
