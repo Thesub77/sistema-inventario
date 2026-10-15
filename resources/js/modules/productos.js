@@ -48,6 +48,46 @@ export function productosModule() {
         // Helper methods for combo management
         setProductTipo(tipo) {
             this.productForm.tipo_producto = tipo;
+            const cfgProd = this.empresa?.configuracion?.productos || {};
+            if (!this.isEditingProduct) {
+                if (tipo === 'combo') {
+                    const modoCombo = cfgProd.modo_codigo_combo || 'manual';
+                    const rawPrefijo = (cfgProd.prefijo_codigo_combo || 'COMBO').trim().replace(/-+$/, '');
+                    const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                    const combos = (this.productos || []).filter(p => p.tipo_producto === 'combo');
+                    let maxCombo = 0;
+                    const reCombo = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                    combos.forEach(p => {
+                        const m = (p.codigo_producto || '').match(reCombo);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (n > maxCombo) maxCombo = n;
+                        }
+                    });
+                    const nextNum = maxCombo > 0 ? maxCombo + 1 : combos.length + 1;
+                    this.productForm.codigo_producto = modoCombo === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '';
+                } else {
+                    const modoStd = cfgProd.modo_codigo || 'manual';
+                    const rawPrefijo = (cfgProd.prefijo_codigo || 'PROD').trim().replace(/-+$/, '');
+                    const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                    const stds = (this.productos || []).filter(p => p.tipo_producto !== 'combo');
+                    let maxStd = 0;
+                    const reStd = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                    stds.forEach(p => {
+                        const m = (p.codigo_producto || '').match(reStd);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (n > maxStd) maxStd = n;
+                        }
+                    });
+                    const nextNum = maxStd > 0 ? maxStd + 1 : stds.length + 1;
+                    this.productForm.codigo_producto = modoStd === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '';
+                }
+            }
             if (tipo === 'combo') {
                 this.productForm.existencia_bodega = 0;
                 if (!Array.isArray(this.productForm.componentes)) {
@@ -150,17 +190,37 @@ export function productosModule() {
                 };
             } else {
                 this.isEditingProduct = false;
+                const cfgProd = this.empresa?.configuracion?.productos || {};
+                const modoCodigo = cfgProd.modo_codigo || 'manual';
+                const rawPrefijo = (cfgProd.prefijo_codigo || 'PROD').trim().replace(/-+$/, '');
+                const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                const stockMin = cfgProd.stock_minimo_defecto !== undefined ? Number(cfgProd.stock_minimo_defecto) : 5;
+
+                const stds = (this.productos || []).filter(p => p.tipo_producto !== 'combo');
+                let maxStd = 0;
+                const reStd = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                stds.forEach(p => {
+                    const m = (p.codigo_producto || '').match(reStd);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (n > maxStd) maxStd = n;
+                    }
+                });
+                const nextNum = maxStd > 0 ? maxStd + 1 : stds.length + 1;
+
                 this.productForm = {
                     producto_id: null,
                     id_categoria: this.categorias[0] ? this.categorias[0].categoria_id : '',
-                    codigo_producto: `PROD-${String(this.productos.length + 1).padStart(3, '0')}`,
+                    codigo_producto: modoCodigo === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '',
                     nombre_producto: '',
                     tipo_producto: 'estandar',
                     descripcion_producto: '',
                     costo_compra: 0,
                     precio_venta: 0,
                     existencia_bodega: 10,
-                    existencia_minima: 5,
+                    existencia_minima: stockMin,
                     estado: 1,
                     componentes: [],
                 };

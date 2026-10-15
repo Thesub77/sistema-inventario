@@ -17,6 +17,14 @@
 })();
 
 // 2. Configuración de Tailwind CSS
+window.formatTelefono = function (val) {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 8);
+    if (digits.length > 4) {
+        return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    }
+    return digits;
+};
 window.tailwind = window.tailwind || {};
 window.tailwind.config = {
     darkMode: 'class',
@@ -1993,9 +2001,26 @@ function categoriasModule() {
                 this.categoryForm = { ...cat };
             } else {
                 this.isEditingCategory = false;
+                const cfgProd = this.empresa?.configuracion?.productos || {};
+                const sugerirPrefijo = Boolean(cfgProd.categoria_sugerir_prefijo);
+                const rawPrefijo = (cfgProd.prefijo_categoria || 'CAT').trim().replace(/-+$/, '');
+                const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                let maxCat = 0;
+                const reCat = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                (this.categorias || []).forEach(c => {
+                    const m = (c.codigo_categoria || '').match(reCat);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (n > maxCat) maxCat = n;
+                    }
+                });
+                const nextCatNum = maxCat > 0 ? maxCat + 1 : (this.categorias || []).length + 1;
+
                 this.categoryForm = {
                     categoria_id: null,
-                    codigo_categoria: `CAT-${String(this.categorias.length + 1).padStart(2, '0')}`,
+                    codigo_categoria: sugerirPrefijo
+                        ? `${prefijo}${String(nextCatNum).padStart(2, '0')}`
+                        : '',
                     nombre_categoria: '',
                     descripcion_categoria: '',
                     estado: 1
@@ -2119,6 +2144,46 @@ function productosModule() {
         // Helper methods for combo management
         setProductTipo(tipo) {
             this.productForm.tipo_producto = tipo;
+            const cfgProd = this.empresa?.configuracion?.productos || {};
+            if (!this.isEditingProduct) {
+                if (tipo === 'combo') {
+                    const modoCombo = cfgProd.modo_codigo_combo || 'manual';
+                    const rawPrefijo = (cfgProd.prefijo_codigo_combo || 'COMBO').trim().replace(/-+$/, '');
+                    const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                    const combos = (this.productos || []).filter(p => p.tipo_producto === 'combo');
+                    let maxCombo = 0;
+                    const reCombo = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                    combos.forEach(p => {
+                        const m = (p.codigo_producto || '').match(reCombo);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (n > maxCombo) maxCombo = n;
+                        }
+                    });
+                    const nextNum = maxCombo > 0 ? maxCombo + 1 : combos.length + 1;
+                    this.productForm.codigo_producto = modoCombo === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '';
+                } else {
+                    const modoStd = cfgProd.modo_codigo || 'manual';
+                    const rawPrefijo = (cfgProd.prefijo_codigo || 'PROD').trim().replace(/-+$/, '');
+                    const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                    const stds = (this.productos || []).filter(p => p.tipo_producto !== 'combo');
+                    let maxStd = 0;
+                    const reStd = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                    stds.forEach(p => {
+                        const m = (p.codigo_producto || '').match(reStd);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (n > maxStd) maxStd = n;
+                        }
+                    });
+                    const nextNum = maxStd > 0 ? maxStd + 1 : stds.length + 1;
+                    this.productForm.codigo_producto = modoStd === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '';
+                }
+            }
             if (tipo === 'combo') {
                 this.productForm.existencia_bodega = 0;
                 if (!Array.isArray(this.productForm.componentes)) {
@@ -2220,17 +2285,37 @@ function productosModule() {
                 };
             } else {
                 this.isEditingProduct = false;
+                const cfgProd = this.empresa?.configuracion?.productos || {};
+                const modoCodigo = cfgProd.modo_codigo || 'manual';
+                const rawPrefijo = (cfgProd.prefijo_codigo || 'PROD').trim().replace(/-+$/, '');
+                const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                const stockMin = cfgProd.stock_minimo_defecto !== undefined ? Number(cfgProd.stock_minimo_defecto) : 5;
+
+                const stds = (this.productos || []).filter(p => p.tipo_producto !== 'combo');
+                let maxStd = 0;
+                const reStd = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                stds.forEach(p => {
+                    const m = (p.codigo_producto || '').match(reStd);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (n > maxStd) maxStd = n;
+                    }
+                });
+                const nextNum = maxStd > 0 ? maxStd + 1 : stds.length + 1;
+
                 this.productForm = {
                     producto_id: null,
                     id_categoria: this.categorias[0] ? this.categorias[0].categoria_id : '',
-                    codigo_producto: `PROD-${String(this.productos.length + 1).padStart(3, '0')}`,
+                    codigo_producto: modoCodigo === 'automatico'
+                        ? `${prefijo}${String(nextNum).padStart(3, '0')}`
+                        : '',
                     nombre_producto: '',
                     tipo_producto: 'estandar',
                     descripcion_producto: '',
                     costo_compra: 0,
                     precio_venta: 0,
                     existencia_bodega: 10,
-                    existencia_minima: 5,
+                    existencia_minima: stockMin,
                     estado: 1,
                     componentes: [],
                 };
@@ -4859,6 +4944,11 @@ function app() {
         empresa: null,
         showEmpresaModal: false,
         isSavingEmpresa: false,
+        configTab: 'negocio',
+        pcClockTime: '',
+        pcClockDate: '',
+        pcClockTimezone: '',
+        pcClockTimer: null,
         mostrarBitacora: localStorage.getItem('mostrar_bitacora') === '1',
         empresaForm: {
             nombre_comercial: '',
@@ -4871,7 +4961,21 @@ function app() {
             moneda_simbolo: 'C$',
             regimen_tributario: 'Cuota Fija',
             techo_mensual_cuota_fija: 100000.00,
-            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1'
+            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1',
+            configuracion: {
+                productos: {
+                    modo_codigo: 'manual',
+                    prefijo_codigo: 'PROD',
+                    modo_codigo_combo: 'manual',
+                    prefijo_codigo_combo: 'COMBO',
+                    stock_minimo_defecto: 5,
+                    categoria_sugerir_prefijo: false,
+                    prefijo_categoria: 'CAT'
+                },
+                sistema: {
+                    nivel_bitacora: 'completa'
+                }
+            }
         },
 
         // Navegación
@@ -5455,28 +5559,69 @@ function app() {
             }
         },
 
-        openEmpresaModal() {
-            if (this.empresa) {
-                this.empresaForm = {
-                    nombre_comercial: this.empresa.nombre_comercial || '',
-                    razon_social: this.empresa.razon_social || '',
-                    numero_ruc: this.empresa.numero_ruc || '',
-                    telefono_contacto: this.empresa.telefono_contacto || '',
-                    correo_contacto: this.empresa.correo_contacto || '',
-                    direccion_fisica: this.empresa.direccion_fisica || '',
-                    mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
-                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
-                    regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
-                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
-                    mostrar_bitacora: Boolean(this.mostrarBitacora)
-                };
-            } else {
-                this.empresaForm.mostrar_bitacora = Boolean(this.mostrarBitacora);
+        updatePcClock() {
+            const now = new Date();
+            this.pcClockTime = now.toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            this.pcClockDate = now.toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            try {
+                this.pcClockTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+            } catch {
+                this.pcClockTimezone = 'Local';
             }
+        },
+
+        formatTelefono(val) {
+            if (!val) return '';
+            const digits = String(val).replace(/\D/g, '').slice(0, 8);
+            if (digits.length > 4) {
+                return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+            }
+            return digits;
+        },
+
+        openEmpresaModal() {
+            this.configTab = 'negocio';
+
+            const cfg = this.empresa?.configuracion || {};
+            const cfgProd = cfg.productos || {};
+            const cfgSistema = cfg.sistema || {};
+
+            this.empresaForm = {
+                nombre_comercial: this.empresa?.nombre_comercial || '',
+                razon_social: this.empresa?.razon_social || '',
+                numero_ruc: (this.empresa?.numero_ruc || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+                telefono_contacto: this.formatTelefono(this.empresa?.telefono_contacto || ''),
+                correo_contacto: this.empresa?.correo_contacto || '',
+                direccion_fisica: this.empresa?.direccion_fisica || '',
+                mensaje_pie_ticket: this.empresa?.mensaje_pie_ticket || '',
+                moneda_simbolo: this.empresa?.moneda_simbolo || 'C$',
+                regimen_tributario: 'Cuota Fija',
+                techo_mensual_cuota_fija: this.empresa?.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
+                mostrar_bitacora: Boolean(this.mostrarBitacora),
+                configuracion: {
+                    productos: {
+                        modo_codigo: cfgProd.modo_codigo || 'manual',
+                        prefijo_codigo: cfgProd.prefijo_codigo !== undefined ? cfgProd.prefijo_codigo : 'PROD',
+                        modo_codigo_combo: cfgProd.modo_codigo_combo || 'manual',
+                        prefijo_codigo_combo: cfgProd.prefijo_codigo_combo !== undefined ? cfgProd.prefijo_codigo_combo : 'COMBO',
+                        stock_minimo_defecto: cfgProd.stock_minimo_defecto !== undefined ? Number(cfgProd.stock_minimo_defecto) : 5,
+                        categoria_sugerir_prefijo: Boolean(cfgProd.categoria_sugerir_prefijo),
+                        prefijo_categoria: cfgProd.prefijo_categoria !== undefined ? cfgProd.prefijo_categoria : 'CAT'
+                    },
+                    sistema: {
+                        nivel_bitacora: cfgSistema.nivel_bitacora || 'completa'
+                    }
+                }
+            };
+
             this.showEmpresaModal = true;
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
             });
+        },
+
+        closeEmpresaModal() {
+            this.showEmpresaModal = false;
         },
 
         async saveEmpresa() {
@@ -5484,8 +5629,9 @@ function app() {
                 this.notify('Campo Requerido', 'El nombre comercial de la empresa es obligatorio.', 'warning');
                 return;
             }
-            if (!this.empresaForm.telefono_contacto?.trim()) {
-                this.notify('Campo Requerido', 'El teléfono de contacto es obligatorio.', 'warning');
+            const cleanTel = String(this.empresaForm.telefono_contacto || '').replace(/\D/g, '');
+            if (!cleanTel || cleanTel.length !== 8) {
+                this.notify('Teléfono Inválido', 'El teléfono de contacto debe tener 8 dígitos numéricos (ej. 8888-8888).', 'warning');
                 return;
             }
             if (!this.empresaForm.direccion_fisica?.trim()) {
@@ -5507,10 +5653,16 @@ function app() {
                     this.currentTab = 'dashboard';
                 }
 
-                const payload = { ...this.empresaForm };
+                const payload = {
+                    ...this.empresaForm,
+                    telefono_contacto: cleanTel,
+                    regimen_tributario: 'Cuota Fija',
+                };
                 delete payload.mostrar_bitacora;
                 if (!payload.numero_ruc || !payload.numero_ruc.trim()) {
                     delete payload.numero_ruc;
+                } else {
+                    payload.numero_ruc = payload.numero_ruc.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
                 }
 
                 const res = await this.apiFetch('/api/empresa', {
@@ -5533,13 +5685,13 @@ function app() {
                     this.empresa.numero_ruc = '';
                 }
                 this.receiptEmpresa = this.empresa;
-                this.showEmpresaModal = false;
+                this.closeEmpresaModal();
 
                 if (typeof this.fetchTechoFiscal === 'function') {
                     this.fetchTechoFiscal();
                 }
 
-                this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
+                this.notify('¡Configuración Guardada!', 'Las preferencias del sistema han sido actualizadas.', 'success');
             } catch (error) {
                 this.notify('Error al Guardar', error.message, 'error');
             } finally {
@@ -5558,8 +5710,8 @@ function app() {
                         this.empresaForm = {
                             nombre_comercial: data.nombre_comercial || '',
                             razon_social: data.razon_social || '',
-                            numero_ruc: data.numero_ruc || '',
-                            telefono_contacto: data.telefono_contacto || '',
+                            numero_ruc: (data.numero_ruc || '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                            telefono_contacto: this.formatTelefono(data.telefono_contacto || ''),
                             correo_contacto: data.correo_contacto || '',
                             direccion_fisica: data.direccion_fisica || '',
                             mensaje_pie_ticket: data.mensaje_pie_ticket || '',

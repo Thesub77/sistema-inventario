@@ -73,7 +73,7 @@
                     x-show="(receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc) || (receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto)">
                     <span x-show="receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc" x-text="'RUC: ' + (receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc)"></span>
                     <span x-show="(receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc) && (receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto)"> | </span>
-                    <span x-show="receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto" x-text="'Tel: ' + (receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto)"></span>
+                    <span x-show="receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto" x-text="'Tel: ' + formatTelefono(receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto)"></span>
                 </p>
                 <p class="text-[10px] text-black"
                     x-show="receiptEmpresa?.direccion_fisica || receiptData?.empresa?.direccion_fisica"

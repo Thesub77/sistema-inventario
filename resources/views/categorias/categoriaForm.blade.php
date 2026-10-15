@@ -31,9 +31,13 @@
                 <label class="block text-xs font-semibold text-slate-300 mb-1">Código</label>
                 <input type="text"
                     x-model="categoryForm.codigo_categoria"
+                    @input="categoryForm.codigo_categoria = $event.target.value.replace(/[^a-zA-Z0-9\-]/g, '')"
+                    :disabled="!isEditingCategory && Boolean(empresa?.configuracion?.productos?.categoria_sugerir_prefijo)"
                     maxlength="16"
-                    placeholder="CAT-001"
-                    class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                    placeholder="Opcional (ej. BEB)"
+                    class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 font-mono disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-900/60">
+                <span x-show="!isEditingCategory && Boolean(empresa?.configuracion?.productos?.categoria_sugerir_prefijo)"
+                    class="text-[10px] text-slate-400 mt-0.5 block">Autogenerado según configuración</span>
             </div>
 
             {{-- Campo: Nombre de Categoría (BD: nombre_categoria VARCHAR(24) NOT NULL) --}}

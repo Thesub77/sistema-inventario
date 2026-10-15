@@ -23,11 +23,13 @@ class Empresa extends Model
         'moneda_simbolo',
         'regimen_tributario',
         'techo_mensual_cuota_fija',
+        'configuracion',
         'estado',
     ];
 
     protected $casts = [
         'techo_mensual_cuota_fija' => 'decimal:2',
+        'configuracion' => 'array',
     ];
 
     public function cajas()

@@ -94,9 +94,9 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-1 flex-shrink-0">
-                        <!-- Botón Configuración de Negocio (Solo Administrador o permiso empresa.gestionar) -->
-                        <button x-show="canAccessBusinessInfo" x-cloak type="button" @click="openEmpresaModal()" title="Datos del Negocio / Facturación" class="p-2 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-all cursor-pointer active:scale-95">
-                            <i data-lucide="store" class="w-4 h-4"></i>
+                        <!-- Botón Configuración del Sistema (Solo Administrador o permiso empresa.gestionar) -->
+                        <button x-show="canAccessBusinessInfo" x-cloak type="button" @click="openEmpresaModal()" title="Configuración del Sistema" class="p-2 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-all cursor-pointer active:scale-95">
+                            <i data-lucide="settings" class="w-4 h-4"></i>
                         </button>
                         <!-- Logout Button -->
                         <button type="button" @click="logout()" title="Cerrar Sesión" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer active:scale-95">
@@ -124,14 +124,6 @@
                     <button x-show="canAccessPOS" x-cloak @click="currentTab = 'pos'" class="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                         <i data-lucide="shopping-cart" class="w-4 h-4"></i>
                         <span>Punto de Venta (POS)</span>
-                    </button>
-
-                    <!-- Configuración de Datos del Negocio (Solo Administrador o roles con permiso empresa.gestionar) -->
-                    <button x-show="canAccessBusinessInfo" x-cloak @click="openEmpresaModal()" type="button"
-                        class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-700/80 transition-all cursor-pointer shadow-sm active:scale-95"
-                        title="Configurar Datos del Negocio para Facturación">
-                        <i data-lucide="store" class="w-4 h-4 text-brand-400"></i>
-                        <span class="hidden lg:inline">Datos del Negocio</span>
                     </button>
 
                     <!-- Switch Modo Claro / Modo Oscuro -->
