@@ -126,8 +126,35 @@ class EmpresaTest extends TestCase
         $this->assertDatabaseHas('empresa', [
             'nombre_comercial' => 'Supermercado Central',
             'numero_ruc' => 'J0310000000099',
+            'telefono_contacto' => '22557799',
+            'regimen_tributario' => 'Cuota Fija',
             'correo_contacto' => 'admin@central.com',
         ]);
+    }
+
+    public function test_rechaza_numero_ruc_o_telefono_con_formato_invalido(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // RUC con caracteres especiales
+        $resRuc = $this->putJson('/api/empresa', [
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310-000#99',
+            'telefono_contacto' => '8888-8888',
+            'direccion_fisica' => 'Costado norte, Managua',
+        ]);
+        $resRuc->assertStatus(422)
+            ->assertJsonValidationErrors(['numero_ruc']);
+
+        // Teléfono con longitud incorrecta o caracteres raros
+        $resTel = $this->putJson('/api/empresa', [
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310000000099',
+            'telefono_contacto' => '8888-88A',
+            'direccion_fisica' => 'Costado norte, Managua',
+        ]);
+        $resTel->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono_contacto']);
     }
 
     public function test_caja_se_relaciona_con_empresa(): void
@@ -195,5 +222,71 @@ class EmpresaTest extends TestCase
                 ],
                 'anulada',
             ]);
+    }
+
+    public function test_administrador_puede_guardar_y_obtener_configuracion_del_sistema(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // 1. Consulta inicial retorna configuración por defecto
+        $getRes = $this->getJson('/api/empresa');
+        $getRes->assertStatus(200)
+            ->assertJsonPath('configuracion.productos.modo_codigo', 'manual')
+            ->assertJsonPath('configuracion.productos.prefijo_codigo', 'PROD')
+            ->assertJsonPath('configuracion.productos.modo_codigo_combo', 'manual')
+            ->assertJsonPath('configuracion.productos.prefijo_codigo_combo', 'COMBO')
+            ->assertJsonPath('configuracion.productos.categoria_sugerir_prefijo', false)
+            ->assertJsonPath('configuracion.productos.prefijo_categoria', 'CAT');
+
+        // 2. Actualizar configuración personalizada
+        $payload = [
+            'nombre_comercial' => 'Mi Negocio Personalizado',
+            'numero_ruc' => 'J0310000000001',
+            'telefono_contacto' => '8888-8888',
+            'direccion_fisica' => 'Costado norte, Managua',
+            'configuracion' => [
+                'productos' => [
+                    'modo_codigo' => 'automatico',
+                    'prefijo_codigo' => 'ART',
+                    'modo_codigo_combo' => 'automatico',
+                    'prefijo_codigo_combo' => 'PACK',
+                    'stock_minimo_defecto' => 8,
+                    'categoria_sugerir_prefijo' => true,
+                    'prefijo_categoria' => 'DEP',
+                ],
+            ],
+        ];
+
+        $putRes = $this->putJson('/api/empresa', $payload);
+        $putRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('empresa.configuracion.productos.modo_codigo', 'automatico')
+            ->assertJsonPath('empresa.configuracion.productos.prefijo_codigo', 'ART')
+            ->assertJsonPath('empresa.configuracion.productos.modo_codigo_combo', 'automatico')
+            ->assertJsonPath('empresa.configuracion.productos.prefijo_codigo_combo', 'PACK')
+            ->assertJsonPath('empresa.configuracion.productos.stock_minimo_defecto', 8)
+            ->assertJsonPath('empresa.configuracion.productos.categoria_sugerir_prefijo', true)
+            ->assertJsonPath('empresa.configuracion.productos.prefijo_categoria', 'DEP');
+    }
+
+    public function test_rechaza_prefijo_con_caracteres_invalidos_o_especiales(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $payload = [
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310000000001',
+            'telefono_contacto' => '8888-8888',
+            'direccion_fisica' => 'Costado norte, Managua',
+            'configuracion' => [
+                'productos' => [
+                    'prefijo_codigo' => 'pro%#%$%&* ',
+                ],
+            ],
+        ];
+
+        $res = $this->putJson('/api/empresa', $payload);
+        $res->assertStatus(422)
+            ->assertJsonValidationErrors(['configuracion.productos.prefijo_codigo']);
     }
 }

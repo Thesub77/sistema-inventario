@@ -552,7 +552,7 @@
                         x-text="empresa?.direccion_fisica"></p>
                     <p class="text-xs text-black"
                         x-show="empresa?.telefono_contacto || empresa?.correo_contacto">
-                        <span x-show="empresa?.telefono_contacto" x-text="'Tel: ' + empresa.telefono_contacto"></span>
+                        <span x-show="empresa?.telefono_contacto" x-text="'Tel: ' + formatTelefono(empresa.telefono_contacto)"></span>
                         <span x-show="empresa?.telefono_contacto && empresa?.correo_contacto"> | </span>
                         <span x-show="empresa?.correo_contacto" x-text="empresa.correo_contacto"></span>
                     </p>

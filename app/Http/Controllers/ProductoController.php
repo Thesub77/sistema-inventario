@@ -229,7 +229,7 @@ class ProductoController extends Controller
 
         return [
             'id_categoria' => [...$presencia, 'integer', $categoria],
-            'codigo_producto' => [...$presencia, 'string', 'max:32', $codigo],
+            'codigo_producto' => [...$presencia, 'string', 'max:32', 'regex:/^[a-zA-Z0-9\-]+$/', $codigo],
             'nombre_producto' => [...$presencia, 'string', 'max:128', $nombre],
             'tipo_producto' => ['sometimes', 'required', 'string', 'in:estandar,combo'],
             'descripcion_producto' => [...$presencia, 'string', 'max:128'],
@@ -251,6 +251,7 @@ class ProductoController extends Controller
 
         $validator = Validator::make($request->all(), $this->rules($producto, $esCombo), [
             'codigo_producto.unique' => 'El código de producto ya está registrado.',
+            'codigo_producto.regex' => 'El código de producto solo debe contener letras, números y guiones.',
             'nombre_producto.unique' => 'Ya existe un producto registrado con este nombre.',
             'id_categoria.exists' => 'La categoría seleccionada no es válida o está inactiva.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',

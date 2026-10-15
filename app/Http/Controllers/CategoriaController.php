@@ -46,6 +46,7 @@ class CategoriaController extends Controller
                 'nullable',
                 'string',
                 'max:16',
+                'regex:/^[a-zA-Z0-9\-]+$/',
                 Rule::unique('categoria', 'codigo_categoria')->where(fn ($query) => $query->where('estado', 1)),
             ],
             'nombre_categoria' => [
@@ -58,6 +59,7 @@ class CategoriaController extends Controller
             'estado' => 'sometimes|integer|in:0,1',
         ], [
             'codigo_categoria.unique' => 'El código de categoría ya está en uso.',
+            'codigo_categoria.regex' => 'El código de categoría solo debe contener letras, números y guiones.',
             'nombre_categoria.required' => 'El nombre de la categoría es obligatorio.',
             'nombre_categoria.unique' => 'Ya existe una categoría con este nombre.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
@@ -85,6 +87,7 @@ class CategoriaController extends Controller
                 'nullable',
                 'string',
                 'max:16',
+                'regex:/^[a-zA-Z0-9\-]+$/',
                 Rule::unique('categoria', 'codigo_categoria')
                     ->ignore($categoria->categoria_id, 'categoria_id')
                     ->where(fn ($query) => $query->where('estado', 1)),
@@ -102,6 +105,7 @@ class CategoriaController extends Controller
             'estado' => 'sometimes|required|integer|in:0,1',
         ], [
             'codigo_categoria.unique' => 'El código de categoría ya está en uso por otra categoría.',
+            'codigo_categoria.regex' => 'El código de categoría solo debe contener letras, números y guiones.',
             'nombre_categoria.unique' => 'Ya existe una categoría con este nombre.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
         ]);

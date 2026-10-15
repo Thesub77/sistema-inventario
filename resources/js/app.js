@@ -21,6 +21,15 @@ function mergeModules(target, ...sources) {
     return target;
 }
 
+window.formatTelefono = function(val) {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 8);
+    if (digits.length > 4) {
+        return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    }
+    return digits;
+};
+
 export function app() {
     const appObj = {
         // Main State
@@ -98,6 +107,11 @@ export function app() {
         empresa: null,
         showEmpresaModal: false,
         isSavingEmpresa: false,
+        configTab: 'negocio',
+        pcClockTime: '',
+        pcClockDate: '',
+        pcClockTimezone: '',
+        pcClockTimer: null,
         mostrarBitacora: localStorage.getItem('mostrar_bitacora') === '1',
         empresaForm: {
             nombre_comercial: '',
@@ -110,7 +124,21 @@ export function app() {
             moneda_simbolo: 'C$',
             regimen_tributario: 'Cuota Fija',
             techo_mensual_cuota_fija: 100000.00,
-            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1'
+            mostrar_bitacora: localStorage.getItem('mostrar_bitacora') === '1',
+            configuracion: {
+                productos: {
+                    modo_codigo: 'manual',
+                    prefijo_codigo: 'PROD',
+                    modo_codigo_combo: 'manual',
+                    prefijo_codigo_combo: 'COMBO',
+                    stock_minimo_defecto: 5,
+                    categoria_sugerir_prefijo: false,
+                    prefijo_categoria: 'CAT'
+                },
+                sistema: {
+                    nivel_bitacora: 'completa'
+                }
+            }
         },
 
         // Navigation Sidebar Configuration
@@ -737,28 +765,58 @@ export function app() {
             }
         },
 
-        openEmpresaModal() {
-            if (this.empresa) {
-                this.empresaForm = {
-                    nombre_comercial: this.empresa.nombre_comercial || '',
-                    razon_social: this.empresa.razon_social || '',
-                    numero_ruc: this.empresa.numero_ruc || '',
-                    telefono_contacto: this.empresa.telefono_contacto || '',
-                    correo_contacto: this.empresa.correo_contacto || '',
-                    direccion_fisica: this.empresa.direccion_fisica || '',
-                    mensaje_pie_ticket: this.empresa.mensaje_pie_ticket || '',
-                    moneda_simbolo: this.empresa.moneda_simbolo || 'C$',
-                    regimen_tributario: this.empresa.regimen_tributario || 'Cuota Fija',
-                    techo_mensual_cuota_fija: this.empresa.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
-                    mostrar_bitacora: Boolean(this.mostrarBitacora)
-                };
-            } else {
-                this.empresaForm.mostrar_bitacora = Boolean(this.mostrarBitacora);
+        formatTelefono(val) {
+            if (!val) return '';
+            const digits = String(val).replace(/\D/g, '').slice(0, 8);
+            if (digits.length > 4) {
+                return `${digits.slice(0, 4)}-${digits.slice(4)}`;
             }
+            return digits;
+        },
+
+        openEmpresaModal() {
+            this.configTab = 'negocio';
+
+            const cfg = this.empresa?.configuracion || {};
+            const cfgProd = cfg.productos || {};
+            const cfgSistema = cfg.sistema || {};
+
+            this.empresaForm = {
+                nombre_comercial: this.empresa?.nombre_comercial || '',
+                razon_social: this.empresa?.razon_social || '',
+                numero_ruc: (this.empresa?.numero_ruc || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+                telefono_contacto: this.formatTelefono(this.empresa?.telefono_contacto || ''),
+                correo_contacto: this.empresa?.correo_contacto || '',
+                direccion_fisica: this.empresa?.direccion_fisica || '',
+                mensaje_pie_ticket: this.empresa?.mensaje_pie_ticket || '',
+                moneda_simbolo: this.empresa?.moneda_simbolo || 'C$',
+                regimen_tributario: 'Cuota Fija',
+                techo_mensual_cuota_fija: this.empresa?.techo_mensual_cuota_fija !== undefined ? Number(this.empresa.techo_mensual_cuota_fija) : 100000.00,
+                mostrar_bitacora: Boolean(this.mostrarBitacora),
+                configuracion: {
+                    productos: {
+                        modo_codigo: cfgProd.modo_codigo || 'manual',
+                        prefijo_codigo: cfgProd.prefijo_codigo !== undefined ? cfgProd.prefijo_codigo : 'PROD',
+                        modo_codigo_combo: cfgProd.modo_codigo_combo || 'manual',
+                        prefijo_codigo_combo: cfgProd.prefijo_codigo_combo !== undefined ? cfgProd.prefijo_codigo_combo : 'COMBO',
+                        stock_minimo_defecto: cfgProd.stock_minimo_defecto !== undefined ? Number(cfgProd.stock_minimo_defecto) : 5,
+                        categoria_sugerir_prefijo: Boolean(cfgProd.categoria_sugerir_prefijo),
+                        prefijo_categoria: cfgProd.prefijo_categoria !== undefined ? cfgProd.prefijo_categoria : 'CAT'
+                    },
+                    sistema: {
+                        nivel_bitacora: cfgSistema.nivel_bitacora || 'completa'
+                    }
+                }
+            };
+
             this.showEmpresaModal = true;
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
             });
+        },
+
+        closeEmpresaModal() {
+            this.showEmpresaModal = false;
         },
 
         async saveEmpresa() {
@@ -766,8 +824,9 @@ export function app() {
                 this.notify('Campo Requerido', 'El nombre comercial de la empresa es obligatorio.', 'warning');
                 return;
             }
-            if (!this.empresaForm.telefono_contacto?.trim()) {
-                this.notify('Campo Requerido', 'El teléfono de contacto es obligatorio.', 'warning');
+            const cleanTel = String(this.empresaForm.telefono_contacto || '').replace(/\D/g, '');
+            if (!cleanTel || cleanTel.length !== 8) {
+                this.notify('Teléfono Inválido', 'El teléfono de contacto debe tener 8 dígitos numéricos (ej. 8888-8888).', 'warning');
                 return;
             }
             if (!this.empresaForm.direccion_fisica?.trim()) {
@@ -789,10 +848,16 @@ export function app() {
                     this.currentTab = 'dashboard';
                 }
 
-                const payload = { ...this.empresaForm };
+                const payload = {
+                    ...this.empresaForm,
+                    telefono_contacto: cleanTel,
+                    regimen_tributario: 'Cuota Fija',
+                };
                 delete payload.mostrar_bitacora;
                 if (!payload.numero_ruc || !payload.numero_ruc.trim()) {
                     delete payload.numero_ruc;
+                } else {
+                    payload.numero_ruc = payload.numero_ruc.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
                 }
 
                 const res = await this.apiFetch('/api/empresa', {
@@ -815,13 +880,13 @@ export function app() {
                     this.empresa.numero_ruc = '';
                 }
                 this.receiptEmpresa = this.empresa;
-                this.showEmpresaModal = false;
+                this.closeEmpresaModal();
 
                 if (typeof this.fetchTechoFiscal === 'function') {
                     this.fetchTechoFiscal();
                 }
 
-                this.notify('¡Datos Guardados!', data.message || 'Los datos del negocio han sido actualizados con éxito.', 'success');
+                this.notify('¡Configuración Guardada!', 'Las preferencias del sistema han sido actualizadas.', 'success');
             } catch (error) {
                 this.notify('Error al Guardar', error.message, 'error');
             } finally {
@@ -840,8 +905,8 @@ export function app() {
                         this.empresaForm = {
                             nombre_comercial: data.nombre_comercial || '',
                             razon_social: data.razon_social || '',
-                            numero_ruc: data.numero_ruc || '',
-                            telefono_contacto: data.telefono_contacto || '',
+                            numero_ruc: (data.numero_ruc || '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                            telefono_contacto: this.formatTelefono(data.telefono_contacto || ''),
                             correo_contacto: data.correo_contacto || '',
                             direccion_fisica: data.direccion_fisica || '',
                             mensaje_pie_ticket: data.mensaje_pie_ticket || '',

@@ -21,9 +21,26 @@ export function categoriasModule() {
                 };
             } else {
                 this.isEditingCategory = false;
+                const cfgProd = this.empresa?.configuracion?.productos || {};
+                const sugerirPrefijo = Boolean(cfgProd.categoria_sugerir_prefijo);
+                const rawPrefijo = (cfgProd.prefijo_categoria || 'CAT').trim().replace(/-+$/, '');
+                const prefijo = rawPrefijo ? `${rawPrefijo}-` : '';
+                let maxCat = 0;
+                const reCat = new RegExp('^' + prefijo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\d+)$', 'i');
+                (this.categorias || []).forEach(c => {
+                    const m = (c.codigo_categoria || '').match(reCat);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (n > maxCat) maxCat = n;
+                    }
+                });
+                const nextCatNum = maxCat > 0 ? maxCat + 1 : (this.categorias || []).length + 1;
+
                 this.categoryForm = {
                     categoria_id: null,
-                    codigo_categoria: `CAT-${String(this.categorias.length + 1).padStart(2, '0')}`,
+                    codigo_categoria: sugerirPrefijo
+                        ? `${prefijo}${String(nextCatNum).padStart(2, '0')}`
+                        : '',
                     nombre_categoria: '',
                     descripcion_categoria: '',
                     estado: 1
