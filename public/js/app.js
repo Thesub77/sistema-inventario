@@ -2189,6 +2189,11 @@ function productosModule() {
                 if (!Array.isArray(this.productForm.componentes)) {
                     this.productForm.componentes = [];
                 }
+            } else {
+                if (Number(this.productForm.existencia_bodega) === 0 && !this.isEditingProduct) {
+                    const cfgProd = this.empresa?.configuracion?.productos || {};
+                    this.productForm.existencia_bodega = cfgProd.stock_minimo_defecto !== undefined ? Math.max(10, Number(cfgProd.stock_minimo_defecto) * 2) : 10;
+                }
             }
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
@@ -2327,12 +2332,31 @@ function productosModule() {
         },
 
         async saveProduct() {
-            if (this.productForm.tipo_producto === 'combo') {
+            const isCombo = this.productForm.tipo_producto === 'combo';
+            if (isCombo) {
                 if (!this.productForm.componentes || this.productForm.componentes.length === 0) {
                     this.notify('Componentes Requeridos', 'Debe agregar al menos un producto componente para el combo.', 'warning');
                     return;
                 }
                 this.productForm.existencia_bodega = 0;
+            }
+
+            const payload = { ...this.productForm };
+            if (!isCombo) {
+                payload.tipo_producto = 'estandar';
+                delete payload.componentes;
+            }
+            if (payload.costo_compra !== undefined) {
+                payload.costo_compra = Math.max(0, parseFloat(payload.costo_compra) || 0);
+            }
+            if (payload.precio_venta !== undefined) {
+                payload.precio_venta = Math.max(0, parseFloat(payload.precio_venta) || 0);
+            }
+            if (payload.existencia_bodega !== undefined) {
+                payload.existencia_bodega = isCombo ? 0 : Math.max(0, parseInt(payload.existencia_bodega, 10) || 0);
+            }
+            if (payload.existencia_minima !== undefined) {
+                payload.existencia_minima = Math.max(0, parseInt(payload.existencia_minima, 10) || 0);
             }
 
             const url = this.isEditingProduct ?
@@ -2343,7 +2367,7 @@ function productosModule() {
             try {
                 const res = await this.apiFetch(url, {
                     method,
-                    body: JSON.stringify(this.productForm)
+                    body: JSON.stringify(payload)
                 });
 
                 if (!res.ok) {

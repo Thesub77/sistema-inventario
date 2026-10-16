@@ -504,4 +504,29 @@ class ProductoComboTest extends TestCase
         $resPut->assertStatus(422)
             ->assertJsonValidationErrors(['estado']);
     }
+
+    public function test_registro_de_producto_estandar_permite_crear_sin_exigir_componentes()
+    {
+        // Enviar producto estándar con componentes: [] (como lo envía el formulario base)
+        $res = $this->actingAs($this->admin)->postJson('/api/productos', [
+            'id_categoria' => $this->categoria->categoria_id,
+            'codigo_producto' => 'STD-TEST-001',
+            'nombre_producto' => 'Producto Estandar Prueba',
+            'tipo_producto' => 'estandar',
+            'descripcion_producto' => 'Sin componentes',
+            'costo_compra' => 20.00,
+            'precio_venta' => 30.00,
+            'existencia_bodega' => 15,
+            'existencia_minima' => 5,
+            'estado' => 1,
+            'componentes' => [],
+        ]);
+
+        $res->assertStatus(201);
+        $this->assertDatabaseHas('producto', [
+            'codigo_producto' => 'STD-TEST-001',
+            'tipo_producto' => 'estandar',
+            'existencia_bodega' => 15,
+        ]);
+    }
 }
