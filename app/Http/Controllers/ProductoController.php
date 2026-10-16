@@ -69,16 +69,19 @@ class ProductoController extends Controller
         $validated['estado'] = $validated['estado'] ?? 1;
 
         try {
-            $producto = DB::transaction(function () use ($validated, $request) {
+            $producto = DB::transaction(function () use ($validated) {
                 $esCombo = ($validated['tipo_producto'] ?? 'estandar') === 'combo';
                 if ($esCombo) {
                     $validated['existencia_bodega'] = 0;
                 }
 
+                $componentes = $validated['componentes'] ?? [];
+                unset($validated['componentes']);
+
                 $producto = Producto::create($validated);
 
-                if ($esCombo && $request->has('componentes')) {
-                    foreach ($request->input('componentes') as $item) {
+                if ($esCombo && ! empty($componentes)) {
+                    foreach ($componentes as $item) {
                         ProductoComboItem::create([
                             'id_producto_combo' => $producto->producto_id,
                             'id_producto_componente' => $item['id_producto_componente'],
@@ -138,17 +141,22 @@ class ProductoController extends Controller
                     }
                 }
 
+                $componentes = $validated['componentes'] ?? null;
+                unset($validated['componentes']);
+
                 $producto->update($validated);
 
-                if ($esCombo && $request->has('componentes')) {
+                if ($esCombo && is_array($componentes)) {
                     $producto->comboItems()->delete();
-                    foreach ($request->input('componentes') as $item) {
+                    foreach ($componentes as $item) {
                         ProductoComboItem::create([
                             'id_producto_combo' => $producto->producto_id,
                             'id_producto_componente' => $item['id_producto_componente'],
                             'cantidad' => $item['cantidad'],
                         ]);
                     }
+                } elseif (! $esCombo) {
+                    $producto->comboItems()->delete();
                 }
 
                 return $producto->load(['categoria', 'comboItems.componente']);
@@ -227,7 +235,7 @@ class ProductoController extends Controller
             $nombre->ignore($producto->producto_id, 'producto_id');
         }
 
-        return [
+        $rules = [
             'id_categoria' => [...$presencia, 'integer', $categoria],
             'codigo_producto' => [...$presencia, 'string', 'max:32', 'regex:/^[a-zA-Z0-9\-]+$/', $codigo],
             'nombre_producto' => [...$presencia, 'string', 'max:128', $nombre],
@@ -238,10 +246,17 @@ class ProductoController extends Controller
             'existencia_bodega' => $esCombo ? ['nullable', 'integer', 'min:0', 'max:2147483647'] : [...$presencia, 'integer', 'min:0', 'max:2147483647'],
             'existencia_minima' => [...$presencia, 'integer', 'min:0', 'max:2147483647'],
             'estado' => ['sometimes', 'integer', 'in:0,1'],
-            'componentes' => [$esCombo && ! $producto ? 'required' : 'sometimes', 'array', 'min:1'],
-            'componentes.*.id_producto_componente' => ['required', 'integer', 'exists:producto,producto_id'],
-            'componentes.*.cantidad' => ['required', 'integer', 'min:1', 'max:10000'],
         ];
+
+        if ($esCombo) {
+            $rules['componentes'] = [! $producto ? 'required' : 'sometimes', 'array', 'min:1'];
+            $rules['componentes.*.id_producto_componente'] = ['required', 'integer', 'exists:producto,producto_id'];
+            $rules['componentes.*.cantidad'] = ['required', 'integer', 'min:1', 'max:10000'];
+        } else {
+            $rules['componentes'] = ['nullable', 'array'];
+        }
+
+        return $rules;
     }
 
     private function validateProducto(Request $request, ?Producto $producto = null): array
@@ -255,6 +270,10 @@ class ProductoController extends Controller
             'nombre_producto.unique' => 'Ya existe un producto registrado con este nombre.',
             'id_categoria.exists' => 'La categoría seleccionada no es válida o está inactiva.',
             'estado.in' => 'El estado debe ser 1 (Activo) o 0 (Inactivo).',
+            'costo_compra.min' => 'El costo de compra no puede ser menor a 0.',
+            'precio_venta.min' => 'El precio de venta no puede ser menor a 0.',
+            'existencia_bodega.min' => 'El stock inicial no puede ser un número negativo.',
+            'existencia_minima.min' => 'El stock mínimo no puede ser un número negativo.',
             'componentes.required' => 'Un producto compuesto debe tener al menos un producto componente.',
             'componentes.min' => 'Un producto compuesto debe tener al menos un producto componente.',
         ]);

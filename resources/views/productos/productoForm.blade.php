@@ -118,7 +118,9 @@
                             <option :value="p.producto_id" x-text="p.nombre_producto + ' (Stock: ' + p.existencia_bodega + ')'"></option>
                         </template>
                     </select>
-                    <input type="number" min="1" x-model.number="comboNuevaCantidad" placeholder="Cant"
+                    <input type="number" min="1" step="1" x-model.number="comboNuevaCantidad" placeholder="Cant"
+                        @keydown="if(['-', '+', 'e', 'E', '.'].includes($event.key)) $event.preventDefault()"
+                        @paste="const t = ($event.clipboardData || window.clipboardData).getData('text'); if (!/^\d+$/.test(t.trim())) $event.preventDefault()"
                         class="w-16 bg-dark-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white text-center">
                     <button type="button" @click="agregarComponenteCombo()"
                         class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer">
@@ -139,12 +141,16 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Costo de Compra (C$)</label>
-                    <input type="number" step="0.01" x-model.number="productForm.costo_compra" required
+                    <input type="number" step="0.01" min="0" x-model.number="productForm.costo_compra" required
+                        @keydown="if(['-', '+', 'e', 'E'].includes($event.key) || ($event.key === '.' && String($event.target.value || '').includes('.'))) $event.preventDefault()"
+                        @paste="const t = ($event.clipboardData || window.clipboardData).getData('text'); if (!/^\d*(\.\d*)?$/.test(t.trim())) $event.preventDefault()"
                         class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Precio de Venta (C$)</label>
-                    <input type="number" step="0.01" x-model.number="productForm.precio_venta" required
+                    <input type="number" step="0.01" min="0" x-model.number="productForm.precio_venta" required
+                        @keydown="if(['-', '+', 'e', 'E'].includes($event.key) || ($event.key === '.' && String($event.target.value || '').includes('.'))) $event.preventDefault()"
+                        @paste="const t = ($event.clipboardData || window.clipboardData).getData('text'); if (!/^\d*(\.\d*)?$/.test(t.trim())) $event.preventDefault()"
                         class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
                 </div>
             </div>
@@ -153,12 +159,16 @@
             <div x-show="productForm.tipo_producto !== 'combo'" class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Stock Inicial</label>
-                    <input type="number" x-model.number="productForm.existencia_bodega" :required="productForm.tipo_producto !== 'combo'"
+                    <input type="number" min="0" step="1" x-model.number="productForm.existencia_bodega" :required="productForm.tipo_producto !== 'combo'"
+                        @keydown="if(['-', '+', 'e', 'E', '.'].includes($event.key)) $event.preventDefault()"
+                        @paste="const t = ($event.clipboardData || window.clipboardData).getData('text'); if (!/^\d+$/.test(t.trim())) $event.preventDefault()"
                         class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Stock Mínimo</label>
-                    <input type="number" x-model.number="productForm.existencia_minima" required
+                    <input type="number" min="0" step="1" x-model.number="productForm.existencia_minima" required
+                        @keydown="if(['-', '+', 'e', 'E', '.'].includes($event.key)) $event.preventDefault()"
+                        @paste="const t = ($event.clipboardData || window.clipboardData).getData('text'); if (!/^\d+$/.test(t.trim())) $event.preventDefault()"
                         class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
                 </div>
             </div>
