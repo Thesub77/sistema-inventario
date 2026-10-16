@@ -189,7 +189,7 @@
                 <!-- 10. TAB: BITÁCORA DE AUDITORÍA -->
                 @include('sistema.bitacoraView')
 
-                <!-- 11. TAB: LIBRO DIARIO FISCAL (DGI CUOTA FIJA) -->
+                <!-- 11. TAB: BALANCE MENSUAL (DGI CUOTA FIJA) -->
                 @include('ventas.libroDiarioView')
 
 
