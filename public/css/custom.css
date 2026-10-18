@@ -4,7 +4,17 @@
 }
 
 /* Transiciones suaves entre modo oscuro y claro */
-body, aside, header, main, .glass-panel, input, select, textarea, button, table, tr {
+body,
+aside,
+header,
+main,
+.glass-panel,
+input,
+select,
+textarea,
+button,
+table,
+tr {
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
 
@@ -173,8 +183,8 @@ html:not(.dark) .border-slate-700\/60 {
     border-color: #e2e8f0 !important;
 }
 
-html:not(.dark) .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
-html:not(.dark) .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) {
+html:not(.dark) .divide-slate-800> :not([hidden])~ :not([hidden]),
+html:not(.dark) .divide-slate-800\/60> :not([hidden])~ :not([hidden]) {
     border-color: #e2e8f0 !important;
 }
 
@@ -339,7 +349,7 @@ html:not(.dark) .fixed.inset-0.bg-black\/70 {
     background-color: rgba(15, 23, 42, 0.5) !important;
 }
 
-html:not(.dark) .fixed.inset-0.bg-black\/70 > div {
+html:not(.dark) .fixed.inset-0.bg-black\/70>div {
     background-color: #ffffff !important;
     border-color: #e2e8f0 !important;
     box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.18) !important;
@@ -385,13 +395,25 @@ html:not(.dark) .swal2-html-container {
 /* ==========================================================================
    ESTILOS DE IMPRESIÓN PARA COMPROBANTE / TICKET (80mm & FORMATO OFICIAL)
    ========================================================================== */
+@page {
+    margin: 0;
+}
+
 @media print {
+    @page {
+        margin: 0;
+    }
+
     /* Ocultar toda la interfaz visual de la aplicación */
     body * {
         visibility: hidden !important;
     }
 
-    aside, header, nav, .no-print, .swal2-container {
+    aside,
+    header,
+    nav,
+    .no-print,
+    .swal2-container {
         display: none !important;
     }
 

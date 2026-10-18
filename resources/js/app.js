@@ -545,6 +545,8 @@ export function app() {
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
                             this.fetchVentas().catch(() => { }),
+                            this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
+                            this.fetchCuentasPorPagar ? this.fetchCuentasPorPagar().catch(() => { }) : Promise.resolve(),
                             this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
@@ -713,32 +715,43 @@ export function app() {
         },
 
         async fetchVentas() {
-            try {
-                const [venRes, cajRes, movCajRes, turnosRes] = await Promise.all([
-                    this.apiFetch('/api/ventas').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/cajas').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/caja-movimientos-venta').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/caja-operaciones').catch(() => ({ ok: false }))
-                ]);
-                if (venRes && venRes.ok) {
-                    const venData = await venRes.json();
-                    this.ventas = Array.isArray(venData) ? venData : [];
-                }
-                if (cajRes && cajRes.ok) {
-                    const cajData = await cajRes.json();
-                    this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
-                }
-                if (movCajRes && movCajRes.ok) {
-                    const movData = await movCajRes.json();
-                    this.cajaMovimientos = Array.isArray(movData) ? movData : [];
-                }
-                if (turnosRes && turnosRes.ok) {
-                    const turnosData = await turnosRes.json();
-                    this.turnos = Array.isArray(turnosData) ? turnosData : [];
-                }
-            } catch (e) {
-                console.error('Error cargando ventas y cajas:', e);
+            if (this._fetchingVentasPromise) {
+                return this._fetchingVentasPromise;
             }
+            this._fetchingVentasPromise = (async () => {
+                try {
+                    const [venRes, cajRes, movCajRes, turnosRes] = await Promise.all([
+                        this.apiFetch('/api/ventas').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/cajas').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/caja-movimientos-venta').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/caja-operaciones').catch(() => ({ ok: false }))
+                    ]);
+                    if (venRes && venRes.ok) {
+                        const venData = await venRes.json();
+                        this.ventas = Array.isArray(venData) ? venData : [];
+                        if (this.currentTab === 'libro-diario' && typeof this.calcularLibroDiarioLocal === 'function') {
+                            this.calcularLibroDiarioLocal();
+                        }
+                    }
+                    if (cajRes && cajRes.ok) {
+                        const cajData = await cajRes.json();
+                        this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
+                    }
+                    if (movCajRes && movCajRes.ok) {
+                        const movData = await movCajRes.json();
+                        this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                    }
+                    if (turnosRes && turnosRes.ok) {
+                        const turnosData = await turnosRes.json();
+                        this.turnos = Array.isArray(turnosData) ? turnosData : [];
+                    }
+                } catch (e) {
+                    console.error('Error cargando ventas y cajas:', e);
+                } finally {
+                    this._fetchingVentasPromise = null;
+                }
+            })();
+            return this._fetchingVentasPromise;
         },
 
         async fetchInventario() {
@@ -1111,6 +1124,12 @@ export function app() {
 
         getMovimientoConcepto(mov) {
             if (!mov) return 'Movimiento';
+            if (mov.justificacion) return mov.justificacion;
+            if (mov.motivo) return mov.motivo;
+            if (mov.concepto) return mov.concepto;
+            if (mov.descripcion) return mov.descripcion;
+            if (mov.observacion) return mov.observacion;
+
             if (mov.venta && mov.venta.codigo_venta) {
                 return (Number(mov.monto_movimiento) < 0 ? 'Devolución Factura ' : 'Cobro Factura ') + mov.venta.codigo_venta;
             }
@@ -1118,13 +1137,26 @@ export function app() {
                 return (Number(mov.monto_movimiento) < 0 ? 'Devolución Venta #' : 'Venta #') + mov.id_venta;
             }
 
-            if (Array.isArray(this.bitacoras)) {
-                const needle = `Movimiento extraordinario #${mov.caja_movimiento_venta_id}`;
-                const b = this.bitacoras.find(bit => bit.descripcion_bitacora && bit.descripcion_bitacora.includes(needle));
-                if (b) {
+            if (Array.isArray(this.bitacoras) && this.bitacoras.length > 0) {
+                const id = String(mov.caja_movimiento_venta_id || '');
+                const b = this.bitacoras.find(bit => {
+                    const desc = bit.descripcion_bitacora || '';
+                    if (id) {
+                        const regex = new RegExp(`(?:Mov\\.|Movimiento|Movimiento extraordinario|Egreso de caja|Ingreso de caja)\\s*#${id}\\b`, 'i');
+                        if (regex.test(desc)) return true;
+                    }
+                    return false;
+                });
+                if (b && b.descripcion_bitacora) {
                     const motivoIndex = b.descripcion_bitacora.indexOf('Motivo:');
                     if (motivoIndex !== -1) {
                         return b.descripcion_bitacora.substring(motivoIndex + 7).trim();
+                    }
+                    if (b.accion_bitacora === 'CAJA_PAGO_PROVEEDOR' || b.descripcion_bitacora.includes('Pago a proveedor')) {
+                        const colonIndex = b.descripcion_bitacora.indexOf(':');
+                        if (colonIndex !== -1) {
+                            return b.descripcion_bitacora.substring(colonIndex + 1).trim();
+                        }
                     }
                     return b.descripcion_bitacora;
                 }

@@ -1103,16 +1103,56 @@ function fiscalModule() {
     // Helper para extraer { year, month } seguro contra variaciones de formato y zonas horarias
     function extractYearMonth(dateVal) {
         if (!dateVal) return null;
-        const s = String(dateVal).trim();
+        let s = String(dateVal).trim();
+
+        // 1. Si es solo fecha YYYY-MM-DD sin componente de hora, año y mes exactos de calendario
+        const dateOnlyMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateOnlyMatch) {
+            return { year: parseInt(dateOnlyMatch[1], 10), month: parseInt(dateOnlyMatch[2], 10) };
+        }
+
+        // 2. Si viene formateada como DD/MM/YYYY
+        const latinMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if (latinMatch) {
+            return { year: parseInt(latinMatch[3], 10), month: parseInt(latinMatch[2], 10) };
+        }
+
+        // 3. Si viene con fecha y hora (ej: "2026-10-01 01:30:00" o ISO), normalizar con 'Z'
+        // para interpretar en la zona horaria local del navegador, 100% coherente con formatDate().
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) {
+            s = s.replace(' ', 'T') + 'Z';
+        }
+        const d = new Date(s);
+        const target = isNaN(d.getTime()) ? new Date(dateVal) : d;
+        if (!isNaN(target.getTime())) {
+            return { year: target.getFullYear(), month: target.getMonth() + 1 };
+        }
+
         const match = s.match(/^(\d{4})-(\d{2})/);
         if (match) {
             return { year: parseInt(match[1], 10), month: parseInt(match[2], 10) };
         }
-        const d = new Date(dateVal);
-        if (!isNaN(d.getTime())) {
-            return { year: d.getFullYear(), month: d.getMonth() + 1 };
-        }
         return null;
+    }
+
+    // Helper para obtener YYYY-MM-DD local exacto para agrupar ventas diarias
+    function getLocalDateStr(dateVal) {
+        if (!dateVal) return '';
+        let s = String(dateVal).trim();
+        const dateOnlyMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateOnlyMatch) {
+            return s;
+        }
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) {
+            s = s.replace(' ', 'T') + 'Z';
+        }
+        const d = new Date(s);
+        const target = isNaN(d.getTime()) ? new Date(dateVal) : d;
+        if (isNaN(target.getTime())) {
+            return s.split('T')[0].split(' ')[0];
+        }
+        const pad = n => String(n).padStart(2, '0');
+        return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
     }
 
     return {
@@ -1131,6 +1171,42 @@ function fiscalModule() {
             total_acumulado_mes: '0.00',
             total_transacciones_mes: 0,
             dias: []
+        },
+
+        getDayNumber(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) return match[3];
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? '' : String(d.getDate()).padStart(2, '0');
+        },
+
+        getDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        },
+
+        getFullDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+            return name.charAt(0).toUpperCase() + name.slice(1);
         },
 
         // Lista de meses para el selector interactivo
@@ -1188,7 +1264,7 @@ function fiscalModule() {
 
                     return true;
                 })
-                .sort((a, b) => new Date(b.fecha_hora_venta) - new Date(a.fecha_hora_venta));
+                .sort((a, b) => new Date(String(b.fecha_hora_venta).replace(' ', 'T')) - new Date(String(a.fecha_hora_venta).replace(' ', 'T')));
         },
 
         // Cuentas por pagar reales del mes (consumidas directamente del módulo Cuentas por Pagar)
@@ -1278,9 +1354,39 @@ function fiscalModule() {
             const anioSel = Number(this.libroDiarioAnio);
             const movs = Array.isArray(this.cajaMovimientos) ? this.cajaMovimientos : [];
 
+            // Conjunto de IDs de movimientos de caja generados por abonos/pagos a facturas de proveedores
+            const movimientosPagosCxP = new Set();
+            (this.cuentasPorPagar || []).forEach(c => {
+                (c.pagos || []).forEach(p => {
+                    if (p.id_caja_movimiento_venta) {
+                        movimientosPagosCxP.add(Number(p.id_caja_movimiento_venta));
+                    }
+                });
+            });
+
             return movs.filter(m => {
                 if (Number(m.monto_movimiento || 0) >= 0) return false;
                 if (m.id_venta) return false;
+
+                const mId = Number(m.caja_movimiento_venta_id);
+
+                // Excluir si el egreso corresponde a un pago de cuenta por pagar de proveedor
+                if (movimientosPagosCxP.has(mId)) return false;
+
+                // Excluir si la bitácora lo registra formalmente como pago a proveedor
+                if (Array.isArray(this.bitacoras) && this.bitacoras.length > 0) {
+                    const esPagoProv = this.bitacoras.some(bit => {
+                        if (bit.accion_bitacora === 'CAJA_PAGO_PROVEEDOR') {
+                            const desc = bit.descripcion_bitacora || '';
+                            const match = desc.match(/(?:Egreso de caja|Mov\.?)\s*#(\d+)/i);
+                            if (match && Number(match[1]) === mId) return true;
+                            if (desc.includes(`#${mId}`)) return true;
+                        }
+                        return false;
+                    });
+                    if (esPagoProv) return false;
+                }
+
                 const ym = extractYearMonth(m.fecha_hora_movimiento || m.created_at);
                 return ym && ym.year === anioSel && ym.month === mesSel;
             });
@@ -1330,21 +1436,106 @@ function fiscalModule() {
             return Number(this.libroFiscalMermasMes.reduce((sum, m) => sum + Number(m.costo_total_perdida || 0), 0).toFixed(2));
         },
 
-        // Total Ingresos Facturados del Mes
+        // Total Ingresos Facturados del Mes (100% reactivo al mes y año seleccionado)
         get libroFiscalTotalIngresos() {
-            return Number(this.libroDiarioData?.total_acumulado_mes || 0);
+            const mesSel = Number(this.libroDiarioMes);
+            const anioSel = Number(this.libroDiarioAnio);
+
+            // 1. Si this.ventas está en memoria, calcular inmediatamente sobre las ventas activas del mes
+            if (Array.isArray(this.ventas) && this.ventas.length > 0) {
+                const total = this.ventas
+                    .filter(v => {
+                        if (Number(v.estado) === 0) return false;
+                        if (!v.fecha_hora_venta) return false;
+                        const ym = extractYearMonth(v.fecha_hora_venta);
+                        return ym && ym.year === anioSel && ym.month === mesSel;
+                    })
+                    .reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
+                return Number(total.toFixed(2));
+            }
+
+            // 2. Fallback a libroDiarioData solo si coincide exactamente con el mes y año consultado
+            if (this.libroDiarioData &&
+                Number(this.libroDiarioData.mes) === mesSel &&
+                Number(this.libroDiarioData.anio) === anioSel) {
+                return Number(this.libroDiarioData.total_acumulado_mes || 0);
+            }
+
+            return 0;
         },
 
-        // RESULTADO DEL MES: Ganancia Operativa Real = (+) Ventas (-) Gastos Operativos (-) Mermas
-        // Nota: NO se restan compras masivas de stock a crédito como pérdida directa del mes
+        // Cantidad de facturas/tickets del mes seleccionado
+        get libroFiscalTotalTransacciones() {
+            const mesSel = Number(this.libroDiarioMes);
+            const anioSel = Number(this.libroDiarioAnio);
+
+            if (Array.isArray(this.ventas) && this.ventas.length > 0) {
+                return this.ventas.filter(v => {
+                    if (Number(v.estado) === 0) return false;
+                    if (!v.fecha_hora_venta) return false;
+                    const ym = extractYearMonth(v.fecha_hora_venta);
+                    return ym && ym.year === anioSel && ym.month === mesSel;
+                }).length;
+            }
+
+            if (this.libroDiarioData &&
+                Number(this.libroDiarioData.mes) === mesSel &&
+                Number(this.libroDiarioData.anio) === anioSel) {
+                return Number(this.libroDiarioData.total_transacciones_mes || 0);
+            }
+
+            return 0;
+        },
+
+        // Límite fiscal DGI y semáforo reactivo específico para el mes y año consultado en el Balance
+        get libroFiscalTecho() {
+            const defaultTecho = Number(this.empresa?.techo_mensual_cuota_fija !== undefined ? this.empresa.techo_mensual_cuota_fija : 100000.00);
+            const regimen = this.empresa?.regimen_tributario || 'Cuota Fija';
+            const anioSel = Number(this.libroDiarioAnio);
+
+            // Ventas del mes seleccionado (exacto, reactivo)
+            const ventasMes = Number(this.libroFiscalTotalIngresos || 0);
+            const techoMensual = defaultTecho;
+            const porcentaje = techoMensual > 0 ? (ventasMes / techoMensual) * 100 : (ventasMes > 0 ? 100 : 0);
+            const saldoDisponible = Math.max(0, techoMensual - ventasMes);
+            const estadoSemaforo = porcentaje < 75 ? 'normal' : (porcentaje < 100 ? 'alerta' : 'excedido');
+
+            // Acumulado del año fiscal consultado (estrictamente dentro del anioSel)
+            let ventasAnual = 0;
+            if (Array.isArray(this.ventas)) {
+                ventasAnual = this.ventas
+                    .filter(v => {
+                        if (Number(v.estado) === 0) return false;
+                        if (!v.fecha_hora_venta) return false;
+                        const ym = extractYearMonth(v.fecha_hora_venta);
+                        return ym && ym.year === anioSel;
+                    })
+                    .reduce((sum, v) => sum + Number(v.total_venta || 0), 0);
+            } else if (this.techoFiscalData?.ventas_anual_acumulado) {
+                ventasAnual = Number(this.techoFiscalData.ventas_anual_acumulado);
+            }
+
+            return {
+                regimen: regimen,
+                ventas_mes: Number(ventasMes.toFixed(2)),
+                techo_mensual: techoMensual,
+                porcentaje_consumido: Number(porcentaje.toFixed(2)),
+                saldo_disponible: Number(saldoDisponible.toFixed(2)),
+                estado_semaforo: estadoSemaforo,
+                ventas_anual_acumulado: Number(ventasAnual.toFixed(2)),
+                techo_anual: Number((techoMensual * 12).toFixed(2))
+            };
+        },
+
+        // RESULTADO DEL MES: Flujo Neto de Dinero = (+) Ventas (-) Gastos Operativos (-) Pagos a Proveedores
         get libroFiscalResultadoMes() {
-            return Number((this.libroFiscalTotalIngresos - this.libroFiscalTotalGastosOperativos - this.libroFiscalTotalMermas).toFixed(2));
+            return Number((this.libroFiscalTotalIngresos - this.libroFiscalTotalGastosOperativos - this.libroFiscalInventarioPagado).toFixed(2));
         },
         get libroFiscalRentabilidad() {
             return this.libroFiscalResultadoMes;
         },
 
-        // Margen Operativo Real (%)
+        // Margen de Flujo Neto (%)
         get libroFiscalMargen() {
             const ing = this.libroFiscalTotalIngresos;
             if (ing <= 0) return 0;
@@ -1355,70 +1546,6 @@ function fiscalModule() {
         get libroFiscalTotalEgresos() {
             return Number((this.libroFiscalTotalGastosOperativos + this.libroFiscalTotalInventario).toFixed(2));
         },
-
-        // ALERTAS EDUCATIVAS AUTOMÁTICAS PARA EL DUEÑO DE NEGOCIO
-        get libroFiscalAlertaStock() {
-            if (this.libroFiscalTotalInventario > this.libroFiscalTotalIngresos && this.libroFiscalTotalIngresos > 0) {
-                return `💡 Compraste C$ ${this.libroFiscalTotalInventario.toLocaleString('es-NI', { minimumFractionDigits: 2 })} en mercadería. Es inventario para vender, no una pérdida directa. Tu ganancia operativa real del mes es de C$ ${this.libroFiscalResultadoMes.toLocaleString('es-NI', { minimumFractionDigits: 2 })}.`;
-            }
-            return null;
-        },
-        get libroFiscalAlertaMermas() {
-            if (this.libroFiscalTotalMermas > 0) {
-                return `🚨 Registraste C$ ${this.libroFiscalTotalMermas.toLocaleString('es-NI', { minimumFractionDigits: 2 })} en mermas por productos dañados o vencidos. Revisa desperdicios y rotación de stock para evitar fugas de dinero.`;
-            }
-            return null;
-        },
-
-        // Diagnóstico Financiero y Rumbo del Negocio intuitivo y amigable para el dueño
-        get libroFiscalDiagnostico() {
-            const ventas = this.libroFiscalTotalIngresos;
-            const operativos = this.libroFiscalTotalGastosOperativos;
-            const stock = this.libroFiscalTotalInventario;
-            const mermas = this.libroFiscalTotalMermas;
-            const resultado = this.libroFiscalResultadoMes;
-            const margen = this.libroFiscalMargen;
-
-            if (ventas === 0 && operativos === 0 && stock === 0 && mermas === 0) {
-                return {
-                    estado: 'Sin Operaciones en el Período',
-                    badge: 'neutral',
-                    mensaje: 'No se registran ventas, deudas con proveedores ni mermas en este mes.',
-                    rumbo: 'Inicia registrando tus ventas diarias en el POS y las compras o gastos en el sistema para calcular el resultado del mes.'
-                };
-            }
-
-            if (resultado > 0) {
-                let msg = `¡Excelente resultado! Tu negocio generó una ganancia operativa real de C$ ${resultado.toLocaleString('es-NI', { minimumFractionDigits: 2 })} (margen del ${margen}% sobre ventas).`;
-                if (stock > 0) {
-                    msg += ` Además, invertiste C$ ${stock.toLocaleString('es-NI', { minimumFractionDigits: 2 })} en mercadería disponible para la venta.`;
-                }
-                if (mermas > 0) {
-                    msg += ` Se absorbieron C$ ${mermas.toLocaleString('es-NI', { minimumFractionDigits: 2 })} en pérdidas por mermas.`;
-                }
-                return {
-                    estado: 'Ganancia Operativa Positiva',
-                    badge: 'rentable',
-                    mensaje: msg,
-                    rumbo: 'Vas por excelente camino. Mantén controlados los gastos operativos y vigila los productos con riesgo de vencimiento para que no mermen tu ganancia.'
-                };
-            } else if (resultado === 0) {
-                return {
-                    estado: 'Punto de Equilibrio Operativo',
-                    badge: 'alerta',
-                    mensaje: `Tus ventas del mes cubrieron exactamente los gastos operativos y mermas registradas.`,
-                    rumbo: 'Intenta impulsar tus ventas diarias en el POS o revisar si puedes reducir gastos operativos para comenzar a generar ganancias libres.'
-                };
-            } else {
-                return {
-                    estado: 'Gastos Operativos Superaron las Ventas',
-                    badge: 'deficit',
-                    mensaje: `En este período los gastos operativos (C$ ${operativos.toLocaleString('es-NI', { minimumFractionDigits: 2 })}) y mermas (C$ ${mermas.toLocaleString('es-NI', { minimumFractionDigits: 2 })}) superaron a las ventas por C$ ${Math.abs(resultado).toLocaleString('es-NI', { minimumFractionDigits: 2 })}. (Nota: Las compras de stock no se consideran pérdida).`,
-                    rumbo: 'Revisa qué gastos operativos puedes optimizar y reduce las mermas de inventario para volver a tener números positivos.'
-                };
-            }
-        },
-
         // Helper para formatear fecha y hora completa
         formatDateTime(dateInput) {
             if (!dateInput) return '';
@@ -1435,48 +1562,38 @@ function fiscalModule() {
             });
         },
 
-        // Selector rápido: Mes Actual
-        setLibroDiarioMesActual() {
-            const n = new Date();
-            this.libroDiarioMes = n.getMonth() + 1;
-            this.libroDiarioAnio = n.getFullYear();
-            this.fetchLibroDiario();
-        },
-
-        // Selector rápido: Mes Anterior
-        setLibroDiarioMesAnterior() {
-            let m = Number(this.libroDiarioMes) - 1;
-            let a = Number(this.libroDiarioAnio);
-            if (m < 1) {
-                m = 12;
-                a -= 1;
-            }
-            this.libroDiarioMes = m;
-            this.libroDiarioAnio = a;
-            this.fetchLibroDiario();
-        },
-
         // Consulta de datos de Libro Diario conectada al backend con fallback local reactivo
         async fetchLibroDiario() {
-            this.libroDiarioLoading = true;
             this.libroDiarioEmisionFecha = this.formatDateTime(new Date());
 
-            // Garantizar que las cuentas por pagar y ventas estén en memoria
-            if (typeof this.fetchCuentasPorPagar === 'function') {
-                this.fetchCuentasPorPagar().catch(() => {});
+            const mes = Number(this.libroDiarioMes);
+            const anio = Number(this.libroDiarioAnio);
+
+            // 1. Si ya tenemos ventas en memoria, renderizar inmediatamente en 0ms
+            if (Array.isArray(this.ventas) && this.ventas.length > 0) {
+                this.calcularLibroDiarioLocal();
+                this.libroDiarioLoading = false;
+            } else {
+                this.libroDiarioLoading = true;
+            }
+
+            // 2. Disparar en segundo plano (no bloqueante) cargas auxiliares de gastos e inventario
+            if (typeof this.fetchCuentasPorPagar === 'function' && (!this.cuentasPorPagar || this.cuentasPorPagar.length === 0)) {
+                this.fetchCuentasPorPagar().catch(() => { });
             }
             if (typeof this.fetchVentas === 'function' && (!this.ventas || this.ventas.length === 0)) {
-                this.fetchVentas().catch(() => {});
+                this.fetchVentas().catch(() => { });
+            }
+            if (typeof this.fetchInventario === 'function' && (!this.movimientosInventario || this.movimientosInventario.length === 0)) {
+                this.fetchInventario().catch(() => { });
             }
 
+            // 3. Consultar el endpoint oficial rápido de agregación del Libro Diario
             try {
-                const mes = Number(this.libroDiarioMes);
-                const anio = Number(this.libroDiarioAnio);
-
                 const res = await this.apiFetch(`/api/fiscal/libro-diario?mes=${mes}&anio=${anio}`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && data.success) {
+                    if (data && data.success && Number(data.mes) === Number(this.libroDiarioMes) && Number(data.anio) === Number(this.libroDiarioAnio)) {
                         this.libroDiarioData = data;
                         this.libroDiarioLoading = false;
                         this.$nextTick(() => {
@@ -1489,7 +1606,7 @@ function fiscalModule() {
                 console.warn('Fallo al consultar /api/fiscal/libro-diario, calculando desde ventas locales:', err);
             }
 
-            // Fallback de cálculo reactivo local basado en this.ventas
+            // 4. Fallback reactivo local
             this.calcularLibroDiarioLocal();
             this.libroDiarioLoading = false;
             this.$nextTick(() => {
@@ -1515,7 +1632,7 @@ function fiscalModule() {
             let totalTransacciones = 0;
 
             ventasMes.forEach(v => {
-                const fechaStr = v.fecha_hora_venta.substring(0, 10);
+                const fechaStr = getLocalDateStr(v.fecha_hora_venta);
                 if (!diasMap[fechaStr]) {
                     diasMap[fechaStr] = {
                         fecha: fechaStr,
@@ -1574,7 +1691,6 @@ function fiscalModule() {
                 .replace(/[/\\?%*:|"<>]/g, '-').trim();
             const fileName = `Balance Mensual ${mesNombre} ${comercioNombre}`;
 
-            // Configurar el título del documento para que "Guardar como PDF" sugiera el nombre oficial requerido
             document.title = fileName;
 
             window.print();
@@ -1607,43 +1723,41 @@ function fiscalModule() {
             csvContent += `"Período Mensual: ${mesNombre} ${anio}"\r\n`;
             csvContent += `"Fecha de Emisión: ${this.libroDiarioEmisionFecha}"\r\n\r\n`;
 
-            // Resumen Financiero y Resultado del Mes
-            csvContent += `"RESUMEN FINANCIERO Y RESULTADO DEL MES"\r\n`;
+            // Resumen de Flujo de Dinero y Saldo del Mes
+            csvContent += `"RESUMEN DE FLUJO DE DINERO Y SALDO DEL MES"\r\n`;
             csvContent += `"Métrica / Concepto","Monto (C$)","Detalle Explicativo"\r\n`;
-            csvContent += `"1. Total Ventas Facturadas","${this.libroFiscalTotalIngresos.toFixed(2)}","${this.libroDiarioData?.total_transacciones_mes || 0} tickets emitidos"\r\n`;
-            csvContent += `"2. Gastos Operativos","${this.libroFiscalTotalGastosOperativos.toFixed(2)}","Servicios, DGI, empaques y gastos diarios en efectivo"\r\n`;
-            csvContent += `"3. Compras de Stock (Inventario)","${this.libroFiscalTotalInventario.toFixed(2)}","Pagado: C$ ${this.libroFiscalInventarioPagado.toFixed(2)} | Pendiente (Crédito): C$ ${this.libroFiscalInventarioPendiente.toFixed(2)}"\r\n`;
-            csvContent += `"4. Mermas y Pérdidas Reales","${this.libroFiscalTotalMermas.toFixed(2)}","${this.libroFiscalMermasMes.length} productos dañados/vencidos"\r\n`;
-            csvContent += `"RESULTADO DEL MES (Ganancia Operativa Real)","${this.libroFiscalResultadoMes.toFixed(2)}","Margen Operativo: ${this.libroFiscalMargen}% (Ventas - Gastos Operativos - Mermas)"\r\n`;
-            csvContent += `"Diagnóstico y Rumbo","${this.libroFiscalDiagnostico.estado}","${this.libroFiscalDiagnostico.rumbo}"\r\n\r\n`;
+            csvContent += `"1. Total Facturado (Ventas)","${this.libroFiscalTotalIngresos.toFixed(2)}","${this.libroFiscalTotalTransacciones} tickets emitidos"\r\n`;
+            csvContent += `"2. Gastos Operativos","${this.libroFiscalTotalGastosOperativos.toFixed(2)}","Servicios, alquiler, DGI y gastos diarios en efectivo"\r\n`;
+            csvContent += `"3. Pagos a Proveedores de Mercadería","${this.libroFiscalInventarioPagado.toFixed(2)}","Pagado: C$ ${this.libroFiscalInventarioPagado.toFixed(2)} | Pendiente (Crédito): C$ ${this.libroFiscalInventarioPendiente.toFixed(2)}"\r\n`;
+            csvContent += `"4. Mermas Registradas","${this.libroFiscalTotalMermas.toFixed(2)}","${this.libroFiscalMermasMes.length} productos dañados/vencidos"\r\n`;
+            csvContent += `"SALDO NETO DE DINERO EN CAJA/BANCO","${this.libroFiscalResultadoMes.toFixed(2)}","Flujo Neto: Ventas - Gastos Operativos - Pagos a Proveedores"\r\n\r\n`;
 
             // SECCIÓN I: Ventas Diarias
             csvContent += `"I. CUADERNO DE INGRESOS - VENTAS DIARIAS FACTURADAS"\r\n`;
-            csvContent += `"Fecha","Cantidad de Tickets","Comprobante Inicial","Comprobante Final","Rango de Comprobantes","Total Diario (C$)"\r\n`;
+            csvContent += `"Fecha","Cantidad de Tickets","Total Diario (C$)"\r\n`;
 
             (this.libroDiarioData?.dias || []).forEach(d => {
-                const rango = d.comprobante_inicial === d.comprobante_final
-                    ? d.comprobante_inicial
-                    : `${d.comprobante_inicial} al ${d.comprobante_final}`;
-                csvContent += `"${d.fecha}","${d.cantidad_transacciones}","${d.comprobante_inicial}","${d.comprobante_final}","${rango}","${d.total_dia}"\r\n`;
+                csvContent += `"${d.fecha}","${d.cantidad_transacciones}","${d.total_dia}"\r\n`;
             });
-            csvContent += `"TOTAL VENTAS MES","${this.libroDiarioData?.total_transacciones_mes || 0} tickets","","","","${this.libroFiscalTotalIngresos.toFixed(2)}"\r\n\r\n`;
+            csvContent += `"TOTAL VENTAS MES","${this.libroFiscalTotalTransacciones} tickets","${this.libroFiscalTotalIngresos.toFixed(2)}"\r\n\r\n`;
 
             // SECCIÓN II: Gastos Operativos y Gastos Diarios en Efectivo
             csvContent += `"II. GASTOS OPERATIVOS Y GASTOS DIARIOS EN EFECTIVO"\r\n`;
-            csvContent += `"Fecha","Acreedor / Proveedor","Concepto / Detalle","N° Factura / Doc","Tipo","Monto (C$)"\r\n`;
+            csvContent += `"Fecha","Proveedor / Origen","Concepto","Tipo","Monto (C$)"\r\n`;
 
             (this.libroFiscalGastosOperativosCuentas || []).forEach(c => {
                 const fecha = c.fecha_emision || (c.created_at ? c.created_at.slice(0, 10) : '---');
-                csvContent += `"${fecha}","${c.proveedor?.nombre_comercial || 'Proveedor'}","${c.descripcion || 'Gasto operativo'}","${c.numero_factura || 'S/N'}","Deuda Operativa","${Number(c.monto_total || 0).toFixed(2)}"\r\n`;
+                csvContent += `"${fecha}","${c.proveedor?.nombre_comercial || 'Proveedor'}","${c.descripcion || 'Gasto operativo'}","Deuda Operativa","${Number(c.monto_total || 0).toFixed(2)}"\r\n`;
             });
-            if (this.libroFiscalTotalCajaEgresos > 0) {
-                csvContent += `"Mes","Caja Chica","Gastos diarios y suministros en efectivo","Caja","Efectivo","${this.libroFiscalTotalCajaEgresos.toFixed(2)}"\r\n`;
-            }
-            csvContent += `"TOTAL GASTOS OPERATIVOS","","","","","${this.libroFiscalTotalGastosOperativos.toFixed(2)}"\r\n\r\n`;
+            (this.libroFiscalCajaEgresosMes || []).forEach(eg => {
+                const fecha = eg.fecha_hora_movimiento ? String(eg.fecha_hora_movimiento).slice(0, 10) : '---';
+                const concepto = typeof this.getMovimientoConcepto === 'function' ? this.getMovimientoConcepto(eg) : 'Egreso de Caja';
+                csvContent += `"${fecha}","Control Diario","${concepto}","Efectivo","${Math.abs(Number(eg.monto_movimiento || 0)).toFixed(2)}"\r\n`;
+            });
+            csvContent += `"TOTAL GASTOS OPERATIVOS","","","","${this.libroFiscalTotalGastosOperativos.toFixed(2)}"\r\n\r\n`;
 
-            // SECCIÓN III: Compras de Stock e Inversión en Inventario
-            csvContent += `"III. COMPRAS DE STOCK E INVERSIÓN EN INVENTARIO (MERCADERÍA)"\r\n`;
+            // SECCIÓN III: Pagos a Proveedores de Mercadería
+            csvContent += `"III. PAGOS A PROVEEDORES DE MERCADERÍA"\r\n`;
             csvContent += `"Fecha","Proveedor","N° Factura","Detalle Mercadería","Total Factura (C$)","Monto Pagado (C$)","Saldo Pendiente (Crédito C$)"\r\n`;
             (this.libroFiscalInventarioCuentas || []).forEach(c => {
                 const fecha = c.fecha_emision || (c.created_at ? c.created_at.slice(0, 10) : '---');
@@ -1652,7 +1766,7 @@ function fiscalModule() {
                     : (Number(c.monto_total || 0) - Number(c.monto_pagado || 0));
                 csvContent += `"${fecha}","${c.proveedor?.nombre_comercial || 'Proveedor'}","${c.numero_factura || 'S/N'}","${c.descripcion || 'Compra de mercadería'}","${Number(c.monto_total || 0).toFixed(2)}","${Number(c.monto_pagado || 0).toFixed(2)}","${Math.max(0, pend).toFixed(2)}"\r\n`;
             });
-            csvContent += `"TOTAL COMPRAS STOCK","","","","${this.libroFiscalTotalInventario.toFixed(2)}","${this.libroFiscalInventarioPagado.toFixed(2)}","${this.libroFiscalInventarioPendiente.toFixed(2)}"\r\n\r\n`;
+            csvContent += `"TOTAL SALIDAS A PROVEEDORES","","","","${this.libroFiscalTotalInventario.toFixed(2)}","${this.libroFiscalInventarioPagado.toFixed(2)}","${this.libroFiscalInventarioPendiente.toFixed(2)}"\r\n\r\n`;
 
             // SECCIÓN IV: Mermas y Pérdidas Reales
             csvContent += `"IV. MERMAS Y PÉRDIDAS REALES (PRODUCTOS DAÑADOS / VENCIDOS)"\r\n`;
@@ -1669,7 +1783,8 @@ function fiscalModule() {
                 csvContent += `"III. DETALLE INDIVIDUAL DE COMPROBANTES EMITIDOS EN EL PERÍODO"\r\n`;
                 csvContent += `"N° Factura / Ticket","Fecha y Hora","Cliente","Método de Pago","Total Facturado (C$)"\r\n`;
                 ventasDetalle.forEach(v => {
-                    csvContent += `"${v.codigo_venta}","${v.fecha_hora_venta}","${v.cliente_nombre || 'Consumidor Final'}","${v.metodo_pago || 'Efectivo'}","${Number(v.total_venta || 0).toFixed(2)}"\r\n`;
+                    const fechaFormateada = typeof this.formatDate === 'function' ? this.formatDate(v.fecha_hora_venta) : v.fecha_hora_venta;
+                    csvContent += `"${v.codigo_venta}","${fechaFormateada}","${v.cliente_nombre || 'Consumidor Final'}","${v.metodo_pago || 'Efectivo'}","${Number(v.total_venta || 0).toFixed(2)}"\r\n`;
                 });
             }
 
@@ -1902,6 +2017,18 @@ function utilsModule() {
         formatDate(dateStr) {
             if (!dateStr) return 'N/A';
             let normalized = String(dateStr).trim();
+
+            // Si es solo fecha YYYY-MM-DD sin componente de hora, formatear directamente sin desfase de zona horaria
+            const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (dateOnlyMatch) {
+                return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+            }
+
+            // Si ya viene formateada como DD/MM/YYYY
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
+                return normalized;
+            }
+
             // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
                 normalized = normalized.replace(' ', 'T') + 'Z';
@@ -1927,6 +2054,17 @@ function utilsModule() {
         formatDateOnly(dateStr) {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
+
+            // Si es solo fecha YYYY-MM-DD sin hora, retornar directamente DD/MM/YYYY sin desfase UTC
+            const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (dateOnlyMatch) {
+                return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+            }
+
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
+                return normalized;
+            }
+
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
                 normalized = normalized.replace(' ', 'T') + 'Z';
             }
@@ -1940,6 +2078,42 @@ function utilsModule() {
             const year = target.getFullYear();
 
             return `${day}/${month}/${year}`;
+        },
+
+        getDayNumber(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) return match[3];
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? '' : String(d.getDate()).padStart(2, '0');
+        },
+
+        getDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        },
+
+        getFullDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+            return name.charAt(0).toUpperCase() + name.slice(1);
         },
 
         formatTime(dateStr) {
@@ -5371,6 +5545,8 @@ function app() {
                             this.fetchLibroDiario(),
                             this.fetchEmpresa(),
                             this.fetchVentas().catch(() => { }),
+                            this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
+                            this.fetchCuentasPorPagar ? this.fetchCuentasPorPagar().catch(() => { }) : Promise.resolve(),
                             this.fetchUsuarios().catch(() => { })
                         ]);
                         break;
@@ -5531,32 +5707,43 @@ function app() {
         },
 
         async fetchVentas() {
-            try {
-                const [venRes, cajRes, movCajRes, turnosRes] = await Promise.all([
-                    this.apiFetch('/api/ventas').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/cajas').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/caja-movimientos-venta').catch(() => ({ ok: false })),
-                    this.apiFetch('/api/caja-operaciones').catch(() => ({ ok: false }))
-                ]);
-                if (venRes && venRes.ok) {
-                    const venData = await venRes.json();
-                    this.ventas = Array.isArray(venData) ? venData : [];
-                }
-                if (cajRes && cajRes.ok) {
-                    const cajData = await cajRes.json();
-                    this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
-                }
-                if (movCajRes && movCajRes.ok) {
-                    const movData = await movCajRes.json();
-                    this.cajaMovimientos = Array.isArray(movData) ? movData : [];
-                }
-                if (turnosRes && turnosRes.ok) {
-                    const turnosData = await turnosRes.json();
-                    this.turnos = Array.isArray(turnosData) ? turnosData : [];
-                }
-            } catch (e) {
-                console.error('Error cargando ventas y cajas:', e);
+            if (this._fetchingVentasPromise) {
+                return this._fetchingVentasPromise;
             }
+            this._fetchingVentasPromise = (async () => {
+                try {
+                    const [venRes, cajRes, movCajRes, turnosRes] = await Promise.all([
+                        this.apiFetch('/api/ventas').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/cajas').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/caja-movimientos-venta').catch(() => ({ ok: false })),
+                        this.apiFetch('/api/caja-operaciones').catch(() => ({ ok: false }))
+                    ]);
+                    if (venRes && venRes.ok) {
+                        const venData = await venRes.json();
+                        this.ventas = Array.isArray(venData) ? venData : [];
+                        if (this.currentTab === 'libro-diario' && typeof this.calcularLibroDiarioLocal === 'function') {
+                            this.calcularLibroDiarioLocal();
+                        }
+                    }
+                    if (cajRes && cajRes.ok) {
+                        const cajData = await cajRes.json();
+                        this.cajas = Array.isArray(cajData) ? cajData.sort((a, b) => Number(a.caja_id) - Number(b.caja_id)) : [];
+                    }
+                    if (movCajRes && movCajRes.ok) {
+                        const movData = await movCajRes.json();
+                        this.cajaMovimientos = Array.isArray(movData) ? movData : [];
+                    }
+                    if (turnosRes && turnosRes.ok) {
+                        const turnosData = await turnosRes.json();
+                        this.turnos = Array.isArray(turnosData) ? turnosData : [];
+                    }
+                } catch (e) {
+                    console.error('Error cargando ventas y cajas:', e);
+                } finally {
+                    this._fetchingVentasPromise = null;
+                }
+            })();
+            return this._fetchingVentasPromise;
         },
 
         async fetchInventario() {
@@ -5940,6 +6127,12 @@ function app() {
 
         getMovimientoConcepto(mov) {
             if (!mov) return 'Movimiento';
+            if (mov.justificacion) return mov.justificacion;
+            if (mov.motivo) return mov.motivo;
+            if (mov.concepto) return mov.concepto;
+            if (mov.descripcion) return mov.descripcion;
+            if (mov.observacion) return mov.observacion;
+
             if (mov.venta && mov.venta.codigo_venta) {
                 return (Number(mov.monto_movimiento) < 0 ? 'Devolución Factura ' : 'Cobro Factura ') + mov.venta.codigo_venta;
             }
@@ -5947,13 +6140,26 @@ function app() {
                 return (Number(mov.monto_movimiento) < 0 ? 'Devolución Venta #' : 'Venta #') + mov.id_venta;
             }
 
-            if (Array.isArray(this.bitacoras)) {
-                const needle = `Movimiento extraordinario #${mov.caja_movimiento_venta_id}`;
-                const b = this.bitacoras.find(bit => bit.descripcion_bitacora && bit.descripcion_bitacora.includes(needle));
-                if (b) {
+            if (Array.isArray(this.bitacoras) && this.bitacoras.length > 0) {
+                const id = String(mov.caja_movimiento_venta_id || '');
+                const b = this.bitacoras.find(bit => {
+                    const desc = bit.descripcion_bitacora || '';
+                    if (id) {
+                        const regex = new RegExp(`(?:Mov\\.|Movimiento|Movimiento extraordinario|Egreso de caja|Ingreso de caja)\\s*#${id}\\b`, 'i');
+                        if (regex.test(desc)) return true;
+                    }
+                    return false;
+                });
+                if (b && b.descripcion_bitacora) {
                     const motivoIndex = b.descripcion_bitacora.indexOf('Motivo:');
                     if (motivoIndex !== -1) {
                         return b.descripcion_bitacora.substring(motivoIndex + 7).trim();
+                    }
+                    if (b.accion_bitacora === 'CAJA_PAGO_PROVEEDOR' || b.descripcion_bitacora.includes('Pago a proveedor')) {
+                        const colonIndex = b.descripcion_bitacora.indexOf(':');
+                        if (colonIndex !== -1) {
+                            return b.descripcion_bitacora.substring(colonIndex + 1).trim();
+                        }
                     }
                     return b.descripcion_bitacora;
                 }

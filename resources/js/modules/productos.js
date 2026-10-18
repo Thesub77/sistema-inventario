@@ -331,7 +331,7 @@ export function productosModule() {
                 numero_factura_recibo: '',
             };
             if (typeof this.fetchProveedores === 'function' && (!this.proveedores || this.proveedores.length === 0)) {
-                this.fetchProveedores().catch(() => {});
+                this.fetchProveedores().catch(() => { });
             }
             this.showStockModal = true;
             this.$nextTick(() => {
@@ -426,8 +426,8 @@ export function productosModule() {
                 await Promise.all([
                     this.fetchProductos(),
                     this.fetchInventario(),
-                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => {}) : Promise.resolve(),
-                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => {}) : Promise.resolve()
+                    this.fetchBitacoras ? this.fetchBitacoras().catch(() => { }) : Promise.resolve(),
+                    this.fetchDashboardData ? this.fetchDashboardData().catch(() => { }) : Promise.resolve()
                 ]);
 
                 // Notificación no intrusiva con temporizador automático

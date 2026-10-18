@@ -259,7 +259,7 @@ export function posModule() {
                     const clonedRes = res.clone();
                     const errData = await clonedRes.json().catch(() => ({}));
                     const codeCollision = (errData.errors && errData.errors.codigo_venta) ||
-                                          (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
+                        (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
                     if (codeCollision) {
                         salePayload.codigo_venta = `FAC-2026-${Date.now().toString().slice(-6)}`;
                         res = await this.apiFetch('/api/ventas', {
@@ -319,7 +319,7 @@ export function posModule() {
                         cashMap[newSale.venta_id] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         cashMap[newSale.codigo_venta] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         sessionStorage.setItem('pos_cash_records', JSON.stringify(cashMap));
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 // Sincronizaciones secundarias en background sin bloquear la interfaz
@@ -370,7 +370,7 @@ export function posModule() {
                             this.receiptData.monto_recibido = rec.monto_recibido;
                             this.receiptData.cambio = rec.cambio;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 this.receiptAnulada = Boolean(preloadedData.estado === 0);
                 this.showReceiptModal = true;
@@ -409,7 +409,7 @@ export function posModule() {
                         this.receiptData.monto_recibido = rec.monto_recibido;
                         this.receiptData.cambio = rec.cambio;
                     }
-                } catch (e) {}
+                } catch (e) { }
                 this.receiptAnulada = Boolean(data.anulada);
                 this.$nextTick(() => {
                     if (window.lucide) window.lucide.createIcons();
