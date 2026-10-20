@@ -2029,9 +2029,9 @@ function utilsModule() {
                 return normalized;
             }
 
-            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+            // Normalizar formato de fecha y hora para interpretar en hora local
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
@@ -2066,7 +2066,7 @@ function utilsModule() {
             }
 
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
@@ -4351,7 +4351,11 @@ function posModule() {
                 referencia_transferencia: (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta')
                     ? (this.posSale.referencia_transferencia ? this.posSale.referencia_transferencia.trim() : null)
                     : null,
-                fecha_hora_venta: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                fecha_hora_venta: (() => {
+                    const n = new Date();
+                    const p = v => String(v).padStart(2, '0');
+                    return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+                })(),
                 subtotal_venta: this.cartSubtotal,
                 descuento_venta: this.posSale.descuento_venta || 0,
                 total_venta: this.cartTotal,

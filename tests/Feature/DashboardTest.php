@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Caja;
 use App\Models\Categoria;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\Venta;
 use App\Models\Venta_detalle;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Sanctum;
@@ -175,5 +177,158 @@ class DashboardTest extends TestCase
     {
         Auth::forgetGuards();
         $this->getJson('/api/dashboard/resumen')->assertStatus(401);
+    }
+
+    public function test_techo_fiscal_retorna_metricas_correctas_y_semaforo_normal(): void
+    {
+        Empresa::create([
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310000000001',
+            'telefono_contacto' => '2244-6688',
+            'direccion_fisica' => 'Managua',
+            'moneda_simbolo' => 'C$',
+            'regimen_tributario' => 'Cuota Fija',
+            'techo_mensual_cuota_fija' => 100000.00,
+            'estado' => 1,
+        ]);
+
+        $ahora = Carbon::now();
+
+        Venta::create([
+            'id_usuario' => $this->usuario->usuario_id,
+            'codigo_venta' => 'FAC-TF-01',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => $ahora->copy()->startOfMonth()->addDays(2),
+            'subtotal_venta' => 45200.00,
+            'descuento_venta' => 0.00,
+            'total_venta' => 45200.00,
+            'estado' => 1,
+        ]);
+
+        $res = $this->getJson('/api/dashboard/techo-fiscal');
+
+        $res->assertStatus(200);
+        $res->assertJsonStructure([
+            'regimen',
+            'ventas_mes',
+            'techo_mensual',
+            'porcentaje_consumido',
+            'saldo_disponible',
+            'estado_semaforo',
+            'ventas_anual_acumulado',
+            'techo_anual',
+        ]);
+
+        $this->assertSame('Cuota Fija', $res->json('regimen'));
+        $this->assertEquals(45200.00, $res->json('ventas_mes'));
+        $this->assertEquals(100000.00, $res->json('techo_mensual'));
+        $this->assertEquals(45.20, $res->json('porcentaje_consumido'));
+        $this->assertEquals(54800.00, $res->json('saldo_disponible'));
+        $this->assertSame('normal', $res->json('estado_semaforo'));
+        $this->assertEquals(1200000.00, $res->json('techo_anual'));
+    }
+
+    public function test_techo_fiscal_excluye_estrictamente_ventas_anuladas(): void
+    {
+        Empresa::create([
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310000000001',
+            'telefono_contacto' => '2244-6688',
+            'direccion_fisica' => 'Managua',
+            'moneda_simbolo' => 'C$',
+            'regimen_tributario' => 'Cuota Fija',
+            'techo_mensual_cuota_fija' => 100000.00,
+            'estado' => 1,
+        ]);
+
+        $ahora = Carbon::now();
+
+        Venta::create([
+            'id_usuario' => $this->usuario->usuario_id,
+            'codigo_venta' => 'FAC-ACT-01',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => $ahora->copy()->startOfMonth()->addDay(),
+            'subtotal_venta' => 30000.00,
+            'descuento_venta' => 0.00,
+            'total_venta' => 30000.00,
+            'estado' => 1,
+        ]);
+
+        // Venta anulada (estado = 0)
+        Venta::create([
+            'id_usuario' => $this->usuario->usuario_id,
+            'codigo_venta' => 'FAC-ANUL-01',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => $ahora->copy()->startOfMonth()->addDays(2),
+            'subtotal_venta' => 70000.00,
+            'descuento_venta' => 0.00,
+            'total_venta' => 70000.00,
+            'estado' => 0,
+        ]);
+
+        $res = $this->getJson('/api/dashboard/techo-fiscal');
+
+        $res->assertStatus(200);
+        $this->assertEquals(30000.00, $res->json('ventas_mes'));
+        $this->assertEquals(30.00, $res->json('porcentaje_consumido'));
+        $this->assertEquals(70000.00, $res->json('saldo_disponible'));
+        $this->assertSame('normal', $res->json('estado_semaforo'));
+    }
+
+    public function test_techo_fiscal_evalua_semaforo_alerta_y_excedido(): void
+    {
+        Empresa::create([
+            'nombre_comercial' => 'Empresa Test',
+            'numero_ruc' => 'J0310000000001',
+            'telefono_contacto' => '2244-6688',
+            'direccion_fisica' => 'Managua',
+            'moneda_simbolo' => 'C$',
+            'regimen_tributario' => 'Cuota Fija',
+            'techo_mensual_cuota_fija' => 100000.00,
+            'estado' => 1,
+        ]);
+
+        $ahora = Carbon::now();
+
+        // 80% consumido -> alerta
+        $venta1 = Venta::create([
+            'id_usuario' => $this->usuario->usuario_id,
+            'codigo_venta' => 'FAC-AL-01',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => $ahora->copy()->startOfMonth()->addDay(),
+            'subtotal_venta' => 80000.00,
+            'descuento_venta' => 0.00,
+            'total_venta' => 80000.00,
+            'estado' => 1,
+        ]);
+
+        $resAlerta = $this->getJson('/api/dashboard/techo-fiscal');
+        $resAlerta->assertStatus(200);
+        $this->assertEquals(80.00, $resAlerta->json('porcentaje_consumido'));
+        $this->assertSame('alerta', $resAlerta->json('estado_semaforo'));
+
+        // Venta adicional que supera el techo (105,000) -> excedido
+        Venta::create([
+            'id_usuario' => $this->usuario->usuario_id,
+            'codigo_venta' => 'FAC-EX-01',
+            'metodo_pago' => 'Efectivo',
+            'fecha_hora_venta' => $ahora->copy()->startOfMonth()->addDays(2),
+            'subtotal_venta' => 25000.00,
+            'descuento_venta' => 0.00,
+            'total_venta' => 25000.00,
+            'estado' => 1,
+        ]);
+
+        $resExcedido = $this->getJson('/api/dashboard/techo-fiscal');
+        $resExcedido->assertStatus(200);
+        $this->assertEquals(105000.00, $resExcedido->json('ventas_mes'));
+        $this->assertEquals(105.00, $resExcedido->json('porcentaje_consumido'));
+        $this->assertSame('excedido', $resExcedido->json('estado_semaforo'));
+    }
+
+    public function test_techo_fiscal_requiere_autenticacion(): void
+    {
+        Auth::forgetGuards();
+        $this->getJson('/api/dashboard/techo-fiscal')->assertStatus(401);
     }
 }

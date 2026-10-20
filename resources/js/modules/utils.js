@@ -97,9 +97,9 @@ export function utilsModule() {
                 return normalized;
             }
 
-            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+            // Normalizar formato de fecha y hora para interpretar en hora local
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
@@ -134,7 +134,7 @@ export function utilsModule() {
             }
 
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
