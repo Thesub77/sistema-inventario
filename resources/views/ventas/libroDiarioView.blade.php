@@ -71,7 +71,7 @@
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
                     <span class="flex items-center gap-1.5">
                         <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-brand-500"></i>
-                        <span>Año Fiscal:</span>
+                        <span>Año:</span>
                     </span>
                 </label>
                 <select x-model.number="libroDiarioAnio" @change="fetchLibroDiario()"
@@ -155,7 +155,7 @@
                         'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50': libroFiscalTecho.estado_semaforo === 'alerta',
                         'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/50': libroFiscalTecho.estado_semaforo === 'excedido'
                     }">
-                    <span class="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Margen Libre DGI:</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Margen Libre:</span>
                     <strong class="font-mono text-sm font-black"
                         :class="{
                             'text-emerald-700 dark:text-emerald-400': libroFiscalTecho.estado_semaforo === 'normal',
@@ -233,19 +233,29 @@
             </div>
 
             <!-- Banner Resumen de Resultado del Mes (Ganancia Operativa Real) -->
-            <div class="flex items-center gap-2.5 px-4 py-2 rounded-2xl border transition-all"
+            <div class="inline-flex items-center gap-3 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border transition-all shadow-xs"
                 :class="libroFiscalResultadoMes >= 0 
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' 
                     : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'">
-                <div class="text-right">
-                    <span class="block text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">Resultado del Mes</span>
-                    <span class="font-display font-black text-base sm:text-lg font-mono tracking-tight"
+                <!-- Columna Izquierda: Resultado del Mes -->
+                <div class="text-right flex flex-col justify-between">
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 leading-none">
+                        Resultado del Mes
+                    </span>
+                    <span class="font-display font-black text-base sm:text-lg font-mono tracking-tight leading-none mt-1.5"
                         x-text="formatCurrency(libroFiscalResultadoMes)"></span>
                 </div>
-                <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
-                <div class="text-left">
-                    <span class="block text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">Margen</span>
-                    <span class="font-bold text-xs font-mono" x-text="libroFiscalMargen + '%'"></span>
+
+                <!-- Divisor Vertical Centrado y Proporcional -->
+                <div class="self-stretch w-px bg-slate-300/80 dark:bg-slate-700/80 my-0.5"></div>
+
+                <!-- Columna Derecha: Margen -->
+                <div class="text-left flex flex-col justify-between">
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 leading-none">
+                        Margen
+                    </span>
+                    <span class="font-display font-black text-base sm:text-lg font-mono tracking-tight leading-none mt-1.5"
+                        x-text="libroFiscalMargen + '%'"></span>
                 </div>
             </div>
         </div>
@@ -293,7 +303,6 @@
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-1.5">
                         <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">3. Compras Stock</span>
-                        <span class="text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300">Mercadería</span>
                     </div>
                     <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                         <i data-lucide="boxes" class="w-4 h-4"></i>
@@ -315,7 +324,6 @@
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-1.5">
                         <span class="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">4. Mermas y Pérdidas</span>
-                        <span class="text-[9px] px-1.5 py-0.2 rounded font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300">Pérdida Real</span>
                     </div>
                     <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -512,10 +520,19 @@
     <!-- =========================================================================
          5. ÁREA IMPRIMIBLE FORMAL DEL BALANCE MENSUAL & CUADERNO FINANCIERO (@media print / AUDITORÍA DGI LEY 822)
          ========================================================================= -->
-    <div id="printableLibroDiarioArea" class="hidden print:block bg-white text-black font-sans p-6 text-xs">
+    <div id="printableLibroDiarioArea" class="hidden print:block bg-white text-black font-sans print:p-0 p-6 text-xs">
+        <table class="report-print-container w-full border-none border-collapse">
+            <thead>
+                <tr>
+                    <td class="report-print-header-space" style="height: 14mm; border: none !important; padding: 0 !important; background: transparent !important;"></td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="report-print-content" style="border: none !important; padding: 0 !important; background: transparent !important;">
 
-        <!-- MEMBRETE DEL COMERCIO Y ENCABEZADO FISCAL -->
-        <div class="border-b-2 border-black pb-4 mb-4">
+                        <!-- MEMBRETE DEL COMERCIO Y ENCABEZADO FISCAL -->
+                        <div class="border-b-2 border-black pb-4 mb-4">
             <div class="flex justify-between items-start">
                 <div class="space-y-0.5">
                     <h1 class="text-xl font-black uppercase tracking-tight text-black"
@@ -662,7 +679,7 @@
         </div>
 
         <!-- SECCIÓN II: GASTOS OPERATIVOS Y GASTOS DIARIOS EN EFECTIVO -->
-        <div class="mb-5" style="page-break-inside: avoid;">
+        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     II. Gastos Operativos y Gastos Diarios en Efectivo
@@ -731,7 +748,7 @@
         </div>
 
         <!-- SECCIÓN III: PAGOS A PROVEEDORES DE MERCADERÍA (SALIDAS DE DINERO) -->
-        <div class="mb-5" style="page-break-inside: avoid;">
+        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     III. Pagos a Proveedores de Mercadería
@@ -794,7 +811,7 @@
         </div>
 
         <!-- SECCIÓN IV: MÓDULO DE MERMAS Y PÉRDIDAS REALES (VALOR DESTRUIDO) -->
-        <div class="mb-5" style="page-break-inside: avoid;">
+        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     IV. Módulo de Mermas y Pérdidas Registradas
@@ -821,9 +838,9 @@
                             <td class="py-1 px-3 border-r border-black font-sans font-medium text-[10px]" x-text="formatDate(m.fecha_movimiento || m.created_at)"></td>
                             <td class="py-1 px-3 border-r border-black font-bold font-sans" x-text="m.producto ? ((m.producto.codigo_barra ? m.producto.codigo_barra + ' - ' : '') + m.producto.nombre_producto) : ('Producto #' + (m.id_producto || ''))"></td>
                             <td class="py-1 px-3 border-r border-black text-[10px] capitalize" x-text="m.tipo_merma || m.motivo || 'Salida por Merma / Deterioro'"></td>
-                            <td class="py-1 px-3 border-r border-black text-center font-mono font-bold" x-text="(m.cantidad_movimiento || 0) + ' un.'"></td>
-                            <td class="py-1 px-3 border-r border-black text-right font-mono" x-text="formatCurrency(m.costo_unitario || 0)"></td>
-                            <td class="py-1 px-3 text-right font-mono font-bold text-black" x-text="formatCurrency(m.costo_total_perdida || 0)"></td>
+                            <td class="py-1 px-3 border-r border-black text-center font-mono font-bold" x-text="(m.cantidad_movimimiento || m.cantidad_movimiento || m.cantidad || 0) + ' un.'"></td>
+                            <td class="py-1 px-3 border-r border-black text-right font-mono" x-text="formatCurrency(m.costo_unitario || m.producto?.costo_compra || 0)"></td>
+                            <td class="py-1 px-3 text-right font-mono font-bold text-black" x-text="formatCurrency(m.costo_total_perdida || ((Number(m.cantidad_movimimiento || m.cantidad_movimiento || 0)) * Number(m.costo_unitario || m.producto?.costo_compra || 0)))"></td>
                         </tr>
                     </template>
 
@@ -852,7 +869,7 @@
         </div>
 
         <!-- SECCIÓN V: LIQUIDACIÓN Y FLUJO NETO DE DINERO DEL MES -->
-        <div class="mb-5" style="page-break-inside: avoid;">
+        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     V. Liquidación y Flujo Neto de Dinero
@@ -913,7 +930,7 @@
 
         <!-- SECCIÓN VI: RELACIÓN INDIVIDUAL DE FACTURAS EMITIDAS EN EL PERÍODO (AUDITORÍA FISCAL) -->
         <template x-if="libroDiarioVentasDetalle.length > 0">
-            <div class="mb-5" style="page-break-inside: avoid;">
+            <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
                 <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                     <h3 class="text-xs font-black uppercase tracking-wider">
                         VI. Relación de Facturas y Comprobantes Emitidos en el Mes
@@ -944,9 +961,19 @@
         </template>
 
         <!-- PIE DE PÁGINA FORMAL -->
-        <div class="mt-6 pt-2 border-t border-dashed border-neutral-400 text-center text-[9px] text-neutral-500 font-mono">
+        <div class="mt-6 pt-2 border-t border-dashed border-neutral-400 text-center text-[9px] text-neutral-500 font-mono" style="break-inside: avoid; page-break-inside: avoid;">
             Documento emitido mediante FacturaStock Pro • Balance Mensual y Control Contable MiPyME • Impreso el: <span x-text="libroDiarioEmisionFecha"></span>
         </div>
+
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td class="report-print-footer-space" style="height: 10mm; border: none !important; padding: 0 !important; background: transparent !important;"></td>
+                </tr>
+            </tfoot>
+        </table>
     </div>
 
 </div>

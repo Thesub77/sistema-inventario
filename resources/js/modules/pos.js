@@ -504,16 +504,16 @@ export function posModule() {
                     margin: [margin, margin, margin, margin],
                     filename: fileName,
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { 
-                        scale: 2, 
-                        useCORS: true, 
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
                         backgroundColor: '#ffffff',
                         logging: false
                     },
-                    jsPDF: { 
-                        unit: 'mm', 
-                        format: [pdfWidth, pdfHeight], 
-                        orientation: 'portrait' 
+                    jsPDF: {
+                        unit: 'mm',
+                        format: [pdfWidth, pdfHeight],
+                        orientation: 'portrait'
                     },
                     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                 };

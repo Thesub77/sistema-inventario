@@ -454,7 +454,8 @@ html:not(.dark) .swal2-html-container {
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
-        padding: 10mm 15mm !important;
+        padding: 0 15mm 10mm 15mm !important;
+        box-sizing: border-box !important;
         background: #ffffff !important;
         color: #000000 !important;
         font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
@@ -465,19 +466,56 @@ html:not(.dark) .swal2-html-container {
         border-radius: 0 !important;
     }
 
-    #printableLibroDiarioArea table {
+    /* Estructura paginada: thead genera el margen superior uniforme en cada salto de página */
+    #printableLibroDiarioArea table.report-print-container {
         width: 100% !important;
+        border: none !important;
         border-collapse: collapse !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
-    #printableLibroDiarioArea th,
-    #printableLibroDiarioArea td {
+    #printableLibroDiarioArea table.report-print-container > thead {
+        display: table-header-group !important;
+    }
+
+    #printableLibroDiarioArea table.report-print-container > tfoot {
+        display: table-footer-group !important;
+    }
+
+    #printableLibroDiarioArea table.report-print-container > thead > tr > td.report-print-header-space,
+    #printableLibroDiarioArea table.report-print-container > tfoot > tr > td.report-print-footer-space,
+    #printableLibroDiarioArea table.report-print-container > tbody > tr > td.report-print-content {
+        border: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+
+    /* Tablas de datos del reporte fiscal */
+    #printableLibroDiarioArea table:not(.report-print-container) {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    #printableLibroDiarioArea table:not(.report-print-container) thead {
+        display: table-header-group !important;
+    }
+
+    #printableLibroDiarioArea table:not(.report-print-container) tr {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    #printableLibroDiarioArea table:not(.report-print-container) th,
+    #printableLibroDiarioArea table:not(.report-print-container) td {
         border: 1px solid #000000 !important;
         padding: 5px 8px !important;
         color: #000000 !important;
     }
 
-    #printableLibroDiarioArea th {
+    #printableLibroDiarioArea table:not(.report-print-container) th {
         background-color: #f1f5f9 !important;
         font-weight: 800 !important;
         text-transform: uppercase !important;

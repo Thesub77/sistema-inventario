@@ -1433,7 +1433,12 @@ function fiscalModule() {
             });
         },
         get libroFiscalTotalMermas() {
-            return Number(this.libroFiscalMermasMes.reduce((sum, m) => sum + Number(m.costo_total_perdida || 0), 0).toFixed(2));
+            return Number(this.libroFiscalMermasMes.reduce((sum, m) => {
+                const cant = Number(m.cantidad_movimimiento || m.cantidad_movimiento || m.cantidad || 0);
+                const costoU = Number(m.costo_unitario || m.producto?.costo_compra || 0);
+                const total = Number(m.costo_total_perdida) || (cant * costoU);
+                return sum + total;
+            }, 0).toFixed(2));
         },
 
         // Total Ingresos Facturados del Mes (100% reactivo al mes y año seleccionado)

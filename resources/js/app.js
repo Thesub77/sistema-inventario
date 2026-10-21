@@ -21,7 +21,7 @@ function mergeModules(target, ...sources) {
     return target;
 }
 
-window.formatTelefono = function(val) {
+window.formatTelefono = function (val) {
     if (!val) return '';
     const digits = String(val).replace(/\D/g, '').slice(0, 8);
     if (digits.length > 4) {

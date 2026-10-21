@@ -318,7 +318,12 @@ export function fiscalModule() {
             });
         },
         get libroFiscalTotalMermas() {
-            return Number(this.libroFiscalMermasMes.reduce((sum, m) => sum + Number(m.costo_total_perdida || 0), 0).toFixed(2));
+            return Number(this.libroFiscalMermasMes.reduce((sum, m) => {
+                const cant = Number(m.cantidad_movimimiento || m.cantidad_movimiento || m.cantidad || 0);
+                const costoU = Number(m.costo_unitario || m.producto?.costo_compra || 0);
+                const total = Number(m.costo_total_perdida) || (cant * costoU);
+                return sum + total;
+            }, 0).toFixed(2));
         },
 
         // Total Ingresos Facturados del Mes (100% reactivo al mes y año seleccionado)
@@ -340,8 +345,8 @@ export function fiscalModule() {
             }
 
             // 2. Fallback a libroDiarioData solo si coincide exactamente con el mes y año consultado
-            if (this.libroDiarioData && 
-                Number(this.libroDiarioData.mes) === mesSel && 
+            if (this.libroDiarioData &&
+                Number(this.libroDiarioData.mes) === mesSel &&
                 Number(this.libroDiarioData.anio) === anioSel) {
                 return Number(this.libroDiarioData.total_acumulado_mes || 0);
             }
@@ -363,8 +368,8 @@ export function fiscalModule() {
                 }).length;
             }
 
-            if (this.libroDiarioData && 
-                Number(this.libroDiarioData.mes) === mesSel && 
+            if (this.libroDiarioData &&
+                Number(this.libroDiarioData.mes) === mesSel &&
                 Number(this.libroDiarioData.anio) === anioSel) {
                 return Number(this.libroDiarioData.total_transacciones_mes || 0);
             }
@@ -465,13 +470,13 @@ export function fiscalModule() {
 
             // 2. Disparar en segundo plano (no bloqueante) cargas auxiliares de gastos e inventario
             if (typeof this.fetchCuentasPorPagar === 'function' && (!this.cuentasPorPagar || this.cuentasPorPagar.length === 0)) {
-                this.fetchCuentasPorPagar().catch(() => {});
+                this.fetchCuentasPorPagar().catch(() => { });
             }
             if (typeof this.fetchVentas === 'function' && (!this.ventas || this.ventas.length === 0)) {
-                this.fetchVentas().catch(() => {});
+                this.fetchVentas().catch(() => { });
             }
             if (typeof this.fetchInventario === 'function' && (!this.movimientosInventario || this.movimientosInventario.length === 0)) {
-                this.fetchInventario().catch(() => {});
+                this.fetchInventario().catch(() => { });
             }
 
             // 3. Consultar el endpoint oficial rápido de agregación del Libro Diario
