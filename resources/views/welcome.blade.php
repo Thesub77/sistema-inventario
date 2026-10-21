@@ -38,36 +38,63 @@
 
 </head>
 
-<body class="h-full bg-dark-950 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="app()" x-init="initApp()">
+<body class="h-full bg-dark-950 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="app()" x-init="initApp()" @keydown.window.escape="if (window.innerWidth < 1024) sidebarOpen = false">
 
     <!-- 1. VISTA DE AUTENTICACIÓN / LOGIN -->
     @include('auth.loginView')
 
     <!-- 2. VISTA PRINCIPAL DEL SISTEMA (DASHBOARD & MÓDULOS) -->
-    <div x-show="isAuthenticated" x-cloak class="flex h-screen overflow-hidden">
+    <div x-show="isAuthenticated" x-cloak class="flex h-screen overflow-hidden relative">
 
-        <!-- Sidebar -->
-        <aside class="w-64 flex-shrink-0 bg-dark-900 border-r border-slate-800/80 flex flex-col justify-between transition-all duration-300 z-30">
+        <!-- Backdrop / Overlay para Pantallas Pequeñas (Cierra la barra al tocar fuera) -->
+        <div x-show="sidebarOpen"
+            @click="sidebarOpen = false"
+            x-transition:enter="transition-opacity ease-linear duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition-opacity ease-linear duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 lg:hidden"
+            aria-hidden="true"
+            x-cloak>
+        </div>
+
+        <!-- Sidebar (Barra de Navegación Lateral: Oculta en pantallas pequeñas con drawer desplegable) -->
+        <aside 
+            :class="sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0 shadow-none'"
+            class="fixed inset-y-0 left-0 z-50 w-64 bg-dark-900 border-r border-slate-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:static lg:z-30 lg:translate-x-0 flex-shrink-0">
             <div>
-                <!-- Brand Logo -->
-                <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-800">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
-                        <i data-lucide="boxes" class="w-5 h-5"></i>
+                <!-- Brand Logo y Botón de Ocultar en Pantallas Pequeñas -->
+                <div class="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/30 flex-shrink-0">
+                            <i data-lucide="boxes" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-display font-bold text-base tracking-wide text-white leading-none">Factura<span class="text-brand-400">Stock</span></h1>
+                            <span class="text-[11px] text-slate-400 font-medium">Gestión & Facturación</span>
+                        </div>
                     </div>
-                    <div>
-                        <h1 class="font-display font-bold text-base tracking-wide text-white leading-none">Factura<span class="text-brand-400">Stock</span></h1>
-                        <span class="text-[11px] text-slate-400 font-medium">Gestión & Facturación</span>
-                    </div>
+
+                    <!-- Botón para cerrar/ocultar barra en móvil (SOLO visible en pantallas pequeñas) -->
+                    <button type="button" @click="sidebarOpen = false"
+                        class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors lg:hidden cursor-pointer active:scale-95"
+                        title="Ocultar barra de navegación">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <!-- Navigation Links -->
                 <nav class="p-3 space-y-1">
                     <template x-for="item in visibleNavItems" :key="item.id">
-                        <button @click="currentTab = item.id"
+                        <button @click="currentTab = item.id; if (window.innerWidth < 1024) sidebarOpen = false;"
                             :class="currentTab === item.id 
                                     ? 'bg-gradient-to-r from-brand-600/90 to-brand-700 text-white shadow-md shadow-brand-600/20 font-semibold' 
                                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium'"
-                            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
+                            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150 cursor-pointer">
                             <i :data-lucide="item.icon" class="w-4 h-4"></i>
                             <span x-text="item.label"></span>
                             <span x-show="getNavBadge(item.id) > 0"
@@ -108,22 +135,32 @@
         </aside>
 
         <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
 
             <!-- Top Header -->
-            <header class="h-16 bg-dark-900/80 backdrop-blur border-b border-slate-800 flex items-center justify-between px-6 z-20">
-                <div class="flex items-center gap-4">
-                    <h2 class="font-display font-bold text-xl text-white capitalize flex items-center gap-2">
-                        <i :data-lucide="currentTabIcon" class="w-5 h-5 text-brand-400"></i>
-                        <span x-text="currentTabTitle"></span>
+            <header class="h-16 bg-dark-900/80 backdrop-blur border-b border-slate-800 flex items-center justify-between px-4 lg:px-6 z-20 flex-shrink-0">
+                <div class="flex items-center gap-3 sm:gap-4 overflow-hidden">
+                    <!-- Botón Hamburguesa para Desplegar la Barra de Navegación en Pantallas Pequeñas -->
+                    <button type="button" @click="sidebarOpen = !sidebarOpen"
+                        class="p-2 -ml-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all lg:hidden cursor-pointer active:scale-95 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        title="Desplegar menú de navegación">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+
+                    <h2 class="font-display font-bold text-lg sm:text-xl text-white capitalize flex items-center gap-2 truncate">
+                        <i :data-lucide="currentTabIcon" class="w-5 h-5 text-brand-400 flex-shrink-0"></i>
+                        <span x-text="currentTabTitle" class="truncate"></span>
                     </h2>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                     <!-- Quick New Sale Action (Solo Cajero, Admin o roles con permiso de POS) -->
-                    <button x-show="canAccessPOS" x-cloak @click="currentTab = 'pos'" class="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
+                    <button x-show="canAccessPOS" x-cloak @click="currentTab = 'pos'" class="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-semibold px-2.5 sm:px-3.5 py-2 rounded-lg shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                         <i data-lucide="shopping-cart" class="w-4 h-4"></i>
-                        <span>Punto de Venta (POS)</span>
+                        <span class="hidden sm:inline">Punto de Venta (POS)</span>
+                        <span class="sm:hidden">POS</span>
                     </button>
 
                     <!-- Switch Modo Claro / Modo Oscuro -->
@@ -162,7 +199,7 @@
             </header>
 
             <!-- Dynamic Views Body -->
-            <main class="flex-1 overflow-y-auto p-6 bg-dark-950/90">
+            <main class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-dark-950/90">
 
                 <!-- 1. TAB: DASHBOARD -->
                 @include('sistema.dashboardView')

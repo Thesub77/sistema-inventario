@@ -437,6 +437,7 @@
                             <th class="py-2.5 px-3 font-semibold">Concepto / Motivo</th>
                             <th class="py-2.5 px-3 font-semibold">Fecha y Hora</th>
                             <th class="py-2.5 px-3 text-right font-semibold">Importe</th>
+                            <th class="py-2.5 px-3 text-center font-semibold">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800/60">
@@ -511,15 +512,55 @@
 
                                 <!-- Importe -->
                                 <td class="py-2.5 px-3 text-right font-mono font-bold"
-                                    :class="Number(mov.monto_movimiento) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
+                                    :class="Number(mov.monto_movimiento) >= 0 ? (isMovimientoVentaAnulada(mov) ? 'text-slate-400 line-through' : 'text-emerald-600 dark:text-emerald-400') : 'text-rose-600 dark:text-rose-400'">
                                     <span x-text="(Number(mov.monto_movimiento) >= 0 ? '+ ' : '- ') + formatCurrency(Math.abs(Number(mov.monto_movimiento)))"></span>
+                                </td>
+
+                                <!-- Acciones Rápidas -->
+                                <td class="py-2.5 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <!-- Ver Comprobante de la Venta -->
+                                        <template x-if="mov.id_venta !== null">
+                                            <button type="button" @click="openReceiptModal(mov.id_venta)"
+                                                class="p-1 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                title="Ver Comprobante">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                </svg>
+                                            </button>
+                                        </template>
+
+                                        <!-- Botón Anular Venta (Directo en Caja) -->
+                                        <template x-if="canAnularMovimientoVenta(mov)">
+                                            <button type="button" @click="anularVentaFromMovimiento(mov)"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-600 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                                title="Anular venta y reponer inventario">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                </svg>
+                                                <span>Anular</span>
+                                            </button>
+                                        </template>
+
+                                        <!-- Indicador Venta ya Anulada -->
+                                        <template x-if="isMovimientoVentaAnulada(mov)">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                                Anulada
+                                            </span>
+                                        </template>
+
+                                        <!-- Movimientos sin venta vinculada -->
+                                        <template x-if="mov.id_venta === null">
+                                            <span class="text-slate-300 dark:text-slate-600 text-xs">-</span>
+                                        </template>
+                                    </div>
                                 </td>
                             </tr>
                         </template>
 
                         <!-- Estado Vacío -->
                         <tr x-show="filteredCajaMovimientos.length === 0">
-                            <td colspan="8" class="py-10 text-center text-slate-400 space-y-2">
+                            <td colspan="9" class="py-10 text-center text-slate-400 space-y-2">
                                 <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-500"></i>
                                 <p class="text-sm font-bold text-slate-700 dark:text-slate-300">No hay movimientos de caja registrados</p>
                                 <p class="text-xs text-slate-400 max-w-sm mx-auto">

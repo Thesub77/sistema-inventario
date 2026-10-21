@@ -418,6 +418,7 @@
                                 <th class="py-2 px-3">Fecha y Hora</th>
                                 <th class="py-2 px-3 text-center">Estado</th>
                                 <th class="py-2 px-3 text-right">Total</th>
+                                <th class="py-2 px-3 text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -444,11 +445,39 @@
                                     <td class="py-2 px-3 text-right font-mono font-bold"
                                         :class="Number(v.estado) === 1 ? 'text-slate-900 dark:text-white' : 'text-slate-400 line-through'"
                                         x-text="formatCurrency(v.total_venta)"></td>
+                                    <td class="py-2 px-3 text-center">
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <!-- Ver Comprobante -->
+                                            <button type="button" @click="openReceiptModal(v.venta_id, v)"
+                                                class="p-1 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                title="Ver Comprobante">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                </svg>
+                                            </button>
+
+                                            <!-- Botón Anular Venta (Condicionado por estado y permisos del backend) -->
+                                            <template x-if="Number(v.estado) === 1 && canAnularVenta(v)">
+                                                <button type="button" @click="anularVenta(v)"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-600 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                                    title="Anular venta y reponer inventario">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                    </svg>
+                                                    <span>Anular</span>
+                                                </button>
+                                            </template>
+
+                                            <template x-if="Number(v.estado) === 0">
+                                                <span class="text-[10px] text-slate-400 dark:text-slate-500 italic">Anulada</span>
+                                            </template>
+                                        </div>
+                                    </td>
                                 </tr>
                             </template>
 
                             <tr x-show="!selectedTurnoAuditoria?.ventas || selectedTurnoAuditoria.ventas.length === 0">
-                                <td colspan="7" class="py-8 text-center text-slate-400">
+                                <td colspan="8" class="py-8 text-center text-slate-400">
                                     No se registraron ventas en este turno de caja.
                                 </td>
                             </tr>

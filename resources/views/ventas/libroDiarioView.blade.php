@@ -521,15 +521,6 @@
          5. ÁREA IMPRIMIBLE FORMAL DEL BALANCE MENSUAL & CUADERNO FINANCIERO (@media print / AUDITORÍA DGI LEY 822)
          ========================================================================= -->
     <div id="printableLibroDiarioArea" class="hidden print:block bg-white text-black font-sans print:p-0 p-6 text-xs">
-        <table class="report-print-container w-full border-none border-collapse">
-            <thead>
-                <tr>
-                    <td class="report-print-header-space" style="height: 14mm; border: none !important; padding: 0 !important; background: transparent !important;"></td>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td class="report-print-content" style="border: none !important; padding: 0 !important; background: transparent !important;">
 
                         <!-- MEMBRETE DEL COMERCIO Y ENCABEZADO FISCAL -->
                         <div class="border-b-2 border-black pb-4 mb-4">
@@ -679,7 +670,7 @@
         </div>
 
         <!-- SECCIÓN II: GASTOS OPERATIVOS Y GASTOS DIARIOS EN EFECTIVO -->
-        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
+        <div class="mb-5">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     II. Gastos Operativos y Gastos Diarios en Efectivo
@@ -748,7 +739,7 @@
         </div>
 
         <!-- SECCIÓN III: PAGOS A PROVEEDORES DE MERCADERÍA (SALIDAS DE DINERO) -->
-        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
+        <div class="mb-5">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     III. Pagos a Proveedores de Mercadería
@@ -811,7 +802,7 @@
         </div>
 
         <!-- SECCIÓN IV: MÓDULO DE MERMAS Y PÉRDIDAS REALES (VALOR DESTRUIDO) -->
-        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
+        <div class="mb-5">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     IV. Módulo de Mermas y Pérdidas Registradas
@@ -869,7 +860,7 @@
         </div>
 
         <!-- SECCIÓN V: LIQUIDACIÓN Y FLUJO NETO DE DINERO DEL MES -->
-        <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
+        <div class="mb-5">
             <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                 <h3 class="text-xs font-black uppercase tracking-wider">
                     V. Liquidación y Flujo Neto de Dinero
@@ -930,7 +921,7 @@
 
         <!-- SECCIÓN VI: RELACIÓN INDIVIDUAL DE FACTURAS EMITIDAS EN EL PERÍODO (AUDITORÍA FISCAL) -->
         <template x-if="libroDiarioVentasDetalle.length > 0">
-            <div class="mb-5" style="break-inside: avoid; page-break-inside: avoid;">
+            <div class="mb-5">
                 <div class="flex items-center justify-between border-b-2 border-black pb-1 mb-1.5">
                     <h3 class="text-xs font-black uppercase tracking-wider">
                         VI. Relación de Facturas y Comprobantes Emitidos en el Mes
@@ -964,16 +955,6 @@
         <div class="mt-6 pt-2 border-t border-dashed border-neutral-400 text-center text-[9px] text-neutral-500 font-mono" style="break-inside: avoid; page-break-inside: avoid;">
             Documento emitido mediante FacturaStock Pro • Balance Mensual y Control Contable MiPyME • Impreso el: <span x-text="libroDiarioEmisionFecha"></span>
         </div>
-
-                    </td>
-                </tr>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td class="report-print-footer-space" style="height: 10mm; border: none !important; padding: 0 !important; background: transparent !important;"></td>
-                </tr>
-            </tfoot>
-        </table>
     </div>
 
 </div>
