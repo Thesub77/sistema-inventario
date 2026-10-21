@@ -85,9 +85,21 @@ export function utilsModule() {
         formatDate(dateStr) {
             if (!dateStr) return 'N/A';
             let normalized = String(dateStr).trim();
-            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
+
+            // Si es solo fecha YYYY-MM-DD sin componente de hora, formatear directamente sin desfase de zona horaria
+            const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (dateOnlyMatch) {
+                return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+            }
+
+            // Si ya viene formateada como DD/MM/YYYY
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
+                return normalized;
+            }
+
+            // Normalizar formato de fecha y hora para interpretar en hora local
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
@@ -110,8 +122,19 @@ export function utilsModule() {
         formatDateOnly(dateStr) {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
+
+            // Si es solo fecha YYYY-MM-DD sin hora, retornar directamente DD/MM/YYYY sin desfase UTC
+            const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (dateOnlyMatch) {
+                return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+            }
+
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
+                return normalized;
+            }
+
             if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+                normalized = normalized.replace(' ', 'T');
             }
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
@@ -123,6 +146,42 @@ export function utilsModule() {
             const year = target.getFullYear();
 
             return `${day}/${month}/${year}`;
+        },
+
+        getDayNumber(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) return match[3];
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? '' : String(d.getDate()).padStart(2, '0');
+        },
+
+        getDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'short' }).replace('.', '');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        },
+
+        getFullDayName(dateStr) {
+            if (!dateStr) return '';
+            const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+                const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+                return name.charAt(0).toUpperCase() + name.slice(1);
+            }
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const name = d.toLocaleDateString('es-NI', { weekday: 'long' });
+            return name.charAt(0).toUpperCase() + name.slice(1);
         },
 
         getMovimientoCodigo(mov) {

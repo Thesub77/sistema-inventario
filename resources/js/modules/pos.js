@@ -211,7 +211,11 @@ export function posModule() {
                 referencia_transferencia: (this.posSale.metodo_pago === 'Transferencia' || this.posSale.metodo_pago === 'Tarjeta')
                     ? (this.posSale.referencia_transferencia ? this.posSale.referencia_transferencia.trim() : null)
                     : null,
-                fecha_hora_venta: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                fecha_hora_venta: (() => {
+                    const n = new Date();
+                    const p = v => String(v).padStart(2, '0');
+                    return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+                })(),
                 subtotal_venta: this.cartSubtotal,
                 descuento_venta: this.posSale.descuento_venta || 0,
                 total_venta: this.cartTotal,
@@ -259,7 +263,7 @@ export function posModule() {
                     const clonedRes = res.clone();
                     const errData = await clonedRes.json().catch(() => ({}));
                     const codeCollision = (errData.errors && errData.errors.codigo_venta) ||
-                                          (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
+                        (typeof errData.message === 'string' && errData.message.includes('codigo venta'));
                     if (codeCollision) {
                         salePayload.codigo_venta = `FAC-2026-${Date.now().toString().slice(-6)}`;
                         res = await this.apiFetch('/api/ventas', {
@@ -319,7 +323,7 @@ export function posModule() {
                         cashMap[newSale.venta_id] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         cashMap[newSale.codigo_venta] = { monto_recibido: efectivoRecibido, cambio: cambioCalculado };
                         sessionStorage.setItem('pos_cash_records', JSON.stringify(cashMap));
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 // Sincronizaciones secundarias en background sin bloquear la interfaz
@@ -370,7 +374,7 @@ export function posModule() {
                             this.receiptData.monto_recibido = rec.monto_recibido;
                             this.receiptData.cambio = rec.cambio;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 this.receiptAnulada = Boolean(preloadedData.estado === 0);
                 this.showReceiptModal = true;
@@ -409,7 +413,7 @@ export function posModule() {
                         this.receiptData.monto_recibido = rec.monto_recibido;
                         this.receiptData.cambio = rec.cambio;
                     }
-                } catch (e) {}
+                } catch (e) { }
                 this.receiptAnulada = Boolean(data.anulada);
                 this.$nextTick(() => {
                     if (window.lucide) window.lucide.createIcons();
@@ -500,16 +504,16 @@ export function posModule() {
                     margin: [margin, margin, margin, margin],
                     filename: fileName,
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { 
-                        scale: 2, 
-                        useCORS: true, 
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
                         backgroundColor: '#ffffff',
                         logging: false
                     },
-                    jsPDF: { 
-                        unit: 'mm', 
-                        format: [pdfWidth, pdfHeight], 
-                        orientation: 'portrait' 
+                    jsPDF: {
+                        unit: 'mm',
+                        format: [pdfWidth, pdfHeight],
+                        orientation: 'portrait'
                     },
                     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                 };

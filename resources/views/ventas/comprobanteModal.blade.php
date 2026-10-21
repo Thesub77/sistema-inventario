@@ -15,36 +15,6 @@
     <div @click.away="showReceiptModal = false"
         class="bg-dark-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 my-8 relative">
 
-        <!-- Cabecera no imprimible con botones de acción rápida -->
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3 no-print">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                    <i data-lucide="receipt" class="w-4 h-4"></i>
-                </div>
-                <div>
-                    <h3 class="font-display font-bold text-base text-white">Comprobante de Pago</h3>
-                    <p class="text-xs text-slate-400">Vista previa de impresión de ticket oficial</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button" @click="downloadReceiptPDF()"
-                    class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                    title="Descargar comprobante en formato PDF">
-                    <i data-lucide="file-down" class="w-4 h-4 text-emerald-500"></i>
-                    <span class="hidden sm:inline">Descargar PDF</span>
-                </button>
-                <button type="button" @click="printReceipt()"
-                    class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer">
-                    <i data-lucide="printer" class="w-4 h-4"></i>
-                    <span>Imprimir</span>
-                </button>
-                <button type="button" @click="showReceiptModal = false"
-                    class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </div>
-
         <!-- Indicador de carga -->
         <div x-show="loadingReceipt" class="py-12 text-center text-slate-400 space-y-2">
             <span class="inline-block animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full"></span>
@@ -66,9 +36,6 @@
             <div class="text-center space-y-0.5 text-black">
                 <h4 class="font-sans font-black text-lg text-black uppercase tracking-tight"
                     x-text="receiptEmpresa?.nombre_comercial || receiptData?.empresa?.nombre_comercial || 'SISTEMA COMERCIAL'"></h4>
-                <p class="text-[11px] text-black font-sans font-bold"
-                    x-show="receiptEmpresa?.razon_social || receiptData?.empresa?.razon_social"
-                    x-text="receiptEmpresa?.razon_social || receiptData?.empresa?.razon_social"></p>
                 <p class="text-[10px] text-black"
                     x-show="(receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc) || (receiptEmpresa?.telefono_contacto || receiptData?.empresa?.telefono_contacto)">
                     <span x-show="receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc" x-text="'RUC: ' + (receiptEmpresa?.numero_ruc || receiptData?.empresa?.numero_ruc)"></span>
