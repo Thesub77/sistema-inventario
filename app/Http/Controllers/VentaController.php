@@ -504,11 +504,6 @@ class VentaController extends Controller
             $request
         ) {
 
-            Venta::findOrFail($id);
-            // Bloquea las cajas antes de la venta y los productos. El servicio también
-            // rechaza movimientos de origen ambiguos antes de modificar inventario.
-            $turnoDevolucion = app(CajaService::class)->paraAnular((int) $id, $request->user(), isset($validated['id_caja']) ? (int) $validated['id_caja'] : null);
-
             $venta = Venta::with([
                 'venta_detalles',
             ])
@@ -521,6 +516,10 @@ class VentaController extends Controller
                     'message' => 'La venta ya se encuentra anulada.',
                 ], 409);
             }
+
+            // Bloquea las cajas antes de la venta y los productos. El servicio también
+            // rechaza movimientos de origen ambiguos antes de modificar inventario.
+            $turnoDevolucion = app(CajaService::class)->paraAnular((int) $id, $request->user(), isset($validated['id_caja']) ? (int) $validated['id_caja'] : null);
 
             if ($turnoDevolucion !== null && $venta->metodo_pago === 'Efectivo') {
                 $cajas = app(CajaService::class);
@@ -625,44 +624,44 @@ class VentaController extends Controller
                     'estado' => 0,
                 ]);
 
-            $origen = Caja_movimiento_venta::with('turno')->where('id_venta', $venta->venta_id)->lockForUpdate()->firstOrFail();
-            // null representa la autorización administrativa sin turno. Una referencia
-            // distinta exige un egreso separado para no alterar el arqueo de origen.
-            $registrarEgreso = $turnoDevolucion === null || $origen->id_caja_operacion === null
-                || (int) $origen->id_caja_operacion !== (int) $turnoDevolucion->caja_operacion_id;
-            // Los cierres emitidos conservan su ingreso; el egreso pertenece al presente.
-            if ($origen->turno === null || ! $registrarEgreso) {
-                $origen->update(['estado' => 0]);
-            }
+            $origen = Caja_movimiento_venta::with('turno')
+                ->where('id_venta', $venta->venta_id)
+                ->where('monto_movimiento', '>', 0)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $venta->update([
                 'estado' => 0,
             ]);
 
-            if ($registrarEgreso) {
-                // La salida actual no reasigna el ingreso histórico a otro turno.
-                $cajas = app(CajaService::class);
-                Caja_movimiento_venta::create([
-                    'id_caja' => $turnoDevolucion?->id_caja ?? $origen->id_caja,
-                    'id_caja_operacion' => $turnoDevolucion?->caja_operacion_id,
-                    'id_venta' => $venta->venta_id,
-                    'monto_movimiento' => $cajas->importe(-$cajas->centavos($venta->total_venta)),
-                    'fecha_hora_movimiento' => now(),
-                    'estado' => 1,
-                ]);
+            // Siempre registramos el egreso de la devolución en la caja correspondiente
+            $cajas = app(CajaService::class);
+            $cajaDestinoId = $turnoDevolucion?->id_caja ?? $origen->id_caja;
+            $turnoDestinoId = $turnoDevolucion?->caja_operacion_id;
+
+            // Si se anula dentro del mismo turno donde se originó la venta
+            if ($turnoDestinoId === null && $origen->turno && $origen->turno->fecha_hora_cierre === null && (int) $origen->turno->estado === 1) {
+                $turnoDestinoId = $origen->id_caja_operacion;
             }
+
+            Caja_movimiento_venta::create([
+                'id_caja' => $cajaDestinoId,
+                'id_caja_operacion' => $turnoDestinoId,
+                'id_venta' => $venta->venta_id,
+                'monto_movimiento' => $cajas->importe(-$cajas->centavos($venta->total_venta)),
+                'fecha_hora_movimiento' => now(),
+                'estado' => 1,
+            ]);
+
+            $esMismoTurno = $turnoDestinoId && (int) $origen->id_caja_operacion === (int) $turnoDestinoId;
 
             Bitacora::create([
                 'id_usuario' => $validated['id_usuario'],
-
                 'accion_bitacora' => 'ANULAR_VENTA',
-
-                'descripcion_bitacora' => "Venta {$venta->codigo_venta} anulada.".($registrarEgreso
-                    ? ($turnoDevolucion ? " Devolucion en turno #{$turnoDevolucion->caja_operacion_id}." : " Egreso sin turno autorizado por administrador en caja #{$origen->id_caja}.")
-                    : ' Anulacion dentro del mismo turno.'),
-
+                'descripcion_bitacora' => "Venta {$venta->codigo_venta} anulada.".($esMismoTurno
+                    ? ' Devolucion y anulacion dentro del mismo turno.'
+                    : ($turnoDestinoId ? " Devolucion en turno #{$turnoDestinoId}." : " Egreso sin turno autorizado por administrador en caja #{$cajaDestinoId}.")),
                 'fecha_hora_bitacora' => now(),
-
                 'estado' => 1,
             ]);
 

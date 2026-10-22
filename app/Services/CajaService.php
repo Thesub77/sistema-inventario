@@ -206,12 +206,12 @@ class CajaService
             CajaException::exigir($venta && array_key_exists($venta->metodo_pago, $totales), 409, 'Existe un movimiento inconsistente en el turno.');
             $totalVenta = $this->centavos($venta->total_venta);
             $esDevolucion = (int) $venta->estado === 0 && $monto <= 0;
-            // Un ingreso compensado en otra caja o turno conserva su importe original.
+            // Un ingreso compensado conserva su importe original en ventas brutas.
             $ingresoCompensado = (int) $venta->estado === 0 && $monto >= 0
                 && Caja_movimiento_venta::where('id_venta', $venta->venta_id)->where('estado', 1)
                     ->where('monto_movimiento', $this->importe(-$totalVenta))
                     ->where('caja_movimiento_venta_id', '!=', $movimiento->caja_movimiento_venta_id)
-                    ->where(fn ($q) => $q->whereNull('id_caja_operacion')->orWhere('id_caja_operacion', '!=', $turno->caja_operacion_id))->exists();
+                    ->exists();
             if ($ingresoCompensado) {
                 $esDevolucion = false;
             }
