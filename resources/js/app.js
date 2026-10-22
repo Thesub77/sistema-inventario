@@ -33,6 +33,7 @@ window.formatTelefono = function(val) {
 export function app() {
     const appObj = {
         // Main State
+        sidebarOpen: false,
         currentTab: 'dashboard',
         loading: false,
 

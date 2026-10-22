@@ -602,70 +602,129 @@ export function posModule() {
             this.showSaleDetailModal = true;
         },
 
-        async deleteSale(sale) {
-            const usuariosActivos = (this.usuarios || []).filter(usuario => Number(usuario.estado) === 1);
-            if (usuariosActivos.length === 0) {
-                this.notify('No se puede anular', 'No hay usuarios activos disponibles para registrar al responsable.', 'error');
+        canAnularVenta(sale) {
+            if (!sale || Number(sale.estado) === 0) return false;
+            if (!this.currentUser) return false;
+            if (this.isAdmin) return true;
+            return this.hasPermission('cajas.gestionar') || this.hasPermission('pos.acceso');
+        },
+
+        canAnularMovimientoVenta(mov) {
+            if (!mov || mov.id_venta === null || Number(mov.monto_movimiento) <= 0) return false;
+            if (mov.venta && Number(mov.venta.estado) === 0) return false;
+            return this.canAnularVenta(mov.venta || { venta_id: mov.id_venta, estado: 1 });
+        },
+
+        isMovimientoVentaAnulada(mov) {
+            return Boolean(mov && mov.id_venta !== null && mov.venta && Number(mov.venta.estado) === 0);
+        },
+
+        async anularVentaFromMovimiento(mov) {
+            if (!mov || !mov.id_venta) return;
+            const saleObj = mov.venta || {
+                venta_id: mov.id_venta,
+                codigo_venta: mov.venta?.codigo_venta || ('Factura #' + mov.id_venta),
+                total_venta: Math.abs(Number(mov.monto_movimiento || 0)),
+                estado: mov.venta?.estado ?? 1
+            };
+            return this.anularVenta(saleObj);
+        },
+
+        async anularVenta(sale) {
+            if (!sale) return;
+            if (Number(sale.estado) === 0) {
+                this.notify('Aviso', 'Esta venta ya se encuentra anulada.', 'info');
                 return;
             }
 
+            if (!this.canAnularVenta(sale)) {
+                this.notify('Sin autorización', 'No tienes los permisos requeridos para anular ventas.', 'error');
+                return;
+            }
+
+            const codigo = sale.codigo_venta || ('Venta #' + sale.venta_id);
+            const total = this.formatCurrency(sale.total_venta || 0);
+
             const result = await Swal.fire({
                 title: '¿Anular venta?',
-                text: `Se anulará la factura ${sale.codigo_venta}`,
-                input: 'select',
-                inputLabel: 'Usuario responsable de la anulación',
-                inputOptions: Object.fromEntries(usuariosActivos.map(usuario => [
-                    String(usuario.usuario_id), usuario.nombre_apellido
-                ])),
-                inputPlaceholder: 'Seleccioná al responsable',
-                inputValidator: value => !value ? 'Seleccioná al usuario responsable.' : undefined,
+                html: `
+                    <div class="text-left space-y-3 text-sm">
+                        <p class="text-slate-700 dark:text-slate-300">
+                            ¿Estás seguro de que deseas anular la factura <strong class="text-brand-500 font-mono">${codigo}</strong> por un total de <strong class="text-emerald-500 font-mono">${total}</strong>?
+                        </p>
+                        <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs space-y-1.5">
+                            <p class="font-bold flex items-center gap-1.5">
+                                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500"></i>
+                                <span>Impacto de la anulación:</span>
+                            </p>
+                            <ul class="list-disc list-inside space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">
+                                <li>El stock de los productos vendidos será repuesto automáticamente.</li>
+                                <li>Se registrará la devolución y el egreso en la caja del turno.</li>
+                                <li>La factura quedará registrada como anulada permanentemente.</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
-                cancelButtonColor: '#334155',
-                confirmButtonText: 'Sí, anular',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Sí, anular venta',
                 cancelButtonText: 'Cancelar',
+                reverseButtons: true,
                 background: this.darkMode ? '#1e293b' : '#ffffff',
-                color: this.darkMode ? '#fff' : '#0f172a'
+                color: this.darkMode ? '#fff' : '#0f172a',
+                didOpen: () => {
+                    if (window.lucide) window.lucide.createIcons();
+                }
             });
 
             if (!result.isConfirmed) return;
 
             try {
-                const idUsuario = Number(result.value);
-                if (!usuariosActivos.some(usuario => Number(usuario.usuario_id) === idUsuario)) {
-                    throw new Error('Seleccioná un usuario activo para registrar la anulación.');
-                }
-
                 const res = await this.apiFetch(`/api/ventas/${sale.venta_id}`, {
                     method: 'DELETE',
-                    body: JSON.stringify({ id_usuario: idUsuario })
+                    body: JSON.stringify({
+                        id_usuario: this.currentUser?.usuario_id || 1
+                    })
                 });
+
                 const data = await res.json().catch(() => ({}));
+
                 if (!res.ok || data.success !== true) {
                     throw new Error(data.message || 'No se pudo anular la venta.');
                 }
-            } catch (error) {
-                this.notify('No se pudo anular la venta', error.message, 'error');
-                return;
-            }
 
-            try {
-                await Promise.all([
-                    this.fetchVentas(),
-                    this.fetchProductos(),
-                    this.fetchInventario(),
-                    this.fetchBitacoras()
-                ]);
-                if (typeof this.fetchLibroDiario === 'function') {
-                    await this.fetchLibroDiario();
+                this.notify('Venta Anulada', `La factura ${codigo} fue anulada correctamente.`, 'success');
+
+                // 1. Si el modal de auditoría de turno está abierto, recargarlo para mostrar el cambio al instante
+                if (this.showTurnoAuditoriaModal && this.selectedTurnoAuditoria?.caja_operacion_id) {
+                    await this.openTurnoAuditoriaModal(this.selectedTurnoAuditoria.caja_operacion_id);
                 }
-            } catch {
-                this.notify('Venta Anulada', 'La anulación se guardó, pero no se pudo actualizar la pantalla.', 'warning');
-                return;
-            }
 
-            this.notify('Venta Anulada', `La factura ${sale.codigo_venta} fue anulada correctamente.`, 'success');
+                // 2. Refrescar datos en segundo plano
+                await Promise.allSettled([
+                    typeof this.fetchVentas === 'function' ? this.fetchVentas() : Promise.resolve(),
+                    typeof this.fetchProductos === 'function' ? this.fetchProductos() : Promise.resolve(),
+                    typeof this.fetchInventario === 'function' ? this.fetchInventario() : Promise.resolve(),
+                    typeof this.fetchCajaMovimientos === 'function' ? this.fetchCajaMovimientos() : Promise.resolve(),
+                    typeof this.fetchTurnos === 'function' ? this.fetchTurnos() : Promise.resolve(),
+                    typeof this.fetchBitacoras === 'function' ? this.fetchBitacoras() : Promise.resolve(),
+                    typeof this.fetchLibroDiario === 'function' ? this.fetchLibroDiario() : Promise.resolve()
+                ]);
+
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+
+            } catch (error) {
+                console.error('Error al anular venta:', error);
+                this.notify('No se pudo anular la venta', error.message || 'Ocurrió un error inesperado al procesar la anulación.', 'error');
+            }
+        },
+
+        async deleteSale(sale) {
+            return this.anularVenta(sale);
         },
 
         // Métodos de control y filtrado del Historial de Ventas

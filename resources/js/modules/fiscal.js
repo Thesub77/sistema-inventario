@@ -584,15 +584,27 @@ export function fiscalModule() {
 
             document.title = fileName;
 
+            // Inyectar regla de impresión específica para garantizar márgenes y tamaño Carta multipágina
+            const styleId = 'print-page-balance-override';
+            let styleTag = document.getElementById(styleId);
+            if (!styleTag) {
+                styleTag = document.createElement('style');
+                styleTag.id = styleId;
+                styleTag.textContent = '@page { size: letter portrait; margin: 12mm 15mm 12mm 15mm !important; }';
+                document.head.appendChild(styleTag);
+            }
+
             window.print();
 
-            // Restaurar título de pestaña
-            setTimeout(() => {
+            // Restaurar título de pestaña y limpiar regla temporal
+            const cleanUp = () => {
                 document.title = originalTitle;
-            }, 1000);
-            window.addEventListener('afterprint', () => {
-                document.title = originalTitle;
-            }, { once: true });
+                const el = document.getElementById(styleId);
+                if (el) el.remove();
+            };
+
+            setTimeout(cleanUp, 1500);
+            window.addEventListener('afterprint', cleanUp, { once: true });
         },
 
         // Exportación a CSV oficial para auditoría fiscal y cuaderno contable en Excel
