@@ -335,8 +335,9 @@ export function app() {
         getVentaLocalDate(dateStr) {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+            const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return `${match[1]}-${match[2]}-${match[3]}`;
             }
             const d = new Date(normalized);
             if (isNaN(d.getTime())) {
@@ -1170,15 +1171,20 @@ export function app() {
             if (!mov) return '';
             if (mov.codigo_movimiento) return mov.codigo_movimiento;
             let normalized = String(mov.fecha_hora_movimiento || '').trim();
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
-            }
-            const d = new Date(normalized);
-            const target = isNaN(d.getTime()) ? new Date() : d;
+            const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
             const pad = (n, len = 2) => String(n).padStart(len, '0');
-            const day = pad(target.getDate(), 2);
-            const month = pad(target.getMonth() + 1, 2);
-            const year = String(target.getFullYear()).slice(-2);
+            let day, month, year;
+            if (match) {
+                year = match[1].slice(-2);
+                month = match[2];
+                day = match[3];
+            } else {
+                const d = new Date(normalized);
+                const target = isNaN(d.getTime()) ? new Date() : d;
+                day = pad(target.getDate(), 2);
+                month = pad(target.getMonth() + 1, 2);
+                year = String(target.getFullYear()).slice(-2);
+            }
             const caja = pad(mov.id_caja || 1, 3);
             const id = pad(mov.caja_movimiento_venta_id || 0, 5);
 

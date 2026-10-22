@@ -30,20 +30,15 @@ export function fiscalModule() {
             return { year: parseInt(latinMatch[3], 10), month: parseInt(latinMatch[2], 10) };
         }
 
-        // 3. Si viene con fecha y hora (ej: "2026-10-01 01:30:00" o ISO), normalizar con 'Z'
-        // para interpretar en la zona horaria local del navegador, 100% coherente con formatDate().
-        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) {
-            s = s.replace(' ', 'T') + 'Z';
+        // 3. Si viene con fecha y hora estándar (ej: "2026-10-01 01:30:00" o ISO)
+        const match = s.match(/^(\d{4})-(\d{2})/);
+        if (match) {
+            return { year: parseInt(match[1], 10), month: parseInt(match[2], 10) };
         }
         const d = new Date(s);
         const target = isNaN(d.getTime()) ? new Date(dateVal) : d;
         if (!isNaN(target.getTime())) {
             return { year: target.getFullYear(), month: target.getMonth() + 1 };
-        }
-
-        const match = s.match(/^(\d{4})-(\d{2})/);
-        if (match) {
-            return { year: parseInt(match[1], 10), month: parseInt(match[2], 10) };
         }
         return null;
     }
@@ -56,8 +51,9 @@ export function fiscalModule() {
         if (dateOnlyMatch) {
             return s;
         }
-        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) {
-            s = s.replace(' ', 'T') + 'Z';
+        const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+            return `${match[1]}-${match[2]}-${match[3]}`;
         }
         const d = new Date(s);
         const target = isNaN(d.getTime()) ? new Date(dateVal) : d;

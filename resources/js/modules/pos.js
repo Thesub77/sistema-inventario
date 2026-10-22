@@ -739,9 +739,9 @@ export function posModule() {
         getVentaLocalDate(dateStr) {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
-            // Normalizar fechas UTC sin sufijo Z (ej: "2026-09-30 01:35:00") a ISO UTC para interpretar en hora local
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+            const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return `${match[1]}-${match[2]}-${match[3]}`;
             }
             const d = new Date(normalized);
             if (isNaN(d.getTime())) {
