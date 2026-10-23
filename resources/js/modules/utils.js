@@ -86,21 +86,33 @@ export function utilsModule() {
             if (!dateStr) return 'N/A';
             let normalized = String(dateStr).trim();
 
-            // Si es solo fecha YYYY-MM-DD sin componente de hora, formatear directamente sin desfase de zona horaria
+            // 1. Si es solo fecha YYYY-MM-DD sin componente de hora, formatear directamente sin desfase de zona horaria
             const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
             if (dateOnlyMatch) {
                 return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
             }
 
-            // Si ya viene formateada como DD/MM/YYYY
+            // 2. Si ya viene formateada como DD/MM/YYYY
             if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
                 return normalized;
             }
 
-            // Normalizar formato de fecha y hora para interpretar en hora local
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T');
+            // 3. Si viene con fecha y hora estándar local (ej: "2026-10-22 10:49:54" o "2026-10-22T10:49:54") sin offset de zona,
+            // extraer componentes directamente para garantizar inmunidad total contra desfases UTC de navegadores o Safari
+            const standardMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+            if (standardMatch) {
+                const year = standardMatch[1];
+                const month = standardMatch[2];
+                const day = standardMatch[3];
+                let hours = parseInt(standardMatch[4], 10);
+                const minutes = standardMatch[5];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? String(hours).padStart(2, '0') : '12';
+                return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
             }
+
+            // 4. Si incluye indicador de zona horaria explícito (ej: ISO con Z o offset +/-HH:mm)
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
             if (isNaN(target.getTime())) return dateStr;
@@ -123,19 +135,23 @@ export function utilsModule() {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
 
-            // Si es solo fecha YYYY-MM-DD sin hora, retornar directamente DD/MM/YYYY sin desfase UTC
+            // 1. Si es solo fecha YYYY-MM-DD sin hora, retornar directamente DD/MM/YYYY sin desfase UTC
             const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
             if (dateOnlyMatch) {
                 return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
             }
 
+            // 2. Si ya viene formateada como DD/MM/YYYY
             if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
                 return normalized;
             }
 
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T');
+            // 3. Si viene con fecha y hora estándar local, tomar la fecha directamente
+            const standardMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (standardMatch) {
+                return `${standardMatch[3]}/${standardMatch[2]}/${standardMatch[1]}`;
             }
+
             const d = new Date(normalized);
             const target = isNaN(d.getTime()) ? new Date(dateStr) : d;
             if (isNaN(target.getTime())) return dateStr;
@@ -170,7 +186,7 @@ export function utilsModule() {
             return name.charAt(0).toUpperCase() + name.slice(1);
         },
 
-        getFullDayName(dateStr) {
+        getDayFullName(dateStr) {
             if (!dateStr) return '';
             const match = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
             if (match) {
@@ -188,15 +204,20 @@ export function utilsModule() {
             if (!mov) return '';
             if (mov.codigo_movimiento) return mov.codigo_movimiento;
             let normalized = String(mov.fecha_hora_movimiento || '').trim();
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
-            }
-            const d = new Date(normalized);
-            const target = isNaN(d.getTime()) ? new Date() : d;
+            const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
             const pad = (n, len = 2) => String(n).padStart(len, '0');
-            const day = pad(target.getDate(), 2);
-            const month = pad(target.getMonth() + 1, 2);
-            const year = String(target.getFullYear()).slice(-2);
+            let day, month, year;
+            if (match) {
+                year = match[1].slice(-2);
+                month = match[2];
+                day = match[3];
+            } else {
+                const d = new Date(normalized);
+                const target = isNaN(d.getTime()) ? new Date() : d;
+                day = pad(target.getDate(), 2);
+                month = pad(target.getMonth() + 1, 2);
+                year = String(target.getFullYear()).slice(-2);
+            }
             const caja = pad(mov.id_caja || 1, 3);
             const id = pad(mov.caja_movimiento_venta_id || 0, 5);
 
@@ -206,10 +227,17 @@ export function utilsModule() {
         formatTime(dateStr) {
             if (!dateStr) return '';
             let normalized = String(dateStr).trim();
-            // Si la fecha viene en formato UTC sin sufijo de zona horaria (ej: "2026-09-27 02:35:00")
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-                normalized = normalized.replace(' ', 'T') + 'Z';
+            // Si viene con fecha y hora estándar sin offset explícito
+            const standardMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+            if (standardMatch) {
+                let hours = parseInt(standardMatch[4], 10);
+                const minutes = standardMatch[5];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? String(hours).padStart(2, '0') : '12';
+                return `${hours}:${minutes} ${ampm}`;
             }
+
             const d = new Date(normalized);
             if (isNaN(d.getTime())) {
                 const fallback = new Date(dateStr);
