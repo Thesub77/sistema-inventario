@@ -5350,8 +5350,9 @@ function app() {
                 case 'categorias':
                     return this.hasPermission('categorias.ver') || this.hasPermission('categorias.gestionar') || this.hasPermission('inventario.gestionar');
                 case 'ventas':
-                case 'libro-diario':
                     return this.hasPermission('ventas.ver') || this.hasPermission('pos.acceso') || this.hasPermission('ventas.crear');
+                case 'libro-diario':
+                    return this.isAdmin || this.hasPermission('usuarios.gestionar');
                 case 'proveedores':
                 case 'cuentas-por-pagar':
                     return this.isAdmin || this.hasPermission('proveedores.gestionar');

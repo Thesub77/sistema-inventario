@@ -65,8 +65,8 @@ Route::middleware('auth:sanctum')->group(function () {
         require __DIR__.'/api/venta_routes.php';
     });
 
-    // Módulo de Reportes Fiscales (DGI Cuota Fija)
-    Route::middleware('permission:ventas.ver,pos.acceso')->group(function () {
+    // Módulo de Reportes Fiscales (DGI Cuota Fija - Exclusivo Administrador)
+    Route::middleware('permission:usuarios.gestionar')->group(function () {
         Route::get('/fiscal/libro-diario', [FiscalController::class, 'libroDiario']);
     });
 });
