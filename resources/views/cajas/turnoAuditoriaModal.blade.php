@@ -636,7 +636,7 @@
         <!-- 6. Pie del Modal con Acciones de Cierre -->
         <div class="px-5 sm:px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0 bg-slate-50/80 dark:bg-dark-900/90">
             <span class="text-xs text-slate-400">
-                Auditoría certificada por el sistema financiero FacturaStock Pro
+                Auditoría certificada por el sistema financiero SIFEI
             </span>
             <button type="button" @click="showTurnoAuditoriaModal = false"
                 class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-colors cursor-pointer">
@@ -655,7 +655,7 @@
             <div class="p-6 text-black bg-white space-y-4 font-sans text-xs">
                 <!-- Membrete de la Empresa -->
                 <div class="border-b-2 border-black pb-3 text-center space-y-1">
-                    <h2 class="text-xl font-black uppercase tracking-wider" x-text="empresa?.nombre_comercial || 'FACTURASTOCK PRO'"></h2>
+                    <h2 class="text-xl font-black uppercase tracking-wider" x-text="empresa?.nombre_comercial || 'SIFEI'"></h2>
                     <p class="text-xs font-semibold" x-text="empresa?.razon_social ? 'Razón Social: ' + empresa.razon_social : ''"></p>
                     <p class="text-xs font-mono font-bold" x-text="empresa?.numero_ruc ? 'RUC: ' + empresa.numero_ruc : ''"></p>
                     <p class="text-[11px]" x-text="empresa?.direccion_fisica || ''"></p>

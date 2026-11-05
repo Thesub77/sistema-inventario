@@ -47,13 +47,31 @@
     {{-- Tarjeta Principal de Login --}}
     <div class="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl relative z-10 border border-slate-800 space-y-6">
         
-        {{-- Logo y Cabecera --}}
+        {{-- Logo y Cabecera SIFEI --}}
         <div class="text-center space-y-2">
-            <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-xl shadow-brand-500/30">
-                <i data-lucide="boxes" class="w-7 h-7"></i>
+            <!-- Isotipo Oficial SIFEI (Hexágono Isométrico Vectorial con Cinta S) -->
+            <div class="w-14 h-14 mx-auto flex items-center justify-center">
+                <svg class="w-14 h-14 drop-shadow-[0_4px_16px_rgba(37,99,235,0.4)]" viewBox="0 0 100 114" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="sifeiBlueLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#60A5FA"/>
+                            <stop offset="50%" stop-color="#2563EB"/>
+                            <stop offset="100%" stop-color="#1D4ED8"/>
+                        </linearGradient>
+                        <linearGradient id="sifeiGreenLogin" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#86EFAC"/>
+                            <stop offset="45%" stop-color="#22C55E"/>
+                            <stop offset="100%" stop-color="#15803D"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Pliegue Azul Exterior y Diagonal Central -->
+                    <path fill="url(#sifeiBlueLogin)" d="M49.5 0.5C52 0.5 55 1.5 57 2.8L95.5 25C98.5 27 100 29 100 32V58L81.5 47V37L53 21L19.5 40V50L55 71L58 73.5L47.5 79.5L20 64V78.5L43 92.5L63.5 105L53 111.5C51 112.5 49 112.5 47 111.5L3.5 86C1 84 0 81.5 0 78.5V35.5C0 31.5 1.5 28.5 4.5 26.5L45 1.5C46.5 0.8 48 0.5 49.5 0.5Z"/>
+                    <!-- Pliegue Verde Esmeralda (Cinta 'S') -->
+                    <path fill="url(#sifeiGreenLogin)" d="M54 31L96 56.5C98.8 58.2 100 60.5 100 63.5V81C100 84.5 98.5 87 95.5 89L64 106L58.5 102.5L44 93.5L81 72V69.5L40 44.5C37.5 42.5 37.5 40 39 38L51 31.2C52 30.7 53 30.7 54 31Z"/>
+                </svg>
             </div>
-            <h1 class="font-display font-bold text-2xl text-white tracking-tight">
-                Factura<span class="text-brand-400">Stock</span> <span class="text-xs uppercase px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 font-semibold tracking-wider align-middle">Pro</span>
+            <h1 class="font-display font-bold text-2xl tracking-wide transition-colors" :class="darkMode ? 'text-white' : 'text-slate-950'">
+                SIFEI
             </h1>
             <p class="text-xs text-slate-400">Ingresa tus credenciales para acceder al sistema</p>
         </div>

@@ -953,7 +953,7 @@
 
         <!-- PIE DE PÁGINA FORMAL -->
         <div class="mt-6 pt-2 border-t border-dashed border-neutral-400 text-center text-[9px] text-neutral-500 font-mono" style="break-inside: avoid; page-break-inside: avoid;">
-            Documento emitido mediante FacturaStock Pro • Balance Mensual y Control Contable MiPyME • Impreso el: <span x-text="libroDiarioEmisionFecha"></span>
+            Documento emitido mediante SIFEI • Balance Mensual y Control Contable MiPyME • Impreso el: <span x-text="libroDiarioEmisionFecha"></span>
         </div>
     </div>
 
