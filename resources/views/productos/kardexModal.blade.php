@@ -164,9 +164,6 @@
                 </span>
             </template>
         </div>
-                </span>
-            </template>
-        </div>
 
         <!-- Tabla Desplazable de Movimientos: Ocupa todo el alto y ancho libre -->
         <div class="overflow-x-auto overflow-y-auto flex-1 min-h-0 p-0">
