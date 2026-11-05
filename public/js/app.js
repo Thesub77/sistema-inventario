@@ -2309,6 +2309,8 @@ function productosModule() {
             existencia_minima: 5,
             estado: 1,
             componentes: [],
+            proveedor_nombre: '',
+            numero_factura_recibo: '',
         },
 
         showStockModal: false,
@@ -2514,7 +2516,12 @@ function productosModule() {
                     existencia_minima: stockMin,
                     estado: 1,
                     componentes: [],
+                    proveedor_nombre: '',
+                    numero_factura_recibo: '',
                 };
+                if (typeof this.fetchProveedores === 'function' && (!this.proveedores || this.proveedores.length === 0)) {
+                    this.fetchProveedores().catch(() => {});
+                }
             }
             this.showProductModal = true;
             this.$nextTick(() => {
@@ -2568,6 +2575,9 @@ function productosModule() {
                 this.showProductModal = false;
                 this.notify('¡Producto Guardado!', `El producto "${this.productForm.nombre_producto}" se guardó correctamente.`, 'success');
                 await this.fetchProductos();
+                if (typeof this.fetchInventario === 'function') {
+                    await this.fetchInventario().catch(() => {});
+                }
             } catch (error) {
                 this.notify('Error al guardar producto', error.message, 'error');
             }
@@ -2774,7 +2784,21 @@ function productosModule() {
             }
             if (this.kardexFilterType) {
                 const filter = this.kardexFilterType.toLowerCase();
-                list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes(filter));
+                if (filter === 'merma') {
+                    list = list.filter(m => (window.isKardexMerma ? window.isKardexMerma(m) : (m.tipo_movimiento || '').toLowerCase().includes('merma')));
+                } else if (filter === 'entrada') {
+                    list = list.filter(m => {
+                        const t = (m.tipo_movimiento || '').toLowerCase();
+                        const isM = window.isKardexMerma ? window.isKardexMerma(m) : false;
+                        return !isM && (t.includes('entrada') || t.includes('inicial') || t.includes('compra'));
+                    });
+                } else if (filter === 'venta') {
+                    list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes('venta') && !(window.isKardexMerma ? window.isKardexMerma(m) : false));
+                } else if (filter === 'ajuste') {
+                    list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes('ajuste') && !(window.isKardexMerma ? window.isKardexMerma(m) : false));
+                } else {
+                    list = list.filter(m => (m.tipo_movimiento || '').toLowerCase().includes(filter));
+                }
             }
             if (this.kardexSearch && this.kardexSearch.trim()) {
                 const q = this.kardexSearch.toLowerCase().trim();
@@ -2793,22 +2817,43 @@ function productosModule() {
         },
 
         get kardexStats() {
-            const list = this.filteredKardexMovimientos;
+            let baseList = Array.isArray(this.movimientosInventario) ? this.movimientosInventario : [];
+            if (this.kardexSelectedProduct) {
+                const prodId = Number(this.kardexSelectedProduct.producto_id);
+                baseList = baseList.filter(m => Number(m.id_producto) === prodId || (m.producto && Number(m.producto.producto_id) === prodId));
+            }
+            if (this.kardexSearch && this.kardexSearch.trim()) {
+                const q = this.kardexSearch.toLowerCase().trim();
+                baseList = baseList.filter(m => {
+                    const prodName = m.producto ? (m.producto.nombre_producto || '').toLowerCase() : '';
+                    const prodCod = m.producto ? (m.producto.codigo_producto || '').toLowerCase() : '';
+                    const provName = (m.proveedor_nombre || '').toLowerCase();
+                    const factura = (m.numero_factura_recibo || '').toLowerCase();
+                    const tipo = (m.tipo_movimiento || '').toLowerCase();
+                    const usuario = m.usuario ? (m.usuario.nombre_apellido || '').toLowerCase() : '';
+                    const merma = (m.tipo_merma || '').toLowerCase();
+                    return prodName.includes(q) || prodCod.includes(q) || provName.includes(q) || factura.includes(q) || tipo.includes(q) || usuario.includes(q) || merma.includes(q);
+                });
+            }
+
             let entradas = 0;
             let mermas = 0;
             let ventas = 0;
             let ajustes = 0;
             let costoMermas = 0;
-            for (const m of list) {
+            for (const m of baseList) {
                 const tipo = (m.tipo_movimiento || '').toLowerCase();
                 const cant = Number(m.cantidad_movimimiento || m.cantidad_movimiento || 0);
-                if (tipo.includes('entrada') || tipo.includes('inicial')) {
-                    entradas += cant;
-                } else if (tipo.includes('merma')) {
+                const isM = window.isKardexMerma ? window.isKardexMerma(m) : tipo.includes('merma');
+                if (isM) {
                     mermas += cant;
-                    if (m.costo_total_perdida) {
-                        costoMermas += Number(m.costo_total_perdida);
-                    }
+                    const costoUnit = Number(m.costo_unitario || m.producto?.costo_compra || 0);
+                    const costoPerdida = (m.costo_total_perdida !== null && m.costo_total_perdida !== undefined)
+                        ? Number(m.costo_total_perdida)
+                        : (cant * costoUnit);
+                    costoMermas += costoPerdida;
+                } else if (tipo.includes('entrada') || tipo.includes('inicial') || tipo.includes('compra')) {
+                    entradas += cant;
                 } else if (tipo.includes('venta')) {
                     ventas += cant;
                 } else if (tipo.includes('ajuste')) {
@@ -2816,7 +2861,7 @@ function productosModule() {
                 }
             }
             return {
-                totalRegistros: list.length,
+                totalRegistros: baseList.length,
                 entradas,
                 mermas,
                 ventas,

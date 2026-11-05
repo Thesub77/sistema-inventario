@@ -173,6 +173,39 @@
                 </div>
             </div>
 
+            <!-- Proveedor (Opcional, para auditar la primera compra en Kardex) -->
+            <div x-show="!isEditingProduct && productForm.tipo_producto !== 'combo' && Number(productForm.existencia_bodega || 0) > 0"
+                x-transition
+                class="p-3 bg-dark-950/80 border border-slate-800 rounded-xl space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <i data-lucide="truck" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span>Proveedor (Opcional)</span>
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Nombre del Proveedor</label>
+                        <input type="text" maxlength="128" x-model="productForm.proveedor_nombre"
+                            list="proveedoresProductDatalist"
+                            placeholder="Ej. Distribuidora La Fe"
+                            class="w-full bg-dark-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                        <datalist id="proveedoresProductDatalist">
+                            <template x-for="prov in proveedores" :key="prov.proveedor_id || prov.nombre_comercial">
+                                <option :value="prov.nombre_comercial" x-text="prov.nombre_comercial"></option>
+                            </template>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">N° de Factura / Recibo</label>
+                        <input type="text" maxlength="64" x-model="productForm.numero_factura_recibo"
+                            placeholder="Ej. FAC-001 o S/N"
+                            class="w-full bg-dark-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 font-mono">
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400">Si se ingresa, se registrará el movimiento de compra inicial en el Kardex vinculado a este proveedor.</p>
+            </div>
+
             <!-- Información de Stock para Combos -->
             <div x-show="productForm.tipo_producto === 'combo'" class="p-3 bg-slate-800/30 border border-slate-800 rounded-xl flex items-start gap-2.5">
                 <i data-lucide="info" class="w-4 h-4 text-purple-400 shrink-0 mt-0.5"></i>

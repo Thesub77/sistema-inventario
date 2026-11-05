@@ -53,6 +53,18 @@
 
             <!-- Modal Body: Resumen y Lista de Pagos -->
             <div class="p-6 space-y-4">
+                <!-- Concepto de la Factura -->
+                <div class="p-3 bg-slate-50 dark:bg-dark-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-start gap-2.5">
+                    <div class="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1 text-xs">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Concepto</span>
+                        <p class="font-medium text-slate-800 dark:text-slate-200 mt-0.5"
+                            x-text="selectedCuentaHistorial?.descripcion || 'Sin concepto especificado'"></p>
+                    </div>
+                </div>
+
                 <!-- Resumen de Totales -->
                 <div class="grid grid-cols-3 gap-2 p-3 bg-slate-50 dark:bg-dark-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
                     <div>

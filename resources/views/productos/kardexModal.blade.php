@@ -63,10 +63,10 @@
         </div>
 
         <!-- Barra de Filtros y Búsqueda Optimizada -->
-        <div class="px-5 py-3 sm:px-6 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/50 flex-shrink-0 space-y-2.5">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+        <div class="px-5 py-3 sm:px-6 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/50 flex-shrink-0">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                 <!-- Selector de Producto -->
-                <div class="lg:col-span-4">
+                <div>
                     <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                         Producto Seleccionado
                     </label>
@@ -80,112 +80,80 @@
                 </div>
 
                 <!-- Buscador rápido dentro del historial -->
-                <div class="lg:col-span-4">
+                <div>
                     <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                         Buscar en Movimientos
                     </label>
                     <div class="relative">
                         <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-                        <input type="text" x-model="kardexSearch" placeholder="Filtrar por factura, proveedor, merma, responsable..."
+                        <input type="text" x-model="kardexSearch" placeholder="Filtrar por proveedor, factura, merma, responsable..."
                             class="w-full bg-white dark:bg-dark-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-xs">
                     </div>
-                </div>
-
-                <!-- Botones de Filtro por Tipo de Movimiento -->
-                <div class="lg:col-span-4 flex items-center justify-start gap-1.5 overflow-x-auto pb-0.5 text-xs">
-                    <!-- Todos -->
-                    <button type="button" @click="kardexFilterType = ''"
-                        :class="kardexFilterType === '' 
-                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-xs' 
-                            : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                        class="px-2.5 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer whitespace-nowrap">
-                        Todos
-                    </button>
-
-                    <!-- Entradas / Compras (Verde) -->
-                    <button type="button" @click="kardexFilterType = 'Entrada'"
-                        :class="kardexFilterType === 'Entrada' 
-                            ? 'bg-emerald-600 text-white font-semibold shadow-xs' 
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20 dark:hover:bg-emerald-500/20'"
-                        class="px-2.5 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer whitespace-nowrap">
-                        Entradas
-                    </button>
-
-                    <!-- Salidas por Venta (Azul) -->
-                    <button type="button" @click="kardexFilterType = 'Venta'"
-                        :class="kardexFilterType === 'Venta' 
-                            ? 'bg-blue-600 text-white font-semibold shadow-xs' 
-                            : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20 dark:hover:bg-blue-500/20'"
-                        class="px-2.5 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer whitespace-nowrap">
-                        Ventas
-                    </button>
-
-                    <!-- Mermas / Pérdidas (Rojo) -->
-                    <button type="button" @click="kardexFilterType = 'Merma'"
-                        :class="kardexFilterType === 'Merma' 
-                            ? 'bg-rose-600 text-white font-semibold shadow-xs' 
-                            : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20 dark:hover:bg-rose-500/20'"
-                        class="px-2.5 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer whitespace-nowrap">
-                        Mermas
-                    </button>
-
-                    <!-- Ajustes Manuales (Ámbar / Naranja) -->
-                    <button type="button" @click="kardexFilterType = 'Ajuste'"
-                        :class="kardexFilterType === 'Ajuste' 
-                            ? 'bg-amber-600 text-white font-semibold shadow-xs' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 dark:hover:bg-amber-500/20'"
-                        class="px-2.5 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer whitespace-nowrap">
-                        Ajustes
-                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Banner de Métricas Físicas del Inventario (Cards Dinámicas según el Filtro) -->
+        <!-- Banner de Métricas Físicas del Inventario y Filtros Interactivos -->
         <div class="px-5 py-2.5 sm:px-6 bg-slate-100/80 dark:bg-dark-950/90 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2.5 text-xs flex-shrink-0">
-            <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <!-- Total Registros (Siempre visible y clickeable para volver a 'Todos') -->
+            <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                <!-- Total Registros (Todos) -->
                 <button type="button" @click="kardexFilterType = ''"
                     title="Ver todos los movimientos"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/70 text-slate-600 dark:text-slate-300 font-medium shadow-xs hover:border-slate-400 dark:hover:border-slate-500 transition-all cursor-pointer">
-                    Total registros:
-                    <strong class="text-slate-900 dark:text-white font-bold" x-text="kardexStats.totalRegistros"></strong>
+                    :class="kardexFilterType === '' 
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold shadow-xs ring-2 ring-slate-400/40' 
+                        : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer whitespace-nowrap">
+                    <span>Todos:</span>
+                    <strong x-text="kardexStats.totalRegistros"></strong>
                 </button>
 
-                <!-- Card Entradas: Visible solo en 'Todos' o al filtrar por 'Entrada' -->
-                <button type="button" @click="kardexFilterType = 'Entrada'"
-                    x-show="!kardexFilterType || kardexFilterType === 'Entrada'"
+                <!-- Entradas: -->
+                <button type="button" @click="kardexFilterType = (kardexFilterType === 'Entrada' ? '' : 'Entrada')"
                     title="Filtrar por Entradas / Compras"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200/80 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs hover:border-emerald-400 dark:hover:border-emerald-500 transition-all cursor-pointer">
-                    Entradas:
-                    <strong class="font-bold" x-text="'+ ' + kardexStats.entradas + ' uds.'"></strong>
+                    :class="kardexFilterType === 'Entrada' 
+                        ? 'bg-emerald-600 text-white font-bold shadow-xs ring-2 ring-emerald-500/40' 
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20 dark:hover:bg-emerald-500/20 font-medium'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer whitespace-nowrap">
+                    <span>Entradas:</span>
+                    <strong x-text="'+ ' + kardexStats.entradas + ' uds.'"></strong>
                 </button>
 
-                <!-- Card Ventas: Visible solo en 'Todos' o al filtrar por 'Venta' -->
-                <button type="button" @click="kardexFilterType = 'Venta'"
-                    x-show="!kardexFilterType || kardexFilterType === 'Venta'"
+                <!-- Ventas: -->
+                <button type="button" @click="kardexFilterType = (kardexFilterType === 'Venta' ? '' : 'Venta')"
                     title="Filtrar por Salidas de Venta"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200/80 dark:border-blue-500/20 text-blue-700 dark:text-blue-300 font-medium shadow-xs hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer">
-                    Ventas:
-                    <strong class="font-bold" x-text="'- ' + kardexStats.ventas + ' uds.'"></strong>
+                    :class="kardexFilterType === 'Venta' 
+                        ? 'bg-blue-600 text-white font-bold shadow-xs ring-2 ring-blue-500/40' 
+                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20 dark:hover:bg-blue-500/20 font-medium'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer whitespace-nowrap">
+                    <span>Ventas:</span>
+                    <strong x-text="'- ' + kardexStats.ventas + ' uds.'"></strong>
                 </button>
 
-                <!-- Card Mermas: Visible solo en 'Todos' o al filtrar por 'Merma' -->
-                <button type="button" @click="kardexFilterType = 'Merma'"
-                    x-show="!kardexFilterType || kardexFilterType === 'Merma'"
+                <!-- Mermas: Con Pérdida Monetaria visible -->
+                <button type="button" @click="kardexFilterType = (kardexFilterType === 'Merma' ? '' : 'Merma')"
                     title="Filtrar por Mermas / Pérdidas"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-500/10 border border-rose-200/80 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 font-medium shadow-xs hover:border-rose-400 dark:hover:border-rose-500 transition-all cursor-pointer">
-                    Mermas:
-                    <strong class="font-bold" x-text="'- ' + kardexStats.mermas + ' uds.'"></strong>
+                    :class="kardexFilterType === 'Merma' 
+                        ? 'bg-rose-600 text-white font-bold shadow-xs ring-2 ring-rose-500/40' 
+                        : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20 dark:hover:bg-rose-500/20 font-medium'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer whitespace-nowrap">
+                    <span>Mermas:</span>
+                    <strong x-text="'- ' + kardexStats.mermas + ' uds.'"></strong>
+                    <template x-if="kardexStats.costoMermas > 0">
+                        <span class="text-[11px] font-mono opacity-90 pl-1.5 border-l"
+                            :class="kardexFilterType === 'Merma' ? 'border-rose-400 text-rose-100' : 'border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 font-bold'"
+                            x-text="'Pérdida: ' + formatCurrency(kardexStats.costoMermas)"></span>
+                    </template>
                 </button>
 
-                <!-- Card Ajustes: Visible solo en 'Todos' o al filtrar por 'Ajuste' -->
-                <button type="button" @click="kardexFilterType = 'Ajuste'"
-                    x-show="!kardexFilterType || kardexFilterType === 'Ajuste'"
+                <!-- Ajustes: -->
+                <button type="button" @click="kardexFilterType = (kardexFilterType === 'Ajuste' ? '' : 'Ajuste')"
                     title="Filtrar por Ajustes de Inventario"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200/80 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 font-medium shadow-xs hover:border-amber-400 dark:hover:border-amber-500 transition-all cursor-pointer">
-                    Ajustes:
-                    <strong class="font-bold" x-text="(kardexStats.ajustes || 0) + ' mov.'"></strong>
+                    :class="kardexFilterType === 'Ajuste' 
+                        ? 'bg-amber-600 text-white font-bold shadow-xs ring-2 ring-amber-500/40' 
+                        : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 dark:hover:bg-amber-500/20 font-medium'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer whitespace-nowrap">
+                    <span>Ajustes:</span>
+                    <strong x-text="(kardexStats.ajustes || 0) + ' mov.'"></strong>
                 </button>
             </div>
 
@@ -193,6 +161,9 @@
             <template x-if="kardexSelectedProduct && kardexSelectedProduct.tipo_producto === 'combo'">
                 <span class="text-[11px] text-purple-700 dark:text-purple-300 font-medium bg-purple-50 dark:bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-500/20">
                     Combo: Los movimientos físicos se deducen en sus componentes.
+                </span>
+            </template>
+        </div>
                 </span>
             </template>
         </div>
@@ -240,15 +211,21 @@
 
                             <!-- Motivo / Referencia (Diseño Uniforme por Tipo de Motivo) -->
                             <td class="py-3 px-4 whitespace-nowrap">
-                                <!-- 1. Caso Merma / Rotura / Accidente: Chip Rojo con Ícono de Advertencia -->
+                                <!-- 1. Caso Merma / Rotura / Accidente: Chip Rojo con Causa y Pérdida Monetaria -->
                                 <template x-if="isKardexMerma(m)">
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 shadow-2xs"
-                                        :title="'Causa de Merma: ' + getKardexMotivoLabel(m)">
-                                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                        </svg>
-                                        <span x-text="getKardexMotivoLabel(m)"></span>
-                                    </span>
+                                    <div class="inline-flex items-center gap-1.5 flex-wrap">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 shadow-2xs"
+                                            :title="'Causa de Merma: ' + getKardexMotivoLabel(m)">
+                                            <svg class="w-3.5 h-3.5 flex-shrink-0 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                            </svg>
+                                            <span x-text="getKardexMotivoLabel(m)"></span>
+                                        </span>
+                                        <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-bold font-mono rounded bg-rose-100/90 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-200/90 dark:border-rose-500/30"
+                                            title="Pérdida monetaria calculada al costo de adquisición"
+                                            x-text="'Pérdida: ' + formatCurrency(m.costo_total_perdida || ((m.cantidad_movimimiento || m.cantidad_movimiento || 0) * (m.producto?.costo_compra || m.costo_unitario || 0)))">
+                                        </span>
+                                    </div>
                                 </template>
 
                                 <!-- 2. Caso Venta: Chip Azul con Ícono de Carrito POS -->
@@ -262,15 +239,26 @@
                                     </span>
                                 </template>
 
-                                <!-- 3. Caso Entrada / Compra: Chip Verde con Proveedor o Documento -->
+                                <!-- 3. Caso Entrada / Compra: Chip Verde con Proveedor y Documento -->
                                 <template x-if="!isKardexMerma(m) && !( (m.tipo_movimiento || '').toLowerCase().includes('venta') ) && ( (m.tipo_movimiento || '').toLowerCase().includes('entrada') || (m.tipo_movimiento || '').toLowerCase().includes('compra') || (m.tipo_movimiento || '').toLowerCase().includes('inicial') || m.proveedor_nombre || m.numero_factura_recibo )">
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shadow-2xs"
-                                        :title="m.proveedor_nombre ? 'Proveedor: ' + m.proveedor_nombre + (m.numero_factura_recibo ? ' | Doc: ' + m.numero_factura_recibo : '') : 'Entrada por Compra'">
-                                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h2"/>
-                                        </svg>
-                                        <span class="truncate max-w-[200px]" x-text="m.proveedor_nombre ? m.proveedor_nombre + (m.numero_factura_recibo ? ' · ' + m.numero_factura_recibo : '') : (m.numero_factura_recibo ? 'Doc: ' + m.numero_factura_recibo : 'Entrada / Compra')"></span>
-                                    </span>
+                                    <div class="inline-flex items-center gap-1.5 flex-wrap">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 shadow-2xs"
+                                            :title="m.proveedor_nombre ? 'Proveedor: ' + m.proveedor_nombre + (m.numero_factura_recibo ? ' | Doc: ' + m.numero_factura_recibo : '') : 'Entrada por Compra'">
+                                            <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h2"/>
+                                            </svg>
+                                            <template x-if="m.proveedor_nombre">
+                                                <span>Proveedor: <strong class="text-emerald-800 dark:text-emerald-200 font-semibold" x-text="m.proveedor_nombre"></strong></span>
+                                            </template>
+                                            <template x-if="!m.proveedor_nombre">
+                                                <span>Entrada / Compra</span>
+                                            </template>
+                                        </span>
+                                        <template x-if="m.numero_factura_recibo">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                                x-text="'Doc: ' + m.numero_factura_recibo"></span>
+                                        </template>
+                                    </div>
                                 </template>
 
                                 <!-- 4. Caso Ajuste Manual: Chip Ámbar con Ícono de Ajuste -->
@@ -296,15 +284,21 @@
                             </td>
 
                             <!-- Cantidad (Alineación Tabular Derecha y Color Correcto) -->
-                            <td class="py-3 px-4 text-right font-bold tabular-nums whitespace-nowrap"
-                                :class="isKardexMerma(m)
-                                    ? 'text-rose-600 dark:text-rose-400' 
-                                    : ((m.tipo_movimiento || '').toLowerCase().includes('entrada') || (m.tipo_movimiento || '').toLowerCase().includes('inicial') || (m.tipo_movimiento || '').toLowerCase().includes('compra')
-                                        ? 'text-emerald-600 dark:text-emerald-400' 
-                                        : ((m.tipo_movimiento || '').toLowerCase().includes('ajuste') 
-                                            ? 'text-amber-600 dark:text-amber-400' 
-                                            : 'text-blue-600 dark:text-blue-400'))"
-                                x-text="((m.tipo_movimiento || '').toLowerCase().includes('entrada') || (m.tipo_movimiento || '').toLowerCase().includes('inicial') || (m.tipo_movimiento || '').toLowerCase().includes('compra') ? '+' : ((m.tipo_movimiento || '').toLowerCase().includes('ajuste') ? '' : '-')) + (m.cantidad_movimimiento || m.cantidad_movimiento) + ' uds.'">
+                            <td class="py-3 px-4 text-right tabular-nums whitespace-nowrap">
+                                <div class="font-bold text-sm"
+                                    :class="isKardexMerma(m)
+                                        ? 'text-rose-600 dark:text-rose-400' 
+                                        : ((m.tipo_movimiento || '').toLowerCase().includes('entrada') || (m.tipo_movimiento || '').toLowerCase().includes('inicial') || (m.tipo_movimiento || '').toLowerCase().includes('compra')
+                                            ? 'text-emerald-600 dark:text-emerald-400' 
+                                            : ((m.tipo_movimiento || '').toLowerCase().includes('ajuste') 
+                                                ? 'text-amber-600 dark:text-amber-400' 
+                                                : 'text-blue-600 dark:text-blue-400'))"
+                                    x-text="((m.tipo_movimiento || '').toLowerCase().includes('entrada') || (m.tipo_movimiento || '').toLowerCase().includes('inicial') || (m.tipo_movimiento || '').toLowerCase().includes('compra') ? '+' : ((m.tipo_movimiento || '').toLowerCase().includes('ajuste') ? '' : '-')) + (m.cantidad_movimimiento || m.cantidad_movimiento) + ' uds.'">
+                                </div>
+                                <template x-if="isKardexMerma(m)">
+                                    <div class="text-[11px] font-mono text-rose-500/90 dark:text-rose-400/90 font-medium"
+                                        x-text="'- ' + formatCurrency(m.costo_total_perdida || ((m.cantidad_movimimiento || m.cantidad_movimiento || 0) * (m.producto?.costo_compra || m.costo_unitario || 0)))"></div>
+                                </template>
                             </td>
 
                             <!-- Stock Previo -->
