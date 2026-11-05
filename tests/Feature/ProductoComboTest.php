@@ -528,5 +528,40 @@ class ProductoComboTest extends TestCase
             'tipo_producto' => 'estandar',
             'existencia_bodega' => 15,
         ]);
+        $this->assertDatabaseHas('movimiento_inventario', [
+            'tipo_movimiento' => 'Entrada',
+            'cantidad_movimimiento' => 15,
+            'stock_anterior_producto' => 0,
+            'stock_resultante_producto' => 15,
+        ]);
+    }
+
+    public function test_registro_de_producto_con_proveedor_crea_movimiento_kardex_con_proveedor()
+    {
+        $res = $this->actingAs($this->admin)->postJson('/api/productos', [
+            'id_categoria' => $this->categoria->categoria_id,
+            'codigo_producto' => 'PROD-PROV-001',
+            'nombre_producto' => 'Jugo Natural Naranja',
+            'tipo_producto' => 'estandar',
+            'descripcion_producto' => 'Jugo 1L',
+            'costo_compra' => 25.00,
+            'precio_venta' => 40.00,
+            'existencia_bodega' => 20,
+            'existencia_minima' => 5,
+            'proveedor_nombre' => 'Distribuidora Frutas del Campo',
+            'numero_factura_recibo' => 'FAC-9876',
+            'estado' => 1,
+        ]);
+
+        $res->assertStatus(201);
+        $prodId = $res->json('producto_id');
+
+        $this->assertDatabaseHas('movimiento_inventario', [
+            'id_producto' => $prodId,
+            'tipo_movimiento' => 'Entrada',
+            'cantidad_movimimiento' => 20,
+            'proveedor_nombre' => 'Distribuidora Frutas del Campo',
+            'numero_factura_recibo' => 'FAC-9876',
+        ]);
     }
 }

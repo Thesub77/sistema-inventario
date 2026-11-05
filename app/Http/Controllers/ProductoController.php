@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Movimiento_inventario;
 use App\Models\Producto;
 use App\Models\ProductoComboItem;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -68,8 +69,12 @@ class ProductoController extends Controller
         $validated = $this->validateProducto($request);
         $validated['estado'] = $validated['estado'] ?? 1;
 
+        $proveedorNombre = $request->filled('proveedor_nombre') ? mb_substr(trim($request->input('proveedor_nombre')), 0, 128) : null;
+        $numeroFactura = $request->filled('numero_factura_recibo') ? mb_substr(trim($request->input('numero_factura_recibo')), 0, 64) : null;
+        unset($validated['proveedor_nombre'], $validated['numero_factura_recibo']);
+
         try {
-            $producto = DB::transaction(function () use ($validated) {
+            $producto = DB::transaction(function () use ($validated, $request, $proveedorNombre, $numeroFactura) {
                 $esCombo = ($validated['tipo_producto'] ?? 'estandar') === 'combo';
                 if ($esCombo) {
                     $validated['existencia_bodega'] = 0;
@@ -88,6 +93,23 @@ class ProductoController extends Controller
                             'cantidad' => $item['cantidad'],
                         ]);
                     }
+                }
+
+                // Si se crea un producto estándar con existencias iniciales, se genera su movimiento de entrada formal en Kardex
+                if (! $esCombo && (int) $producto->existencia_bodega > 0) {
+                    Movimiento_inventario::create([
+                        'id_producto' => $producto->producto_id,
+                        'id_usuario' => auth()->id() ?? (int) $request->input('id_usuario', 1),
+                        'tipo_movimiento' => 'Entrada',
+                        'cantidad_movimimiento' => (int) $producto->existencia_bodega,
+                        'stock_anterior_producto' => 0,
+                        'stock_resultante_producto' => (int) $producto->existencia_bodega,
+                        'costo_unitario' => $producto->costo_compra,
+                        'proveedor_nombre' => $proveedorNombre,
+                        'numero_factura_recibo' => $numeroFactura,
+                        'fecha_movimiento' => now(),
+                        'estado' => 1,
+                    ]);
                 }
 
                 return $producto->load(['categoria', 'comboItems.componente']);
@@ -246,6 +268,8 @@ class ProductoController extends Controller
             'existencia_bodega' => $esCombo ? ['nullable', 'integer', 'min:0', 'max:2147483647'] : [...$presencia, 'integer', 'min:0', 'max:2147483647'],
             'existencia_minima' => [...$presencia, 'integer', 'min:0', 'max:2147483647'],
             'estado' => ['sometimes', 'integer', 'in:0,1'],
+            'proveedor_nombre' => ['nullable', 'string', 'max:128'],
+            'numero_factura_recibo' => ['nullable', 'string', 'max:64'],
         ];
 
         if ($esCombo) {
