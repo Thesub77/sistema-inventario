@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>FacturaStock Pro - Sistema de Inventario y Facturación</title>
+    <title>SIFEI - Sistema Integral de Facturación, Existencias e Inventario</title>
 
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,12 +68,37 @@
                 <!-- Brand Logo y Botón de Ocultar en Pantallas Pequeñas -->
                 <div class="h-16 flex items-center justify-between px-6 border-b border-slate-800">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/30 flex-shrink-0">
-                            <i data-lucide="boxes" class="w-5 h-5"></i>
+                        <!-- Isotipo Oficial SIFEI (Hexágono Isométrico Vectorial con Cinta S) -->
+                        <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-10 h-10 drop-shadow-[0_2px_10px_rgba(37,99,235,0.35)]" viewBox="0 0 100 114" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <linearGradient id="sifeiBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#60A5FA"/>
+                                        <stop offset="50%" stop-color="#2563EB"/>
+                                        <stop offset="100%" stop-color="#1D4ED8"/>
+                                    </linearGradient>
+                                    <linearGradient id="sifeiGreen" x1="100%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#86EFAC"/>
+                                        <stop offset="45%" stop-color="#22C55E"/>
+                                        <stop offset="100%" stop-color="#15803D"/>
+                                    </linearGradient>
+                                </defs>
+                                <!-- Pliegue Azul Exterior y Diagonal Central -->
+                                <path fill="url(#sifeiBlue)" d="M49.5 0.5C52 0.5 55 1.5 57 2.8L95.5 25C98.5 27 100 29 100 32V58L81.5 47V37L53 21L19.5 40V50L55 71L58 73.5L47.5 79.5L20 64V78.5L43 92.5L63.5 105L53 111.5C51 112.5 49 112.5 47 111.5L3.5 86C1 84 0 81.5 0 78.5V35.5C0 31.5 1.5 28.5 4.5 26.5L45 1.5C46.5 0.8 48 0.5 49.5 0.5Z"/>
+                                <!-- Pliegue Verde Esmeralda (Cinta 'S') -->
+                                <path fill="url(#sifeiGreen)" d="M54 31L96 56.5C98.8 58.2 100 60.5 100 63.5V81C100 84.5 98.5 87 95.5 89L64 106L58.5 102.5L44 93.5L81 72V69.5L40 44.5C37.5 42.5 37.5 40 39 38L51 31.2C52 30.7 53 30.7 54 31Z"/>
+                            </svg>
                         </div>
                         <div>
-                            <h1 class="font-display font-bold text-base tracking-wide text-white leading-none">Factura<span class="text-brand-400">Stock</span></h1>
-                            <span class="text-[11px] text-slate-400 font-medium">Gestión & Facturación</span>
+                            <h1 class="font-display font-bold text-base tracking-wide leading-none transition-colors"
+                                :class="darkMode ? 'text-white' : 'text-black'">
+                                SIFEI
+                            </h1>
+                            <span class="text-[10px] font-medium leading-none block mt-1 transition-colors"
+                                  :class="darkMode ? 'text-white' : 'text-black'"
+                                  title="Sistema Integral de Facturación, Existencias e Inventario">
+                                Facturación & Inventario
+                            </span>
                         </div>
                     </div>
 

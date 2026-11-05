@@ -166,7 +166,7 @@
             <!-- Pie de Factura / Agradecimiento -->
             <div class="text-center text-[10px] text-black space-y-1">
                 <p class="font-bold text-black" x-text="receiptEmpresa?.mensaje_pie_ticket || receiptData?.empresa?.mensaje_pie_ticket || '¡GRACIAS POR SU COMPRA!'"></p>
-                <p class="text-[9px] text-black">Factura emitida electrónicamente</p>
+                <p class="text-[9px] text-neutral-600">Factura emitida electrónicamente mediante SIFEI</p>
             </div>
         </div>
 
