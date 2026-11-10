@@ -208,21 +208,15 @@
 
                             <!-- Motivo / Referencia (Diseño Uniforme por Tipo de Motivo) -->
                             <td class="py-3 px-4 whitespace-nowrap">
-                                <!-- 1. Caso Merma / Rotura / Accidente: Chip Rojo con Causa y Pérdida Monetaria -->
+                                <!-- 1. Caso Merma / Rotura / Accidente: Chip Rojo con Ícono de Advertencia -->
                                 <template x-if="isKardexMerma(m)">
-                                    <div class="inline-flex items-center gap-1.5 flex-wrap">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 shadow-2xs"
-                                            :title="'Causa de Merma: ' + getKardexMotivoLabel(m)">
-                                            <svg class="w-3.5 h-3.5 flex-shrink-0 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                            </svg>
-                                            <span x-text="getKardexMotivoLabel(m)"></span>
-                                        </span>
-                                        <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-bold font-mono rounded bg-rose-100/90 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-200/90 dark:border-rose-500/30"
-                                            title="Pérdida monetaria calculada al costo de adquisición"
-                                            x-text="'Pérdida: ' + formatCurrency(m.costo_total_perdida || ((m.cantidad_movimimiento || m.cantidad_movimiento || 0) * (m.producto?.costo_compra || m.costo_unitario || 0)))">
-                                        </span>
-                                    </div>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 shadow-2xs"
+                                        :title="'Causa de Merma: ' + getKardexMotivoLabel(m)">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                        </svg>
+                                        <span x-text="getKardexMotivoLabel(m)"></span>
+                                    </span>
                                 </template>
 
                                 <!-- 2. Caso Venta: Chip Azul con Ícono de Carrito POS -->

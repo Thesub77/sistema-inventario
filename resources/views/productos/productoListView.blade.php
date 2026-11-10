@@ -11,17 +11,18 @@
 
 <div x-show="currentTab === 'productos'" x-cloak class="space-y-5">
     <!-- Filters & Actions Header -->
-    <div class="flex flex-col md:flex-row items-center justify-between gap-4 glass-panel p-4 rounded-2xl">
-        <div class="flex items-center gap-3 w-full md:w-auto">
+    <div class="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <!-- Filtros y Búsqueda -->
+        <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
             <!-- Search -->
-            <div class="relative flex-1 md:w-80">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <div class="relative flex-1 min-w-[200px] sm:min-w-[240px] max-w-md">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 <input type="text" x-model="searchProduct" placeholder="Buscar por código, nombre..."
-                    class="w-full bg-dark-900 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500">
+                    class="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-brand-500 transition-colors">
             </div>
 
             <!-- Category Filter -->
-            <select x-model="filterCategory" class="bg-dark-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            <select x-model="filterCategory" class="w-full sm:w-auto bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-brand-500 transition-colors cursor-pointer">
                 <option value="">Todas las categorías</option>
                 <template x-for="cat in categorias" :key="cat.categoria_id">
                     <option :value="cat.categoria_id" x-text="cat.nombre_categoria"></option>
@@ -29,19 +30,20 @@
             </select>
 
             <!-- Product Type Filter (Estándar / Combo) -->
-            <select x-model="filterTipoProducto" class="bg-dark-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            <select x-model="filterTipoProducto" class="w-full sm:w-auto bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-brand-500 transition-colors cursor-pointer">
                 <option value="">Todos los tipos</option>
                 <option value="estandar">Individuales / Estándar</option>
                 <option value="combo">Combos / Compuestos</option>
             </select>
         </div>
 
-        <div class="flex items-center gap-2 w-full md:w-auto">
-            <button type="button" @click="openKardexModal(null)" class="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700/80 transition-all cursor-pointer" title="Ver historial de todos los movimientos de stock">
+        <!-- Botones de Acción -->
+        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-start sm:justify-end shrink-0">
+            <button type="button" @click="openKardexModal(null)" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-dark-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700/80 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-xs" title="Ver historial de todos los movimientos de stock">
                 <i data-lucide="history" class="w-4 h-4 text-brand-500"></i>
                 <span>Movimientos de Stock</span>
             </button>
-            <button @click="openProductModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all cursor-pointer">
+            <button @click="openProductModal()" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all cursor-pointer whitespace-nowrap shrink-0">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
                 <span>Agregar Producto</span>
             </button>
@@ -49,7 +51,7 @@
     </div>
 
     <!-- Products Table -->
-    <div class="glass-panel rounded-2xl overflow-hidden">
+    <div class="glass-panel rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead class="text-xs uppercase bg-dark-900/80 text-slate-400 border-b border-slate-800">
